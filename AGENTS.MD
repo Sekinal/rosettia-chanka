@@ -65,6 +65,8 @@ Current structure:
 Important git convention:
 
 - Do **not** commit data artifacts: PDFs, extracted text, CSV, Parquet, generated datasets, model files, or other large/local data. `data/**` is ignored except `.gitkeep` placeholders.
+- Public processed dataset release: https://huggingface.co/datasets/Thermostatic/rosettia-chanka-data
+- The HF dataset release intentionally does not include the source PDF. It includes processed Parquet artifacts plus metadata only.
 
 ## Working Principles For Future Agents
 
@@ -109,6 +111,7 @@ These are candidate directions, not commitments:
 - Current broad dirty SFT preprocessing script: `scripts/preprocess_somosnlp_dirty_parallel.py`.
 - The SomosNLP 2022 Spanish-to-Quechua Hugging Face dataset should be treated as broad, noisy Quechua translation data only. It is not Chanka-verified, and the visible dataset card did not expose a clear license during initial review. Keep its outputs in a separate tier from reviewed Chanka data.
 - Current SomosNLP dirty preprocessing run: 128,434 raw rows, 123,839 unique normalized pairs, 82,873 strict high-quality SFT rows, and 111,699 broad backup SFT rows. Generated outputs are git-ignored under `data/`.
+- Current HF dataset release: `Thermostatic/rosettia-chanka-data`, public. Uploaded files include clean Chanka reviewed/training/glossary Parquets and broad Quechua filtered/scored Parquets. No PDF was uploaded.
 - Web search on 2026-05-18 found a strong Chanka source pool:
   - MINEDU DSpace subject browse has 109 `Quechua Chanka` items; many records expose CC BY 4.0/open access metadata, but embedded PDF rights text may conflict and must be recorded per source.
   - Best near-term parallel candidates are official gob.pe translated PDF pairs from Indecopi, MINJUS/TTAIP, SUNASS, CONTIGO, and ANA.

@@ -4,6 +4,21 @@ RosettIA is a SomosNLP 2026 hackathon project focused on open-source translation
 
 The first milestone is a Spanish <-> Chanka Quechua parallel corpus extracted from public, reusable source material with explicit provenance.
 
+## Public Dataset
+
+Processed dataset artifacts are published on Hugging Face:
+
+https://huggingface.co/datasets/Thermostatic/rosettia-chanka-data
+
+The source PDF is not uploaded. The release includes:
+
+- `clean_chanka/manual_quechua_chanka_parallel_training_ready_augmented.parquet`: 1,055 reviewed Spanish-Chanka Quechua pairs.
+- `clean_chanka/manual_quechua_chanka_parallel_reviewed.parquet`: reviewed extraction rows with decisions and flags.
+- `clean_chanka/*glossary*.parquet`: glossary and simple term-pair artifacts.
+- `broad_quechua/somosnlp_spanish_to_quechua_high_quality_sft.parquet`: 82,873 strict filtered broad Spanish-Quechua pairs derived from the public SomosNLP dataset.
+
+Treat `clean_chanka/` and `broad_quechua/` as separate training tiers. The broad tier is not Chanka-verified.
+
 ## Setup
 
 ```bash
