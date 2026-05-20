@@ -186,9 +186,9 @@ def main() -> None:
     args = parse_args()
     stage_defaults(args)
 
+    from unsloth import FastLanguageModel
     import torch
     from trl import SFTConfig, SFTTrainer
-    from unsloth import FastLanguageModel
 
     if args.wandb_project:
         import os
@@ -241,11 +241,11 @@ def main() -> None:
 
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         args=SFTConfig(
-            max_seq_length=args.max_seq_length,
+            max_length=args.max_seq_length,
             dataset_text_field="text",
             packing=args.packing,
             per_device_train_batch_size=args.per_device_train_batch_size,
