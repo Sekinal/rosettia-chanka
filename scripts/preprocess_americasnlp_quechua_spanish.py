@@ -39,8 +39,8 @@ LINE_FILES = {
 }
 TSV_FILES = {
     "extra": "extra.tsv",
-    "synthetic": "synthetic.tsv",
 }
+SYNTHETIC_FILE = "synthetic.tsv"
 
 
 def download_file(filename: str, raw_dir: Path) -> Path:
@@ -97,18 +97,22 @@ def read_tsv(subset: str, path: Path) -> list[dict[str, object]]:
     return rows
 
 
-def load_raw_dataset(raw_dir: Path) -> pl.DataFrame:
+def load_raw_dataset(raw_dir: Path, include_synthetic: bool = False) -> pl.DataFrame:
     for filename_pair in LINE_FILES.values():
         for filename in filename_pair:
             download_file(filename, raw_dir)
     for filename in TSV_FILES.values():
         download_file(filename, raw_dir)
+    if include_synthetic:
+        download_file(SYNTHETIC_FILE, raw_dir)
 
     rows: list[dict[str, object]] = []
     for subset, (es_filename, quy_filename) in LINE_FILES.items():
         rows.extend(read_parallel_lines(subset, raw_dir / es_filename, raw_dir / quy_filename))
     for subset, filename in TSV_FILES.items():
         rows.extend(read_tsv(subset, raw_dir / filename))
+    if include_synthetic:
+        rows.extend(read_tsv("synthetic", raw_dir / SYNTHETIC_FILE))
     return pl.DataFrame(rows)
 
 
@@ -161,10 +165,6 @@ def write_report(raw: pl.DataFrame, processed: pl.DataFrame, output_path: Path) 
         .sort("len", descending=True)
     )
     hq_real = processed.filter(pl.col("passes_high_quality_filters") & pl.col("is_real_training_source"))
-    hq_with_synth = processed.filter(
-        pl.col("passes_high_quality_filters")
-        & (pl.col("is_real_training_source") | pl.col("is_synthetic_source"))
-    )
     eval_rows = processed.filter(pl.col("is_eval_source"))
 
     lines = [
@@ -174,7 +174,6 @@ def write_report(raw: pl.DataFrame, processed: pl.DataFrame, output_path: Path) 
         f"Raw aligned rows loaded: {raw.height:,}",
         f"Unique normalized pairs: {processed.height:,}",
         f"High-quality real SFT rows: {hq_real.height:,}",
-        f"High-quality real+synthetic SFT rows: {hq_with_synth.height:,}",
         f"Evaluation rows: {eval_rows.height:,}",
         "",
         "## Subset Counts",
@@ -202,6 +201,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-words", type=int, default=FilterConfig.min_words)
     parser.add_argument("--min-length-ratio", type=float, default=FilterConfig.min_length_ratio)
     parser.add_argument("--max-length-ratio", type=float, default=FilterConfig.max_length_ratio)
+    parser.add_argument(
+        "--include-synthetic",
+        action="store_true",
+        help="Also download/process synthetic.tsv and write the synthetic-inclusive SFT artifact.",
+    )
     return parser.parse_args()
 
 
@@ -215,13 +219,9 @@ def main() -> None:
         max_length_ratio=args.max_length_ratio,
     )
 
-    raw = load_raw_dataset(args.raw_dir)
+    raw = load_raw_dataset(args.raw_dir, include_synthetic=args.include_synthetic)
     processed = preprocess(raw, config)
     hq_real = processed.filter(pl.col("passes_high_quality_filters") & pl.col("is_real_training_source"))
-    hq_with_synth = processed.filter(
-        pl.col("passes_high_quality_filters")
-        & (pl.col("is_real_training_source") | pl.col("is_synthetic_source"))
-    )
     eval_rows = processed.filter(pl.col("is_eval_source"))
 
     args.processed_dir.mkdir(parents=True, exist_ok=True)
@@ -229,12 +229,17 @@ def main() -> None:
     processed.write_csv(args.processed_dir / "americasnlp_quechua_spanish_scored.csv")
     hq_real.write_parquet(args.processed_dir / "americasnlp_quechua_spanish_high_quality_real_sft.parquet")
     hq_real.write_csv(args.processed_dir / "americasnlp_quechua_spanish_high_quality_real_sft.csv")
-    hq_with_synth.write_parquet(
-        args.processed_dir / "americasnlp_quechua_spanish_high_quality_with_synthetic_sft.parquet"
-    )
-    hq_with_synth.write_csv(
-        args.processed_dir / "americasnlp_quechua_spanish_high_quality_with_synthetic_sft.csv"
-    )
+    if args.include_synthetic:
+        hq_with_synth = processed.filter(
+            pl.col("passes_high_quality_filters")
+            & (pl.col("is_real_training_source") | pl.col("is_synthetic_source"))
+        )
+        hq_with_synth.write_parquet(
+            args.processed_dir / "americasnlp_quechua_spanish_high_quality_with_synthetic_sft.parquet"
+        )
+        hq_with_synth.write_csv(
+            args.processed_dir / "americasnlp_quechua_spanish_high_quality_with_synthetic_sft.csv"
+        )
     eval_rows.write_parquet(args.processed_dir / "americasnlp_quechua_spanish_eval.parquet")
     eval_rows.write_csv(args.processed_dir / "americasnlp_quechua_spanish_eval.csv")
     write_report(raw, processed, args.report_path)
@@ -242,7 +247,8 @@ def main() -> None:
     print(f"Raw aligned rows loaded: {raw.height:,}")
     print(f"Unique normalized pairs: {processed.height:,}")
     print(f"High-quality real SFT rows: {hq_real.height:,}")
-    print(f"High-quality real+synthetic SFT rows: {hq_with_synth.height:,}")
+    if args.include_synthetic:
+        print(f"High-quality real+synthetic SFT rows: {hq_with_synth.height:,}")
     print(f"Evaluation rows: {eval_rows.height:,}")
     print(f"Wrote report: {args.report_path}")
 

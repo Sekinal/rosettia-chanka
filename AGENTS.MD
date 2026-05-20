@@ -113,8 +113,9 @@ These are candidate directions, not commitments:
 - Current SomosNLP dirty preprocessing run: 128,434 raw rows, 123,839 unique normalized pairs, 82,873 strict high-quality SFT rows, and 111,699 broad backup SFT rows. Generated outputs are git-ignored under `data/`.
 - Current AmericasNLP source note: `docs/references/americasnlp_quechua_spanish.md`.
 - Current AmericasNLP preprocessing script: `scripts/preprocess_americasnlp_quechua_spanish.py`.
-- AmericasNLP 2024 Quechua-Spanish can be used as another broad adaptation tier with `quy` data, but it is not reviewed Chanka judicial-domain data. Keep real and synthetic subsets separate.
-- Current AmericasNLP preprocessing run: 201,241 raw aligned rows, 194,665 unique normalized pairs, 87,004 high-quality real SFT rows, 107,778 high-quality real+synthetic SFT rows, and 996 eval rows. Generated outputs are git-ignored under `data/`.
+- AmericasNLP 2024 Quechua-Spanish can be used as another broad adaptation tier with `quy` data, but it is not reviewed Chanka judicial-domain data. Keep synthetic/backtranslated data opt-in only.
+- Current AmericasNLP real-source preprocessing run: 142,116 raw aligned rows, 135,566 unique normalized pairs, 87,004 high-quality real SFT rows, and 996 eval rows. Generated outputs are git-ignored under `data/`. Synthetic/backtranslated data is opt-in only via `--include-synthetic`.
+- Current broader data-source research note: `docs/references/other_parallel_data_candidates.md`. Best next candidates are FLORES `spa_Latn`/`quy_Latn` for evaluation, PanLex Chanka/Ayacucho CC0 lexical data for terminology/reward features, and IWSLT only for restricted experiments because of NC/ND licensing.
 - Current HF dataset release: `Thermostatic/rosettia-chanka-data`, public. Uploaded files include clean Chanka reviewed/training/glossary Parquets and broad Quechua filtered/scored Parquets. No PDF was uploaded.
 - Web search on 2026-05-18 found a strong Chanka source pool:
   - MINEDU DSpace subject browse has 109 `Quechua Chanka` items; many records expose CC BY 4.0/open access metadata, but embedded PDF rights text may conflict and must be recorded per source.

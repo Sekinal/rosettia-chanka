@@ -136,19 +136,17 @@ This downloads source files from the AmericasNLP GitHub repo and writes local, g
 
 - `data/processed/americasnlp_quechua_spanish_scored.parquet`
 - `data/processed/americasnlp_quechua_spanish_high_quality_real_sft.parquet`
-- `data/processed/americasnlp_quechua_spanish_high_quality_with_synthetic_sft.parquet`
 - `data/processed/americasnlp_quechua_spanish_eval.parquet`
 - `data/interim/americasnlp_quechua_spanish_preprocess_report.md`
 
 Current run counts:
 
-- Raw aligned rows loaded: 201,241.
-- Unique normalized pairs: 194,665.
+- Raw aligned rows loaded: 142,116.
+- Unique normalized pairs: 135,566.
 - High-quality real SFT rows: 87,004.
-- High-quality real+synthetic SFT rows: 107,778.
 - Evaluation rows: 996.
 
-Prefer the real-only SFT file first, then use the synthetic-inclusive file for ablations if it helps. See `docs/references/americasnlp_quechua_spanish.md`.
+Use the real-only SFT file for now. Synthetic/backtranslated data is opt-in for local ablations via `--include-synthetic`; it is not part of the public release. See `docs/references/americasnlp_quechua_spanish.md`.
 
 ## Data Policy
 

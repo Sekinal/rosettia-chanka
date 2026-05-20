@@ -17,14 +17,14 @@ Observed files:
 - `test.es`: 1,003 Spanish-only input lines in the public repo.
 - `dict.es` / `dict.quy`: 9,643 aligned dictionary/example lines.
 - `extra.tsv`: 6,469 additional aligned rows.
-- `synthetic.tsv`: 60,399 synthetic/backtranslated rows.
+- `synthetic.tsv`: 60,399 synthetic/backtranslated rows. This is intentionally excluded by default.
 
 ## Caveats
 
 - This is not reviewed Chanka judicial-domain data.
 - The training data is broad shared-task data. The README says only JW300 (`quy`) is included in `train.es` / `train.quy`.
 - Repository metadata did not expose a top-level GitHub license during initial review. Keep license/provenance visible before redistribution.
-- Keep real and synthetic sources separate in experiments.
+- Keep real and synthetic sources separate in experiments. For now, the public workflow keeps only real-source AmericasNLP data.
 
 ## Preprocessing
 
@@ -38,8 +38,13 @@ The script downloads source files into `data/raw/github/americasnlp2024/quechua-
 
 - `data/processed/americasnlp_quechua_spanish_scored.parquet`
 - `data/processed/americasnlp_quechua_spanish_high_quality_real_sft.parquet`
-- `data/processed/americasnlp_quechua_spanish_high_quality_with_synthetic_sft.parquet`
 - `data/processed/americasnlp_quechua_spanish_eval.parquet`
 - `data/interim/americasnlp_quechua_spanish_preprocess_report.md`
 
 All generated outputs are ignored by git.
+
+Synthetic/backtranslated data can be included only for local ablations:
+
+```bash
+uv run python scripts/preprocess_americasnlp_quechua_spanish.py --include-synthetic
+```
