@@ -117,6 +117,9 @@ These are candidate directions, not commitments:
 - Current AmericasNLP real-source preprocessing run: 142,116 raw aligned rows, 135,566 unique normalized pairs, 87,004 high-quality real SFT rows, and 996 eval rows. Generated outputs are git-ignored under `data/`. Synthetic/backtranslated data is opt-in only via `--include-synthetic`.
 - Current broader data-source research note: `docs/references/other_parallel_data_candidates.md`. Best next candidates are FLORES `spa_Latn`/`quy_Latn` for evaluation, PanLex Chanka/Ayacucho CC0 lexical data for terminology/reward features, and IWSLT only for restricted experiments because of NC/ND licensing.
 - Current HF dataset release: `Thermostatic/rosettia-chanka-data`, public. Uploaded files include clean Chanka reviewed/training/glossary Parquets and broad Quechua filtered/scored Parquets. No PDF was uploaded.
+- Current SFT training script: `scripts/train_sft_unsloth.py`.
+- Current SFT training note: `docs/unsloth_sft.md`.
+- Unsloth official Qwen3.5 docs say QLoRA/4-bit training is not recommended for Qwen3.5. Use 16-bit LoRA with `load_in_4bit=False`, `load_in_16bit=True`, `use_gradient_checkpointing="unsloth"`, and validation enabled. The script creates eval splits, selects best checkpoints by `eval_loss`, and can continue Chanka SFT from the broad LoRA with `--adapter-path`.
 - Web search on 2026-05-18 found a strong Chanka source pool:
   - MINEDU DSpace subject browse has 109 `Quechua Chanka` items; many records expose CC BY 4.0/open access metadata, but embedded PDF rights text may conflict and must be recorded per source.
   - Best near-term parallel candidates are official gob.pe translated PDF pairs from Indecopi, MINJUS/TTAIP, SUNASS, CONTIGO, and ANA.

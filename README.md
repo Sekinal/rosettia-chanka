@@ -148,6 +148,14 @@ Current run counts:
 
 Use the real-only SFT file for now. Synthetic/backtranslated data is opt-in for local ablations via `--include-synthetic`; it is not part of the public release. See `docs/references/americasnlp_quechua_spanish.md`.
 
+## Train With Unsloth SFT
+
+SFT scripts for Qwen3.5 4B LoRA training are in `scripts/train_sft_unsloth.py`. The Chanka pass can continue from the broad adapter with `--adapter-path`.
+
+The workflow uses 16-bit LoRA, not QLoRA, and every run includes a validation split with best-checkpoint selection by `eval_loss`.
+
+See `docs/unsloth_sft.md`.
+
 ## Data Policy
 
 Do not commit source PDFs, extracted text, CSV files, Parquet files, or other data artifacts. Keep data local unless the team explicitly prepares a release package with the right citation and license language.
