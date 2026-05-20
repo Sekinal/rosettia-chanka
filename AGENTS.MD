@@ -120,6 +120,7 @@ These are candidate directions, not commitments:
 - Current SFT training script: `scripts/train_sft_unsloth.py`.
 - Current SFT training note: `docs/unsloth_sft.md`.
 - Unsloth official Qwen3.5 docs say QLoRA/4-bit training is not recommended for Qwen3.5. Use 16-bit LoRA with `load_in_4bit=False`, `load_in_16bit=True`, `use_gradient_checkpointing="unsloth"`, and validation enabled. The script creates eval splits, selects best checkpoints by `eval_loss`, and can continue Chanka SFT from the broad LoRA with `--adapter-path`.
+- Remote SFT setup on `root@91.224.44.81 -p 20899`: repo path `/root/rosettia-chanka`, venv `.venv`, GPU `NVIDIA GeForce RTX 3090` with Torch `2.10.0+cu128`, Unsloth `2026.5.5`, Polars `1.40.1`. Smoke test passed on 2026-05-20 with `--stage broad --max-train-samples 32 --max-eval-samples 8 --max-steps 2 --eval-steps 1 --save-steps 1 --output-dir outputs/smoke`; validation ran during training, checkpoints were saved, and `outputs/smoke/broad/final_lora` was produced. Flash Attention 2 was not installed, so Unsloth used XFormers fallback.
 - Web search on 2026-05-18 found a strong Chanka source pool:
   - MINEDU DSpace subject browse has 109 `Quechua Chanka` items; many records expose CC BY 4.0/open access metadata, but embedded PDF rights text may conflict and must be recorded per source.
   - Best near-term parallel candidates are official gob.pe translated PDF pairs from Indecopi, MINJUS/TTAIP, SUNASS, CONTIGO, and ANA.

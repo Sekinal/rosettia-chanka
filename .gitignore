@@ -13,3 +13,7 @@ wheels/
 data/**
 !data/**/
 !data/**/.gitkeep
+
+# Training artifacts and compiled kernels.
+outputs/
+unsloth_compiled_cache/

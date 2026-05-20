@@ -47,6 +47,8 @@ python scripts/train_sft_unsloth.py \
   --output-dir outputs/smoke
 ```
 
+This smoke test passed on the RTX 3090 server on 2026-05-20. The first run downloads and caches the model, so it is much slower than later runs. Flash Attention 2 was not installed on that server, so Unsloth used the XFormers fallback.
+
 ## Broad SFT
 
 ```bash
