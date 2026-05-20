@@ -105,6 +105,10 @@ These are candidate directions, not commitments:
 - Current split-alternative result: 37 slash-alternative rows split into 81 clean rows. Augmented training-ready corpus has 1,055 pairs and no slash markers.
 - Current glossary result: 423 terminology entries from the vocabulary sections, including 219 simple term pairs. Keep glossary artifacts separate from sentence-pair training unless a deliberate formatting strategy is chosen.
 - Current external-source research note: `docs/source_inventory_chanka.md`.
+- Current broad dirty SFT source note: `docs/references/somosnlp_spanish_to_quechua_dirty.md`.
+- Current broad dirty SFT preprocessing script: `scripts/preprocess_somosnlp_dirty_parallel.py`.
+- The SomosNLP 2022 Spanish-to-Quechua Hugging Face dataset should be treated as broad, noisy Quechua translation data only. It is not Chanka-verified, and the visible dataset card did not expose a clear license during initial review. Keep its outputs in a separate tier from reviewed Chanka data.
+- Current SomosNLP dirty preprocessing run: 128,434 raw rows, 123,839 unique normalized pairs, 82,873 strict high-quality SFT rows, and 111,699 broad backup SFT rows. Generated outputs are git-ignored under `data/`.
 - Web search on 2026-05-18 found a strong Chanka source pool:
   - MINEDU DSpace subject browse has 109 `Quechua Chanka` items; many records expose CC BY 4.0/open access metadata, but embedded PDF rights text may conflict and must be recorded per source.
   - Best near-term parallel candidates are official gob.pe translated PDF pairs from Indecopi, MINJUS/TTAIP, SUNASS, CONTIGO, and ANA.

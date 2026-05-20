@@ -89,6 +89,26 @@ This writes local, git-ignored terminology artifacts:
 
 The glossary is kept separate from sentence-pair training data. It is useful for terminology, retrieval, evaluation, and later augmentation.
 
+## Preprocess Dirty Broad Quechua SFT Data
+
+The SomosNLP 2022 Spanish-to-Quechua Hugging Face dataset is useful as broad, dirty translation SFT data before the clean Chanka judicial fine-tune. It is **not** treated as Chanka-verified data.
+
+```bash
+uv run python scripts/preprocess_somosnlp_dirty_parallel.py
+```
+
+This downloads the Hugging Face Parquet split files into `data/raw/huggingface/somosnlp_spanish_to_quechua/` and writes local, git-ignored artifacts:
+
+- `data/processed/somosnlp_spanish_to_quechua_scored.csv`
+- `data/processed/somosnlp_spanish_to_quechua_scored.parquet`
+- `data/processed/somosnlp_spanish_to_quechua_high_quality_sft.csv`
+- `data/processed/somosnlp_spanish_to_quechua_high_quality_sft.parquet`
+- `data/processed/somosnlp_spanish_to_quechua_broad_sft.csv`
+- `data/processed/somosnlp_spanish_to_quechua_broad_sft.parquet`
+- `data/interim/somosnlp_dirty_preprocess_report.md`
+
+The primary SFT subset is strict: it keeps only normalized pairs with no filter flags. A broader backup subset is also written for ablations. See `docs/references/somosnlp_spanish_to_quechua_dirty.md`.
+
 ## Data Policy
 
 Do not commit source PDFs, extracted text, CSV files, Parquet files, or other data artifacts. Keep data local unless the team explicitly prepares a release package with the right citation and license language.
