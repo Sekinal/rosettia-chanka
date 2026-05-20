@@ -1,0 +1,11 @@
+[project]
+name = "rosettia"
+version = "0.1.0"
+description = "Chanka Quechua dataset and translation tooling for the SomosNLP 2026 hackathon"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "polars>=1.40.1",
+    "pyarrow>=24.0.0",
+    "pymupdf>=1.27.2.3",
+]

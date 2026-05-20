@@ -1,0 +1,15 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local data artifacts: source PDFs, extracted text, generated datasets.
+data/**
+!data/**/
+!data/**/.gitkeep
