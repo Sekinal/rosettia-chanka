@@ -124,6 +124,32 @@ This downloads the Hugging Face Parquet split files into `data/raw/huggingface/s
 
 The primary SFT subset is strict: it keeps only normalized pairs with no filter flags. A broader backup subset is also written for ablations. See `docs/references/somosnlp_spanish_to_quechua_dirty.md`.
 
+## Preprocess AmericasNLP Quechua-Spanish Data
+
+AmericasNLP 2024 Quechua-Spanish is another broad adaptation tier with `quy` resources. It is still not reviewed Chanka judicial-domain data.
+
+```bash
+uv run python scripts/preprocess_americasnlp_quechua_spanish.py
+```
+
+This downloads source files from the AmericasNLP GitHub repo and writes local, git-ignored artifacts:
+
+- `data/processed/americasnlp_quechua_spanish_scored.parquet`
+- `data/processed/americasnlp_quechua_spanish_high_quality_real_sft.parquet`
+- `data/processed/americasnlp_quechua_spanish_high_quality_with_synthetic_sft.parquet`
+- `data/processed/americasnlp_quechua_spanish_eval.parquet`
+- `data/interim/americasnlp_quechua_spanish_preprocess_report.md`
+
+Current run counts:
+
+- Raw aligned rows loaded: 201,241.
+- Unique normalized pairs: 194,665.
+- High-quality real SFT rows: 87,004.
+- High-quality real+synthetic SFT rows: 107,778.
+- Evaluation rows: 996.
+
+Prefer the real-only SFT file first, then use the synthetic-inclusive file for ablations if it helps. See `docs/references/americasnlp_quechua_spanish.md`.
+
 ## Data Policy
 
 Do not commit source PDFs, extracted text, CSV files, Parquet files, or other data artifacts. Keep data local unless the team explicitly prepares a release package with the right citation and license language.
