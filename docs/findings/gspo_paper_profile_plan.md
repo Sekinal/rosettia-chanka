@@ -11,7 +11,7 @@ Goal: test paper-inspired GSPO reward profiles independently for general Spanish
 - Training script: `scripts/train_gspo_chanka_unsloth.py`.
 - Prompt: general Spanish to Quechua Chanka translation. It asks for faithful, natural translation and explicitly discourages Spanish copying.
 - Default comparison length: one epoch unless `MAX_STEPS` is set for a smoke run.
-- Selection metric: checkpoint reward plus qualitative samples, not final-step loss alone.
+- Selection metric: checkpoint reward plus qualitative samples, not final-step loss alone. xCOMET-like proxies are useful only as diagnostics/regression guards; they are not a substitute for a Chanka-capable evaluator.
 - Batching: Unsloth GRPO is sensitive to `num_generations`. Keep per-device train and eval batch sizes divisible by `NUM_GENERATIONS`; do not rely on gradient accumulation to fix a non-divisible microbatch.
 
 ## Profiles
@@ -56,7 +56,7 @@ Chained script: `experiments/gspo/run_2511_train_verifier_then_gspo.sh`
 
 Learned-verifier script: `experiments/gspo/run_2511_learned_verifier_gspo.sh`
 
-The verifier path bootstraps labels from clean Chanka pairs plus synthetic corruptions: correct reference translation, source copy, incomplete translation, Spanish leakage, word-order/fluency damage, repetition damage, fluent unrelated Chanka translations, mixed-reference translations, and unsupported Chanka additions. It trains a separate JSON-scoring LoRA verifier with validation enabled. The `learned_verifier_2511` reward profile can then load the verifier LoRA directly in the GSPO reward loop and blend its score with hard anti-copy, anti-leakage, repetition, and reference guards. This is much slower and uses more memory than metric-only rewards, but it is the preferred DeepSeek-style branch now that training cost is not the deciding constraint.
+The verifier path bootstraps labels from clean Chanka pairs plus synthetic corruptions: correct reference translation, source copy, incomplete translation, Spanish leakage, word-order/fluency damage, repetition damage, fluent unrelated Chanka translations, mixed-reference translations, and unsupported Chanka additions. It trains a separate JSON-scoring LoRA verifier with validation enabled. The `learned_verifier_2511` reward profile can then load the verifier LoRA directly in the GSPO reward loop and blend its score with hard anti-copy, anti-leakage, repetition, and reference guards. This is much slower and uses more memory than metric-only rewards, but it is the preferred DeepSeek-style branch now that training cost is not the deciding constraint. If the current verifier is not discriminative enough, the next escalation is a larger or pairwise/listwise verifier trained from multiple candidate translations per source, with hard negatives sampled from every strong GSPO checkpoint.
 
 ### 2511.06221 VibeThinker
 
