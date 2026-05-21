@@ -52,6 +52,8 @@ for checkpoint in 56 112 168 224; do
     "learned_verifier_on_vibe112_checkpoint_${checkpoint}"
 done
 
+python scripts/summarize_gspo_checkpoint_evals.py "outputs/gspo_checkpoint_evals/${STAMP}" || true
+
 common_env=(
   ROOT_DIR="$ROOT_DIR"
   GSPO_REWARD_PROFILE=learned_verifier_vibe_2511
