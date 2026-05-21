@@ -120,9 +120,11 @@ The sweep ranked candidates by external corpus metrics rather than raw trainer r
 
 The first full VibeThinker contender reached `checkpoint-196` with eval reward `0.30345`, but the process later stopped using GPU SM while still holding GPU memory. It had been launched with completion-table logging every two steps. The serious run was restarted from that GSPO checkpoint as `outputs/gspo_full_contenders/vibethinker_2511_continued_no_tables_20260521-083900` with `--no-log-completions` and `MAX_STEPS=1598`, preserving the useful checkpoint progress while avoiding the logging bottleneck. The restarted run produced `checkpoint-28` with eval reward `0.31191` and `checkpoint-56` with eval reward `0.30850`.
 
-After `checkpoint-56`, the VibeThinker run was relaunched with true trainer checkpoint resume via `--resume-from-checkpoint` and validation/checkpoint cadence changed from 28 to 112 steps. Validation remains inside training, but this avoids spending most of the wall time in repeated full validation generations.
+After `checkpoint-56`, the VibeThinker run was relaunched with true trainer checkpoint resume via `--resume-from-checkpoint` and validation/checkpoint cadence changed from 28 to 112 steps. TRL loaded the checkpoint successfully, but preserved the checkpoint's old 28-step eval/save cadence despite the new arguments. That run produced `checkpoint-84` with eval reward `0.30904` and `checkpoint-112` with eval reward `0.31448`.
 
-Hard-negative verifier SFT is running at `outputs/chanka_translation_verifier_hard_r128`. As of checkpoint `684`, the best validation loss remains `0.00255`; current eval loss was about `0.00285`. Treat additional verifier loss gains as secondary to whether the learned verifier improves GSPO outcomes.
+To actually reduce validation overhead, phase 2 was launched as a fresh adapter-seeded continuation from `checkpoint-112`: `outputs/gspo_full_contenders/vibethinker_2511_phase2_from112_eval112_20260521-0909`. It uses `EVAL_STEPS=112`, `SAVE_STEPS=112`, `MAX_STEPS=1486`, `WARMUP_RATIO=0.01`, and `--no-log-completions`.
+
+Hard-negative verifier SFT is running at `outputs/chanka_translation_verifier_hard_r128`. As of checkpoint `1083`, the best validation loss remains `0.002326` from checkpoint `912`; current eval loss was `0.002389`. Treat additional verifier loss gains as secondary to whether the learned verifier improves GSPO outcomes.
 
 ## Caveats
 
