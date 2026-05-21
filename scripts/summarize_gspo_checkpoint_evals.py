@@ -64,8 +64,8 @@ def write_markdown(records: list[dict[str, Any]], path: Path) -> None:
         "",
         "Ranking uses `selection_score` from external corpus metrics. It is a triage score, not a Chanka quality oracle.",
         "",
-        "| Rank | Checkpoint | Selection | chrF++ | BLEU | token F1 | source copy % | exact copy % | leakage % | TER |",
-        "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Rank | Checkpoint | Selection | chrF++ | BLEU | token F1 | source copy % | exact copy % | leakage % | artifact % | TER |",
+        "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for rank, record in enumerate(records, start=1):
         lines.append(
@@ -81,6 +81,7 @@ def write_markdown(records: list[dict[str, Any]], path: Path) -> None:
                     format_value(record.get("source_copy_ratio", 0.0)),
                     format_value(record.get("exact_source_copy_rate", 0.0)),
                     format_value(record.get("spanish_leakage_penalty", 0.0)),
+                    format_value(record.get("chat_artifact_penalty", 0.0)),
                     format_value(record.get("ter", 0.0)),
                 ]
             )

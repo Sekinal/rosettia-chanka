@@ -17,6 +17,7 @@ CORE_METRICS = (
     "exact_source_copy_rate",
     "source_copy_ratio",
     "spanish_leakage_penalty",
+    "chat_artifact_penalty",
     "ter",
 )
 
@@ -30,6 +31,7 @@ def selection_score(record: dict[str, Any]) -> float:
     source_copy = float(record.get("source_copy_ratio", 0.0))
     exact_copy = float(record.get("exact_source_copy_rate", 0.0))
     leakage = float(record.get("spanish_leakage_penalty", 0.0))
+    artifacts = float(record.get("chat_artifact_penalty", 0.0))
     ter = float(record.get("ter", 100.0))
     return (
         (0.45 * chrf)
@@ -39,6 +41,7 @@ def selection_score(record: dict[str, Any]) -> float:
         - (0.30 * source_copy)
         - (0.40 * exact_copy)
         - (0.25 * leakage)
+        - (0.35 * artifacts)
         - (0.03 * ter)
     )
 
@@ -91,8 +94,8 @@ def write_markdown(records: list[dict[str, Any]], path: Path) -> None:
         "",
         "Ranking uses `selection_score`, which is based on external corpus metrics. It does not rank by profile-local trainer reward because reward scales differ across profiles.",
         "",
-        "| Rank | Profile | Selection | Eval reward | chrF++ | BLEU | token F1 | source copy % | exact copy % | leakage % |",
-        "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Rank | Profile | Selection | Eval reward | chrF++ | BLEU | token F1 | source copy % | exact copy % | leakage % | artifact % |",
+        "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for rank, record in enumerate(records, start=1):
         lines.append(
@@ -109,6 +112,7 @@ def write_markdown(records: list[dict[str, Any]], path: Path) -> None:
                     format_value(record.get("source_copy_ratio", 0.0)),
                     format_value(record.get("exact_source_copy_rate", 0.0)),
                     format_value(record.get("spanish_leakage_penalty", 0.0)),
+                    format_value(record.get("chat_artifact_penalty", 0.0)),
                 ]
             )
             + " |"
