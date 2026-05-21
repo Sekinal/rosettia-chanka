@@ -24,6 +24,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--predictions-jsonl", type=Path, default=None)
     parser.add_argument("--max-seq-length", type=int, default=128)
     parser.add_argument("--max-completion-length", type=int, default=80)
+    parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--validation-fraction", type=float, default=0.15)
     parser.add_argument("--max-eval-samples", type=int, default=None)
     parser.add_argument("--progress-every", type=int, default=16)
@@ -36,6 +37,7 @@ def generate_predictions_with_progress(
     tokenizer,
     rows: list[dict[str, str]],
     max_completion_length: int,
+    batch_size: int,
     progress_every: int,
 ) -> list[str]:
     import torch
@@ -43,13 +45,19 @@ def generate_predictions_with_progress(
     predictions: list[str] = []
     model.eval()
     total = len(rows)
-    for index, row in enumerate(rows, start=1):
-        prompt = tokenizer.apply_chat_template(
-            gspo.prompt_messages(row["source"]),
-            tokenize=False,
-            add_generation_prompt=True,
-        )
-        inputs = tokenizer(text=prompt, return_tensors="pt").to(model.device)
+    batch_size = max(1, batch_size)
+    for start in range(0, total, batch_size):
+        batch_rows = rows[start : start + batch_size]
+        prompts = [
+            tokenizer.apply_chat_template(
+                gspo.prompt_messages(row["source"]),
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+            for row in batch_rows
+        ]
+        inputs = tokenizer(text=prompts, return_tensors="pt", padding=True).to(model.device)
+        prompt_length = inputs["input_ids"].shape[1]
         with torch.inference_mode():
             output_ids = model.generate(
                 **inputs,
@@ -59,10 +67,12 @@ def generate_predictions_with_progress(
                 top_p=None,
                 pad_token_id=tokenizer.eos_token_id,
             )
-        completion_ids = output_ids[0, inputs["input_ids"].shape[1] :]
-        predictions.append(gspo.normalize_text(tokenizer.decode(completion_ids, skip_special_tokens=True)))
-        if progress_every > 0 and (index == total or index % progress_every == 0):
-            print(f"generated {index}/{total} predictions", flush=True)
+        for row_index in range(len(batch_rows)):
+            completion_ids = output_ids[row_index, prompt_length:]
+            predictions.append(gspo.normalize_text(tokenizer.decode(completion_ids, skip_special_tokens=True)))
+        completed = min(total, start + len(batch_rows))
+        if progress_every > 0 and (completed == total or completed % progress_every == 0):
+            print(f"generated {completed}/{total} predictions", flush=True)
     return predictions
 
 
@@ -94,6 +104,7 @@ def main() -> None:
         tokenizer,
         eval_rows,
         args.max_completion_length,
+        args.batch_size,
         args.progress_every,
     )
     references = [row["target"] for row in eval_rows]
