@@ -150,7 +150,7 @@ Use the real-only SFT file for now. Synthetic/backtranslated data is opt-in for 
 
 ## Train With Unsloth SFT
 
-SFT scripts for Qwen3.5 4B LoRA training are in `scripts/train_sft_unsloth.py`. The Chanka pass can continue from the broad adapter with `--adapter-path`.
+SFT scripts for Qwen3.5 LoRA-style adapter training are in `scripts/train_sft_unsloth.py`. The current default model is `unsloth/Qwen3.5-2B` for cheaper early tests. The script supports `--adapter-method lora|dora|rslora` so LoRA, DoRA, and rank-stabilized LoRA can be compared under the same split and evaluation cadence. The Chanka pass can continue from the broad adapter with `--adapter-path`.
 
 The workflow uses 16-bit LoRA, not QLoRA, and every run includes a validation split with best-checkpoint selection by `eval_loss`.
 
