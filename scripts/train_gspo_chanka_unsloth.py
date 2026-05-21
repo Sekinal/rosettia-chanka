@@ -558,7 +558,7 @@ class LearnedVerifierScorer:
         for start in range(0, len(prompts), self.batch_size):
             batch_prompts = prompts[start : start + self.batch_size]
             inputs = self.tokenizer(
-                batch_prompts,
+                text=batch_prompts,
                 return_tensors="pt",
                 padding=True,
                 truncation=True,

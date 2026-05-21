@@ -249,6 +249,59 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
 
         self.assertGreater(translated, copied)
 
+    def test_learned_verifier_scorer_tokenizes_prompts_as_text(self):
+        class FakeTensor(dict):
+            @property
+            def shape(self):
+                return (1, 3)
+
+        class FakeInputs(dict):
+            def to(self, device):
+                return self
+
+        class FakeTokenizer:
+            eos_token = "<eos>"
+            pad_token = "<eos>"
+            eos_token_id = 0
+
+            def __call__(self, *args, **kwargs):
+                self.args = args
+                self.kwargs = kwargs
+                return FakeInputs({"input_ids": FakeTensor()})
+
+            def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=False):
+                return "prompt"
+
+            def decode(self, ids, skip_special_tokens=True):
+                return '{"score":0.5}'
+
+        class FakeModel:
+            device = "cpu"
+
+            def generate(self, **kwargs):
+                class FakeOutput:
+                    def __getitem__(self, key):
+                        return [4]
+
+                return FakeOutput()
+
+            def eval(self):
+                return None
+
+        scorer = train_gspo.LearnedVerifierScorer.__new__(train_gspo.LearnedVerifierScorer)
+        scorer.torch = mock.Mock()
+        scorer.torch.inference_mode.return_value.__enter__ = mock.Mock(return_value=None)
+        scorer.torch.inference_mode.return_value.__exit__ = mock.Mock(return_value=None)
+        scorer.max_seq_length = 512
+        scorer.max_new_tokens = 32
+        scorer.batch_size = 1
+        scorer.model = FakeModel()
+        scorer.tokenizer = FakeTokenizer()
+
+        self.assertEqual(scorer.score_many(["src"], ["ref"], ["hyp"]), [0.5])
+        self.assertEqual(scorer.tokenizer.args, ())
+        self.assertEqual(scorer.tokenizer.kwargs["text"], ["prompt"])
+
 
 if __name__ == "__main__":
     unittest.main()
