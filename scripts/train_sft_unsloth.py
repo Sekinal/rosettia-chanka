@@ -8,9 +8,10 @@ than usual. Every run creates a validation split and monitors eval loss.
 from __future__ import annotations
 
 import argparse
+import math
 import random
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
 import polars as pl
 from datasets import Dataset
@@ -18,7 +19,7 @@ from huggingface_hub import hf_hub_download
 
 
 DATASET_REPO = "Thermostatic/rosettia-chanka-data"
-DEFAULT_MODEL_ID = "unsloth/Qwen3.5-4B"
+DEFAULT_MODEL_ID = "unsloth/Qwen3.5-2B"
 
 BROAD_FILES = [
     "broad_quechua/somosnlp_spanish_to_quechua_high_quality_sft.parquet",
@@ -27,10 +28,21 @@ BROAD_FILES = [
 CHANKA_FILE = "clean_chanka/manual_quechua_chanka_parallel_training_ready_augmented.parquet"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--stage", choices=["broad", "chanka"], required=True)
+    parser.add_argument(
+        "--stage",
+        choices=["broad"],
+        required=True,
+        help="SFT is restricted to broad SomosNLP/AmericasNLP data. Use a separate GSPO workflow for Chanka.",
+    )
     parser.add_argument("--model-id", default=DEFAULT_MODEL_ID)
+    parser.add_argument(
+        "--adapter-method",
+        choices=["lora", "dora", "rslora"],
+        default="lora",
+        help="Adapter variant to train when starting from the base model.",
+    )
     parser.add_argument(
         "--adapter-path",
         type=Path,
@@ -39,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--dataset-repo", default=DATASET_REPO)
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"))
-    parser.add_argument("--max-seq-length", type=int, default=1024)
+    parser.add_argument("--max-seq-length", type=int, default=None)
     parser.add_argument("--seed", type=int, default=3407)
     parser.add_argument("--validation-fraction", type=float, default=None)
     parser.add_argument("--max-train-samples", type=int, default=None)
@@ -48,15 +60,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-steps", type=int, default=-1)
     parser.add_argument("--learning-rate", type=float, default=None)
     parser.add_argument("--warmup-ratio", type=float, default=0.05)
-    parser.add_argument("--per-device-train-batch-size", type=int, default=1)
-    parser.add_argument("--per-device-eval-batch-size", type=int, default=1)
+    parser.add_argument("--per-device-train-batch-size", type=int, default=None)
+    parser.add_argument("--per-device-eval-batch-size", type=int, default=None)
     parser.add_argument("--gradient-accumulation-steps", type=int, default=None)
     parser.add_argument("--lora-r", type=int, default=None)
     parser.add_argument("--lora-alpha", type=int, default=None)
     parser.add_argument("--lora-dropout", type=float, default=0.0)
     parser.add_argument("--weight-decay", type=float, default=0.01)
-    parser.add_argument("--eval-steps", type=int, default=100)
-    parser.add_argument("--save-steps", type=int, default=100)
+    parser.add_argument("--eval-steps", type=int, default=None)
+    parser.add_argument("--save-steps", type=int, default=None)
+    parser.add_argument(
+        "--evals-per-epoch",
+        type=int,
+        default=None,
+        help="If eval/save steps are not set, evaluate this many times inside each epoch.",
+    )
     parser.add_argument("--logging-steps", type=int, default=10)
     parser.add_argument("--dataset-num-proc", type=int, default=2)
     parser.add_argument("--packing", action="store_true")
@@ -68,22 +86,37 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--wandb-project", default=None)
     parser.add_argument("--push-to-hub", default=None, help="Optional HF repo id for the final LoRA adapter.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def stage_defaults(args: argparse.Namespace) -> None:
+    if args.max_seq_length is None:
+        args.max_seq_length = 512 if args.stage == "broad" else 128
     if args.validation_fraction is None:
         args.validation_fraction = 0.02 if args.stage == "broad" else 0.15
     if args.num_train_epochs is None:
         args.num_train_epochs = 1.0 if args.stage == "broad" else 8.0
     if args.learning_rate is None:
         args.learning_rate = 1.0e-4 if args.stage == "broad" else 2.0e-5
+    if args.per_device_train_batch_size is None:
+        args.per_device_train_batch_size = 8
+    if args.per_device_eval_batch_size is None:
+        args.per_device_eval_batch_size = args.per_device_train_batch_size
     if args.gradient_accumulation_steps is None:
-        args.gradient_accumulation_steps = 16 if args.stage == "broad" else 8
+        args.gradient_accumulation_steps = 2 if args.stage == "broad" else 1
     if args.lora_r is None:
-        args.lora_r = 64 if args.stage == "broad" else 128
+        args.lora_r = 64
     if args.lora_alpha is None:
         args.lora_alpha = args.lora_r * 2
+    if args.evals_per_epoch is None:
+        args.evals_per_epoch = 4 if args.stage == "broad" else 8
+
+
+def adapter_flags(adapter_method: str) -> dict[str, bool]:
+    return {
+        "use_dora": adapter_method == "dora",
+        "use_rslora": adapter_method == "rslora",
+    }
 
 
 def download_parquet(repo_id: str, filename: str) -> Path:
@@ -152,6 +185,35 @@ def split_rows(
     return train_rows, eval_rows
 
 
+def optimizer_steps_per_epoch(
+    train_row_count: int,
+    per_device_train_batch_size: int,
+    gradient_accumulation_steps: int,
+) -> int:
+    effective_batch_size = max(1, per_device_train_batch_size) * max(1, gradient_accumulation_steps)
+    return max(1, math.ceil(train_row_count / effective_batch_size))
+
+
+def configure_step_schedule(args: argparse.Namespace, train_row_count: int) -> None:
+    if args.eval_steps is not None and args.save_steps is not None:
+        return
+
+    if args.max_steps and args.max_steps > 0:
+        fallback_steps = max(1, args.max_steps // max(1, args.evals_per_epoch))
+    else:
+        steps_per_epoch = optimizer_steps_per_epoch(
+            train_row_count,
+            args.per_device_train_batch_size,
+            args.gradient_accumulation_steps,
+        )
+        fallback_steps = max(1, steps_per_epoch // max(1, args.evals_per_epoch))
+
+    if args.eval_steps is None:
+        args.eval_steps = fallback_steps
+    if args.save_steps is None:
+        args.save_steps = args.eval_steps
+
+
 def instruction_for(stage: str) -> str:
     if stage == "chanka":
         return (
@@ -216,10 +278,9 @@ def main() -> None:
         full_finetuning=False,
     )
     if args.adapter_path is None:
-        model = FastLanguageModel.get_peft_model(
-            model,
-            r=args.lora_r,
-            target_modules=[
+        peft_kwargs = {
+            "r": args.lora_r,
+            "target_modules": [
                 "q_proj",
                 "k_proj",
                 "v_proj",
@@ -228,16 +289,22 @@ def main() -> None:
                 "up_proj",
                 "down_proj",
             ],
-            lora_alpha=args.lora_alpha,
-            lora_dropout=args.lora_dropout,
-            bias="none",
-            use_gradient_checkpointing="unsloth",
-            random_state=args.seed,
-            max_seq_length=args.max_seq_length,
+            "lora_alpha": args.lora_alpha,
+            "lora_dropout": args.lora_dropout,
+            "bias": "none",
+            "use_gradient_checkpointing": "unsloth",
+            "random_state": args.seed,
+            "max_seq_length": args.max_seq_length,
+            **adapter_flags(args.adapter_method),
+        }
+        model = FastLanguageModel.get_peft_model(
+            model,
+            **peft_kwargs,
         )
 
     train_dataset = build_dataset(tokenizer, args.stage, train_rows)
     eval_dataset = build_dataset(tokenizer, args.stage, eval_rows)
+    configure_step_schedule(args, len(train_dataset))
 
     trainer = SFTTrainer(
         model=model,
@@ -288,15 +355,17 @@ def main() -> None:
     print(f"Train rows: {len(train_dataset):,}")
     print(f"Validation rows: {len(eval_dataset):,}")
     print(f"Stage: {args.stage}")
+    print(f"Adapter method: {args.adapter_method}")
     print(f"Model or adapter: {model_name_or_adapter}")
     print(f"LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")
     print(f"Validation: every {args.eval_steps} steps, best checkpoint by eval_loss")
+    print(f"Saving: every {args.save_steps} steps, keeping the 3 most recent checkpoints")
 
     trainer.train()
     metrics = trainer.evaluate()
     print(metrics)
 
-    final_dir = run_dir / "final_lora"
+    final_dir = run_dir / f"final_{args.adapter_method}"
     model.save_pretrained(str(final_dir))
     tokenizer.save_pretrained(str(final_dir))
 
