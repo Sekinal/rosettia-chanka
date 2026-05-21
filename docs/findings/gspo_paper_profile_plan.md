@@ -126,9 +126,18 @@ To actually reduce validation overhead, phase 2 was launched as a fresh adapter-
 
 Hard-negative verifier SFT is running at `outputs/chanka_translation_verifier_hard_r128`. As of checkpoint `1083`, the best validation loss remains `0.002326` from checkpoint `912`; current eval loss was `0.002389`. Treat additional verifier loss gains as secondary to whether the learned verifier improves GSPO outcomes.
 
+Update as of 2026-05-21 10:17 UTC:
+
+- The hard-negative verifier SFT reached `checkpoint-1383` but crashed during final save with CUDA illegal memory access. Best validation checkpoint is `checkpoint-1368` with eval loss `0.0022854567505419254`; checkpoint `1383` eval loss was `0.002302516484633088`. On the remote only, `final_verifier_lora` is a symlink to `checkpoint-1368`.
+- Learned verifier from the broad SFT adapter alone did not beat Vibe: `outputs/gspo_paper_profiles/2511_learned_verifier_hard_canary_20260521-0936` ended with chrF++ `35.77395`, BLEU `6.19078`, token F1 `17.04413`, exact-copy `1.5625%`, source-copy `4.0551%`, leakage `0.3906%`, TER `102.89017`, and trainer eval reward `0.23386`.
+- Learned verifier applied on top of the Vibe checkpoint did beat the previous best canary externally: `outputs/gspo_paper_profiles/2511_learned_verifier_on_vibe112_canary_20260521-1000` ended with chrF++ `38.20628`, BLEU `7.28880`, token F1 `18.97321`, exact-copy `1.5625%`, source-copy `4.1667%`, leakage `0.3906%`, TER `96.53179`, and trainer eval reward `0.24287`.
+- The serious current contender is `outputs/gspo_full_contenders/learned_verifier_on_vibe112_full_20260521-1016`, seeded from `outputs/gspo_full_contenders/vibethinker_2511_continued_no_tables_20260521-083900/chanka_gspo/checkpoint-112` with verifier `outputs/chanka_translation_verifier_hard_r128/checkpoint-1368`. It uses `MAX_STEPS=224`, `EVAL_STEPS=56`, `SAVE_STEPS=56`, `LEARNING_RATE=7e-7`, `WARMUP_RATIO=0.01`, `NUM_GENERATIONS=4`, verifier reward batch size `2`, and no completion-table logging.
+- The Vibe phase-2 continuation `outputs/gspo_full_contenders/vibethinker_2511_phase2_from112_eval112_20260521-0909` is also still running. It has reached `checkpoint-784`; phase-2 eval reward has risen to `0.32771`, but this reward is not directly comparable with the learned-verifier reward. Compare full runs with final external metrics and qualitative samples.
+
 ## Caveats
 
 - These are proxy implementations, not exact reproductions. We do not have a Chanka-capable xCOMET model, and the severity proxy should not be described as xCOMET. It is only a cheap ablation/guardrail; serious reward-model work should prioritize the learned Chanka verifier.
+- Do not use the xCOMET-inspired proxy as the optimization target. It is useful only for triage and transparent failure accounting. Since a real Chanka-capable xCOMET judge is unavailable, the DeepSeek-style trained verifier plus external lexical sanity metrics is the more defensible reward direction.
 - BLEU/chrF alone are not sufficient. The previous GSPO final adapter showed source-copy risk, so qualitative samples and copy/leakage metrics must be reviewed.
 - The VibeThinker profile is slower because it defaults to eight generations and therefore needs `TRAIN_BATCH_SIZE=8` / `EVAL_BATCH_SIZE=8` unless `NUM_GENERATIONS` is lowered.
 
