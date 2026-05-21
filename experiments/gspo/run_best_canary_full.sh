@@ -47,7 +47,8 @@ python scripts/train_gspo_chanka_unsloth.py \
   --per-device-eval-batch-size "$eval_batch" \
   --eval-steps "${EVAL_STEPS:-28}" \
   --save-steps "${SAVE_STEPS:-28}" \
-  --logging-steps "${LOGGING_STEPS:-2}" \
+  --logging-steps "${LOGGING_STEPS:-10}" \
+  --no-log-completions \
   --temperature "${TEMPERATURE:-0.75}" \
   --top-p "${TOP_P:-0.90}" \
   ${MAX_STEPS:+--max-steps "$MAX_STEPS"} \

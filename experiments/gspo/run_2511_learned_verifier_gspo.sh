@@ -37,7 +37,8 @@ python scripts/train_gspo_chanka_unsloth.py \
   --per-device-eval-batch-size "${EVAL_BATCH_SIZE:-4}" \
   --gradient-accumulation-steps "${GRADIENT_ACCUMULATION_STEPS:-2}" \
   --num-generations "${NUM_GENERATIONS:-4}" \
-  --logging-steps "${LOGGING_STEPS:-5}" \
+  --logging-steps "${LOGGING_STEPS:-10}" \
+  --no-log-completions \
   --temperature "${TEMPERATURE:-0.75}" \
   --top-p "${TOP_P:-0.90}" \
   ${MAX_STEPS:+--max-steps "$MAX_STEPS"} \
