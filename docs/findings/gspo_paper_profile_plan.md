@@ -206,6 +206,12 @@ Update as of 2026-05-21 20:43 UTC:
 - Current best remains `learned_verifier_vibe_on_vibe896_4gen_canary` with selection `26.3808`, chrF++ `40.9703`, BLEU `8.1555`, token F1 `26.6169`, source-copy `2.8270%`, exact-copy `0.6329%`, leakage `0.6329%`, artifact `0.0%`, TER `88.7097`.
 - Interpretation: replacing or averaging the verifier is not enough. V3 adds harder discrimination, but it pushes BLEU down and does not improve the final policy. Next reward work should target policy dynamics rather than another verifier-only swap: shorter/lower-LR updates from the current best, reference-margin rewards, or explicit BLEU/terminology preservation blended with the v1 verifier signal.
 
+Update as of 2026-05-21 21:15 UTC:
+
+- Added `experiments/gspo/run_low_lr_refinement_canary.sh` to test policy dynamics instead of another verifier swap. It starts from the current best adapter with the original `learned_verifier_vibe_2511` reward, LR `2e-7`, no warmup, and only `16` steps.
+- Low-LR refinement did not beat the standing best. Eval dir: `outputs/gspo_checkpoint_evals/20260521-low-lr-refine-current-best-low-lr-refine-canary`. Best checkpoint `16`/final selection `25.9950`, chrF++ `40.3932`, BLEU `8.4617`, token F1 `25.8886`, source-copy `2.6688%`, exact-copy `0.6329%`, leakage `0.7911%`, artifact `0.0%`, TER `88.9401`; checkpoint `8` selection `25.3908`.
+- This is the highest BLEU observed so far, but the standing best still wins on selection, chrF++, token F1, and leakage. The next experiment should not simply lower LR further unless the goal is BLEU-only. A better next target is a reward that preserves the current best's chrF++/token-F1 while adding a small BLEU/TER margin term.
+
 ## Smoke Results
 
 Remote: `root@216.81.248.197 -p 20299`, path `/root/rosettia-chanka`, GPU `NVIDIA L40S`.
