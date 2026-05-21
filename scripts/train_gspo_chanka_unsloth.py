@@ -39,6 +39,7 @@ REWARD_PROFILES = (
     "rosettia_guard_v1",
     "rosettia_guard_v2",
     "learned_verifier_2511",
+    "learned_verifier_vibe_2511",
 )
 SPANISH_STOPWORDS = {
     "el",
@@ -656,9 +657,11 @@ def make_reward_fn(
     verifier_batch_size: int = 4,
 ):
     verifier_scorer = None
-    if profile == "learned_verifier_2511":
+    if profile in {"learned_verifier_2511", "learned_verifier_vibe_2511"}:
         if verifier_adapter_path is None:
-            raise ValueError("--verifier-adapter-path is required for reward-profile learned_verifier_2511")
+            raise ValueError(
+                "--verifier-adapter-path is required for learned-verifier reward profiles"
+            )
         verifier_scorer = LearnedVerifierScorer(
             verifier_adapter_path,
             max_seq_length=verifier_max_seq_length,
@@ -667,11 +670,14 @@ def make_reward_fn(
         )
 
     def reward_fn(completions: list, target: list[str], source: list[str] | None = None, **kwargs: object) -> list[float]:
-        if profile == "learned_verifier_2511":
+        if profile in {"learned_verifier_2511", "learned_verifier_vibe_2511"}:
             assert verifier_scorer is not None
             sources = list(source) if source is not None else [None] * len(target)
             hypotheses = [completion_text(completion) for completion in completions]
-            return learned_verifier_rewards(verifier_scorer, hypotheses, list(target), sources)
+            rewards = learned_verifier_rewards(verifier_scorer, hypotheses, list(target), sources)
+            if profile == "learned_verifier_vibe_2511":
+                rewards = add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
+            return rewards
         return chanka_reward(completions, target, source=source, profile=profile, **kwargs)
 
     reward_fn.__name__ = f"chanka_reward_{profile}"

@@ -26,7 +26,7 @@ if [[ ! -d "$VERIFIER_ADAPTER_PATH" ]]; then
 fi
 
 python scripts/train_gspo_chanka_unsloth.py \
-  --reward-profile learned_verifier_2511 \
+  --reward-profile "${GSPO_REWARD_PROFILE:-learned_verifier_2511}" \
   --verifier-adapter-path "$VERIFIER_ADAPTER_PATH" \
   --verifier-batch-size "${VERIFIER_REWARD_BATCH_SIZE:-4}" \
   --adapter-path "${SFT_ADAPTER_PATH:-outputs/qwen35_2b_broad_lora_r64_a128_seq512_b16_ga1/broad/checkpoint-10400}" \

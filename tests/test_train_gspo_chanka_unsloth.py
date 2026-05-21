@@ -187,6 +187,7 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             "rosettia_guard_v1",
             "rosettia_guard_v2",
             "learned_verifier_2511",
+            "learned_verifier_vibe_2511",
         }
 
         self.assertTrue(expected.issubset(set(train_gspo.REWARD_PROFILES)))
@@ -235,6 +236,8 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
     def test_learned_verifier_profile_requires_adapter_path(self):
         with self.assertRaises(ValueError):
             train_gspo.make_reward_fn("learned_verifier_2511")
+        with self.assertRaises(ValueError):
+            train_gspo.make_reward_fn("learned_verifier_vibe_2511")
 
     def test_learned_verifier_reward_blends_model_score_with_guards(self):
         class FixedScorer:
@@ -258,6 +261,31 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             )[0]
 
         self.assertGreater(translated, copied)
+
+    def test_learned_verifier_vibe_adds_diversity_bonus(self):
+        class FixedScorer:
+            def score_many(self, sources, references, hypotheses):
+                return [0.5 for _ in hypotheses]
+
+        with mock.patch.object(train_gspo, "LearnedVerifierScorer", return_value=FixedScorer()), mock.patch.object(
+            train_gspo, "sentence_chrfpp", return_value=0.5
+        ), mock.patch.object(train_gspo, "sentence_bleu", return_value=0.2):
+            reward_fn = train_gspo.make_reward_fn(
+                "learned_verifier_vibe_2511",
+                verifier_adapter_path=mock.Mock(),
+            )
+            repeated = reward_fn(
+                completions=["x", "x", "x", "x"],
+                target=["a", "a", "a", "a"],
+                source=["s", "s", "s", "s"],
+            )
+            diverse = reward_fn(
+                completions=["x", "y", "z", "w"],
+                target=["a", "a", "a", "a"],
+                source=["s", "s", "s", "s"],
+            )
+
+        self.assertGreater(sum(diverse), sum(repeated))
 
     def test_learned_verifier_scorer_tokenizes_prompts_as_text(self):
         class FakeTensor(dict):
