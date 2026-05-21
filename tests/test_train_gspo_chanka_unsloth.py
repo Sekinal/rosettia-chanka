@@ -206,6 +206,7 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             "rosettia_guard_v2",
             "learned_verifier_2511",
             "learned_verifier_vibe_2511",
+            "learned_verifier_bleu_margin_vibe_2511",
         }
 
         self.assertTrue(expected.issubset(set(train_gspo.REWARD_PROFILES)))
@@ -226,6 +227,35 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
                 "Buenos dias autoridad.",
                 "rosettia_guard_v2",
             )
+
+        self.assertGreater(translated, copied)
+
+    def test_token_precision_rewards_concise_overlap(self):
+        self.assertGreater(
+            train_gspo.token_precision("allin punchaw", "allin punchaw taytay"),
+            train_gspo.token_precision("allin punchaw huk iskay", "allin punchaw taytay"),
+        )
+
+    def test_learned_verifier_bleu_margin_penalizes_source_copy(self):
+        class FixedScorer:
+            def score_many(self, sources, references, hypotheses):
+                return [0.8 for _ in hypotheses]
+
+        with mock.patch.object(train_gspo, "sentence_chrfpp", return_value=0.7), mock.patch.object(
+            train_gspo, "sentence_bleu", return_value=0.3
+        ):
+            translated = train_gspo.learned_verifier_bleu_margin_rewards(
+                FixedScorer(),
+                ["Allin punchaw kamachiq."],
+                ["Allin punchaw kamachiq."],
+                ["Buenos dias autoridad."],
+            )[0]
+            copied = train_gspo.learned_verifier_bleu_margin_rewards(
+                FixedScorer(),
+                ["Buenos dias autoridad."],
+                ["Allin punchaw kamachiq."],
+                ["Buenos dias autoridad."],
+            )[0]
 
         self.assertGreater(translated, copied)
 

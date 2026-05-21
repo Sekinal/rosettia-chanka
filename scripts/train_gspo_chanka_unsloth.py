@@ -41,6 +41,7 @@ REWARD_PROFILES = (
     "learned_verifier_2511",
     "learned_verifier_vibe_2511",
     "learned_verifier_ensemble_vibe_2511",
+    "learned_verifier_bleu_margin_vibe_2511",
 )
 SPANISH_STOPWORDS = {
     "el",
@@ -306,6 +307,22 @@ def token_f1(hypothesis: str, reference: str) -> float:
     precision = overlap / len(hyp_tokens)
     recall = overlap / len(ref_tokens)
     return 2 * precision * recall / (precision + recall)
+
+
+def token_precision(hypothesis: str, reference: str) -> float:
+    hyp_tokens = word_tokens(hypothesis)
+    ref_tokens = word_tokens(reference)
+    if not hyp_tokens or not ref_tokens:
+        return 0.0
+    ref_counts: dict[str, int] = {}
+    for token in ref_tokens:
+        ref_counts[token] = ref_counts.get(token, 0) + 1
+    overlap = 0
+    for token in hyp_tokens:
+        if ref_counts.get(token, 0) > 0:
+            overlap += 1
+            ref_counts[token] -= 1
+    return overlap / len(hyp_tokens)
 
 
 def length_ratio_score(hypothesis: str, reference: str) -> float:
@@ -655,6 +672,34 @@ def learned_verifier_rewards(
     return rewards
 
 
+def learned_verifier_bleu_margin_rewards(
+    scorer: LearnedVerifierScorer,
+    hypotheses: list[str],
+    references: list[str],
+    sources: list[str | None],
+) -> list[float]:
+    verifier_scores = scorer.score_many(sources, references, hypotheses)
+    rewards: list[float] = []
+    for verifier_score, hypothesis, reference, source in zip(verifier_scores, hypotheses, references, sources, strict=True):
+        chrf = sentence_chrfpp(hypothesis, reference)
+        bleu = sentence_bleu(hypothesis, reference)
+        f1 = token_f1(hypothesis, reference)
+        precision = token_precision(hypothesis, reference)
+        length_score = length_ratio_score(hypothesis, reference)
+        semantic_guard = (0.38 * chrf) + (0.26 * f1) + (0.18 * bleu)
+        shape_guard = (0.10 * length_score) + (0.08 * precision)
+        guard_penalty = (
+            0.32 * source_copy_ratio(hypothesis, source)
+            + 0.55 * spanish_leakage_penalty(hypothesis)
+            + 0.18 * repetition_penalty(hypothesis)
+            + 0.70 * chat_artifact_penalty(hypothesis)
+        )
+        if exact_source_copy(hypothesis, source):
+            guard_penalty += 0.55
+        rewards.append((0.58 * verifier_score) + (0.42 * (semantic_guard + shape_guard)) - guard_penalty)
+    return rewards
+
+
 def learned_verifier_ensemble_rewards(
     primary_scorer: LearnedVerifierScorer,
     secondary_scorer: LearnedVerifierScorer,
@@ -741,6 +786,7 @@ def make_reward_fn(
         "learned_verifier_2511",
         "learned_verifier_vibe_2511",
         "learned_verifier_ensemble_vibe_2511",
+        "learned_verifier_bleu_margin_vibe_2511",
     }
     if profile in learned_profiles:
         if verifier_adapter_path is None:
@@ -774,6 +820,12 @@ def make_reward_fn(
             if profile == "learned_verifier_vibe_2511":
                 rewards = add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
             return rewards
+        if profile == "learned_verifier_bleu_margin_vibe_2511":
+            assert verifier_scorer is not None
+            sources = list(source) if source is not None else [None] * len(target)
+            hypotheses = [completion_text(completion) for completion in completions]
+            rewards = learned_verifier_bleu_margin_rewards(verifier_scorer, hypotheses, list(target), sources)
+            return add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
         if profile == "learned_verifier_ensemble_vibe_2511":
             assert verifier_scorer is not None
             assert secondary_verifier_scorer is not None

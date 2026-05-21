@@ -212,6 +212,12 @@ Update as of 2026-05-21 21:15 UTC:
 - Low-LR refinement did not beat the standing best. Eval dir: `outputs/gspo_checkpoint_evals/20260521-low-lr-refine-current-best-low-lr-refine-canary`. Best checkpoint `16`/final selection `25.9950`, chrF++ `40.3932`, BLEU `8.4617`, token F1 `25.8886`, source-copy `2.6688%`, exact-copy `0.6329%`, leakage `0.7911%`, artifact `0.0%`, TER `88.9401`; checkpoint `8` selection `25.3908`.
 - This is the highest BLEU observed so far, but the standing best still wins on selection, chrF++, token F1, and leakage. The next experiment should not simply lower LR further unless the goal is BLEU-only. A better next target is a reward that preserves the current best's chrF++/token-F1 while adding a small BLEU/TER margin term.
 
+Update as of 2026-05-21 21:59 UTC:
+
+- Added `learned_verifier_bleu_margin_vibe_2511` and `experiments/gspo/run_bleu_margin_canary.sh`. The reward keeps the v1 learned verifier dominant but changes the guard term to weight chrF++/token-F1 first and adds smaller BLEU/token-precision pressure, with stricter leakage/artifact penalties.
+- BLEU-margin did not work. Eval dir: `outputs/gspo_checkpoint_evals/20260521-bleu-margin-current-best-bleu-margin-canary`. Best checkpoint `8` selection `25.5784`, chrF++ `40.3062`, BLEU `5.8180`, token F1 `25.7731`, source-copy `2.5105%`, exact-copy `0.6329%`, leakage `0.6329%`, artifact `0.0%`, TER `89.4009`; checkpoint `24`/final selection `25.3610`; checkpoint `16` selection `25.2748`.
+- Interpretation: changing the guard formula did not reproduce the low-LR BLEU gain. The strongest pattern remains the original v1 learned-verifier+Vibe reward seeded from Vibe896, with very short updates. The next canary should test temperature/exploration or sample count around that reward, not another verifier/guard rewrite.
+
 ## Smoke Results
 
 Remote: `root@216.81.248.197 -p 20299`, path `/root/rosettia-chanka`, GPU `NVIDIA L40S`.
