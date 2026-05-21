@@ -54,7 +54,9 @@ Verifier training script: `scripts/train_verifier_chanka_unsloth.py`
 
 Chained script: `experiments/gspo/run_2511_train_verifier_then_gspo.sh`
 
-The verifier path bootstraps labels from clean Chanka pairs plus synthetic corruptions: correct reference translation, source copy, incomplete translation, Spanish leakage, and word-order/fluency damage. It trains a separate JSON-scoring LoRA verifier with validation enabled. The current chained GSPO script trains this verifier first, then runs the verifier-rubric GSPO profile; using the trained verifier directly inside the reward loop is the next integration step because it is more expensive and needs careful batching.
+Learned-verifier script: `experiments/gspo/run_2511_learned_verifier_gspo.sh`
+
+The verifier path bootstraps labels from clean Chanka pairs plus synthetic corruptions: correct reference translation, source copy, incomplete translation, Spanish leakage, and word-order/fluency damage. It trains a separate JSON-scoring LoRA verifier with validation enabled. The `learned_verifier_2511` reward profile can then load the verifier LoRA directly in the GSPO reward loop and blend its score with hard anti-copy, anti-leakage, repetition, and reference guards. This is much slower and uses more memory than metric-only rewards, but it is the preferred DeepSeek-style branch now that training cost is not the deciding constraint.
 
 ### 2511.06221 VibeThinker
 
@@ -94,6 +96,7 @@ The canary sweep runs individual paper profiles plus mixed rewards:
 - `mix_verifier_vibe`: verifier rubric + VibeThinker diversity, with eight generations;
 - `mix_all_strict`: all paper-inspired signals plus stronger copy/leakage guards;
 - `rosettia_guard_v1` and `rosettia_guard_v2`: project-specific rewards designed to prioritize reference overlap, anti-copy behavior, anti-leakage behavior, length sanity, entity preservation, and repetition control.
+- `learned_verifier_2511`: loads a trained verifier LoRA and uses its JSON score as the dominant reward, with project guards to prevent source-copy and Spanish-leakage reward hacking.
 
 Each run writes `final_metrics.json`, and `scripts/summarize_gspo_canaries.py` produces `summary.jsonl` plus `summary.md`. The summary ranks by a profile-comparable `selection_score` based on external corpus metrics: chrF++, BLEU, token F1, length sanity, source-copy rate, exact-copy rate, Spanish leakage, and TER. Do not rank mixed profiles by trainer eval reward alone because each reward profile has a different scale.
 
@@ -107,7 +110,7 @@ The full-contender launcher reruns the summary, selects the first `summary.jsonl
 
 ## Caveats
 
-- These are proxy implementations, not exact reproductions. We do not have a Chanka-capable xCOMET model, and the severity proxy should not be described as xCOMET.
+- These are proxy implementations, not exact reproductions. We do not have a Chanka-capable xCOMET model, and the severity proxy should not be described as xCOMET. It is only a cheap ablation/guardrail; serious reward-model work should prioritize the learned Chanka verifier.
 - BLEU/chrF alone are not sufficient. The previous GSPO final adapter showed source-copy risk, so qualitative samples and copy/leakage metrics must be reviewed.
 - The VibeThinker profile is slower because it defaults to eight generations and therefore needs `TRAIN_BATCH_SIZE=8` / `EVAL_BATCH_SIZE=8` unless `NUM_GENERATIONS` is lowered.
 

@@ -176,6 +176,7 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             "mix_all_strict",
             "rosettia_guard_v1",
             "rosettia_guard_v2",
+            "learned_verifier_2511",
         }
 
         self.assertTrue(expected.issubset(set(train_gspo.REWARD_PROFILES)))
@@ -215,6 +216,38 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             )
 
         self.assertGreater(sum(diverse), sum(repeated))
+
+    def test_parse_verifier_score_accepts_json_and_clamps(self):
+        self.assertEqual(train_gspo.parse_verifier_score('{"score":0.87,"severity":"none"}'), 0.87)
+        self.assertEqual(train_gspo.parse_verifier_score('{"score":1.9}'), 1.0)
+        self.assertEqual(train_gspo.parse_verifier_score("puntaje: 0.42"), 0.42)
+
+    def test_learned_verifier_profile_requires_adapter_path(self):
+        with self.assertRaises(ValueError):
+            train_gspo.make_reward_fn("learned_verifier_2511")
+
+    def test_learned_verifier_reward_blends_model_score_with_guards(self):
+        class FixedScorer:
+            def score_many(self, sources, references, hypotheses):
+                return [0.9 for _ in hypotheses]
+
+        with mock.patch.object(train_gspo, "sentence_chrfpp", return_value=0.7), mock.patch.object(
+            train_gspo, "sentence_bleu", return_value=0.3
+        ):
+            translated = train_gspo.learned_verifier_rewards(
+                FixedScorer(),
+                ["Allin punchaw kamachiq."],
+                ["Allin punchaw kamachiq."],
+                ["Buenos dias autoridad."],
+            )[0]
+            copied = train_gspo.learned_verifier_rewards(
+                FixedScorer(),
+                ["Buenos dias autoridad."],
+                ["Allin punchaw kamachiq."],
+                ["Buenos dias autoridad."],
+            )[0]
+
+        self.assertGreater(translated, copied)
 
 
 if __name__ == "__main__":

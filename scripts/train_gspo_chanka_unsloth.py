@@ -38,6 +38,7 @@ REWARD_PROFILES = (
     "mix_all_strict",
     "rosettia_guard_v1",
     "rosettia_guard_v2",
+    "learned_verifier_2511",
 )
 SPANISH_STOPWORDS = {
     "el",
@@ -108,6 +109,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--metrics-json", type=Path, default=None)
     parser.add_argument("--wandb-project", default=None)
+    parser.add_argument(
+        "--verifier-adapter-path",
+        type=Path,
+        default=None,
+        help="Verifier LoRA path used by reward-profile learned_verifier_2511.",
+    )
+    parser.add_argument("--verifier-max-seq-length", type=int, default=512)
+    parser.add_argument("--verifier-max-new-tokens", type=int, default=96)
+    parser.add_argument("--verifier-batch-size", type=int, default=4)
     return parser.parse_args(argv)
 
 
@@ -487,6 +497,115 @@ def reward_score(
     return baseline_score
 
 
+def verifier_prompt_text(tokenizer, source: str, reference: str, candidate: str) -> str:
+    messages = [
+        {
+            "role": "system",
+            "content": "Eres un verificador experto de traducciones español a quechua chanka.",
+        },
+        {
+            "role": "user",
+            "content": (
+                "Evalua si la traduccion candidata conserva el significado, evita copiar "
+                "el espanol, respeta entidades/numeros y suena natural en quechua chanka. "
+                "Devuelve solo JSON compacto con score entre 0 y 1, severity y rationale.\n\n"
+                f"Español: {source}\n"
+                f"Referencia chanka: {reference}\n"
+                f"Candidata: {candidate}"
+            ),
+        },
+    ]
+    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+
+def parse_verifier_score(text: str) -> float:
+    match = re.search(r'"score"\s*:\s*([01](?:\.\d+)?)', text)
+    if match:
+        return max(0.0, min(1.0, float(match.group(1))))
+    loose = re.search(r"\b(?:score|puntaje)\b\D{0,12}([01](?:\.\d+)?)", text, flags=re.IGNORECASE)
+    if loose:
+        return max(0.0, min(1.0, float(loose.group(1))))
+    return 0.0
+
+
+class LearnedVerifierScorer:
+    def __init__(self, adapter_path: Path, max_seq_length: int, max_new_tokens: int, batch_size: int) -> None:
+        from unsloth import FastLanguageModel
+        import torch
+
+        self.torch = torch
+        self.max_seq_length = max_seq_length
+        self.max_new_tokens = max_new_tokens
+        self.batch_size = max(1, batch_size)
+        self.model, self.tokenizer = FastLanguageModel.from_pretrained(
+            model_name=str(adapter_path),
+            max_seq_length=max_seq_length,
+            load_in_4bit=False,
+            load_in_16bit=True,
+            full_finetuning=False,
+        )
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        FastLanguageModel.for_inference(self.model)
+        self.model.eval()
+
+    def score_many(self, sources: list[str | None], references: list[str], hypotheses: list[str]) -> list[float]:
+        prompts = [
+            verifier_prompt_text(self.tokenizer, source or "", reference, hypothesis)
+            for source, reference, hypothesis in zip(sources, references, hypotheses, strict=True)
+        ]
+        scores: list[float] = []
+        for start in range(0, len(prompts), self.batch_size):
+            batch_prompts = prompts[start : start + self.batch_size]
+            inputs = self.tokenizer(
+                batch_prompts,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=self.max_seq_length,
+            ).to(self.model.device)
+            prompt_length = inputs["input_ids"].shape[1]
+            with self.torch.inference_mode():
+                output_ids = self.model.generate(
+                    **inputs,
+                    max_new_tokens=self.max_new_tokens,
+                    do_sample=False,
+                    temperature=None,
+                    top_p=None,
+                    pad_token_id=self.tokenizer.eos_token_id,
+                )
+            for row_index in range(len(batch_prompts)):
+                completion_ids = output_ids[row_index, prompt_length:]
+                decoded = self.tokenizer.decode(completion_ids, skip_special_tokens=True)
+                scores.append(parse_verifier_score(decoded))
+        return scores
+
+
+def learned_verifier_rewards(
+    scorer: LearnedVerifierScorer,
+    hypotheses: list[str],
+    references: list[str],
+    sources: list[str | None],
+) -> list[float]:
+    verifier_scores = scorer.score_many(sources, references, hypotheses)
+    rewards: list[float] = []
+    for verifier_score, hypothesis, reference, source in zip(verifier_scores, hypotheses, references, sources, strict=True):
+        chrf = sentence_chrfpp(hypothesis, reference)
+        bleu = sentence_bleu(hypothesis, reference)
+        f1 = token_f1(hypothesis, reference)
+        length_score = length_ratio_score(hypothesis, reference)
+        guard_score = baseline_reward_score(hypothesis, reference, source, chrf, bleu, f1, length_score)
+        guard_penalty = (
+            0.35 * source_copy_ratio(hypothesis, source)
+            + 0.45 * spanish_leakage_penalty(hypothesis)
+            + 0.20 * repetition_penalty(hypothesis)
+        )
+        if exact_source_copy(hypothesis, source):
+            guard_penalty += 0.50
+        rewards.append((0.72 * verifier_score) + (0.28 * guard_score) - guard_penalty)
+    return rewards
+
+
 def add_vibethinker_diversity_bonus(rewards: list[float], hypotheses: list[str], sources: list[str | None]) -> list[float]:
     grouped: dict[str | None, list[int]] = {}
     for index, source in enumerate(sources):
@@ -523,8 +642,30 @@ def chanka_reward(
     return rewards
 
 
-def make_reward_fn(profile: str):
+def make_reward_fn(
+    profile: str,
+    verifier_adapter_path: Path | None = None,
+    verifier_max_seq_length: int = 512,
+    verifier_max_new_tokens: int = 96,
+    verifier_batch_size: int = 4,
+):
+    verifier_scorer = None
+    if profile == "learned_verifier_2511":
+        if verifier_adapter_path is None:
+            raise ValueError("--verifier-adapter-path is required for reward-profile learned_verifier_2511")
+        verifier_scorer = LearnedVerifierScorer(
+            verifier_adapter_path,
+            max_seq_length=verifier_max_seq_length,
+            max_new_tokens=verifier_max_new_tokens,
+            batch_size=verifier_batch_size,
+        )
+
     def reward_fn(completions: list, target: list[str], source: list[str] | None = None, **kwargs: object) -> list[float]:
+        if profile == "learned_verifier_2511":
+            assert verifier_scorer is not None
+            sources = list(source) if source is not None else [None] * len(target)
+            hypotheses = [completion_text(completion) for completion in completions]
+            return learned_verifier_rewards(verifier_scorer, hypotheses, list(target), sources)
         return chanka_reward(completions, target, source=source, profile=profile, **kwargs)
 
     reward_fn.__name__ = f"chanka_reward_{profile}"
@@ -683,7 +824,13 @@ def main() -> None:
     trainer = GRPOTrainer(
         model=model,
         processing_class=tokenizer,
-        reward_funcs=make_reward_fn(args.reward_profile),
+        reward_funcs=make_reward_fn(
+            args.reward_profile,
+            verifier_adapter_path=args.verifier_adapter_path,
+            verifier_max_seq_length=args.verifier_max_seq_length,
+            verifier_max_new_tokens=args.verifier_max_new_tokens,
+            verifier_batch_size=args.verifier_batch_size,
+        ),
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         callbacks=[make_jsonl_log_callback(run_dir / "scalar_logs.jsonl")],
