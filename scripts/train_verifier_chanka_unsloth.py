@@ -114,7 +114,43 @@ def truncate_translation(text: str) -> str:
     return " ".join(words[: max(1, len(words) // 2)])
 
 
-def verifier_examples_for_row(row: dict[str, str], rng: random.Random) -> list[dict[str, str]]:
+def other_target(reference: str, distractors: Sequence[str], rng: random.Random) -> str | None:
+    candidates = [target for target in distractors if target and target != reference]
+    if not candidates:
+        return None
+    return rng.choice(candidates)
+
+
+def mix_translations(reference: str, distractor: str) -> str:
+    ref_words = reference.split()
+    distractor_words = distractor.split()
+    if len(ref_words) < 2 or len(distractor_words) < 2:
+        return f"{reference} {distractor}".strip()
+    ref_cut = max(1, len(ref_words) // 2)
+    distractor_cut = max(1, len(distractor_words) // 2)
+    return " ".join([*ref_words[:ref_cut], *distractor_words[distractor_cut:]])
+
+
+def unsupported_chanka_addition(reference: str, distractor: str) -> str:
+    addition = " ".join(distractor.split()[:4])
+    if not addition:
+        return reference
+    return f"{reference} {addition}"
+
+
+def repeat_translation(text: str) -> str:
+    words = text.split()
+    if len(words) <= 2:
+        return f"{text} {text}".strip()
+    repeated_tail = " ".join(words[-min(4, len(words)) :])
+    return f"{text} {repeated_tail}"
+
+
+def verifier_examples_for_row(
+    row: dict[str, str],
+    rng: random.Random,
+    distractors: Sequence[str] | None = None,
+) -> list[dict[str, str]]:
     source = row["source"]
     reference = row["target"]
     examples = [
@@ -153,14 +189,48 @@ def verifier_examples_for_row(row: dict[str, str], rng: random.Random) -> list[d
                 "label": verifier_target(0.48, "major", "word_order_or_fluency_damage"),
             }
         )
+    examples.append(
+        {
+            "source": source,
+            "reference": reference,
+            "candidate": repeat_translation(reference),
+            "label": verifier_target(0.72, "minor", "repetition_or_fluency_damage"),
+        }
+    )
+    distractor = other_target(reference, distractors or (), rng)
+    if distractor:
+        examples.extend(
+            [
+                {
+                    "source": source,
+                    "reference": reference,
+                    "candidate": distractor,
+                    "label": verifier_target(0.16, "critical", "fluent_but_semantically_unrelated_chanka"),
+                },
+                {
+                    "source": source,
+                    "reference": reference,
+                    "candidate": mix_translations(reference, distractor),
+                    "label": verifier_target(0.42, "major", "mixed_translation_from_another_example"),
+                },
+                {
+                    "source": source,
+                    "reference": reference,
+                    "candidate": unsupported_chanka_addition(reference, distractor),
+                    "label": verifier_target(0.64, "minor", "unsupported_extra_chanka_content"),
+                },
+            ]
+        )
     return examples
 
 
 def build_verifier_rows(rows: Iterable[dict[str, str]], seed: int) -> list[dict[str, str]]:
     rng = random.Random(seed)
+    row_list = list(rows)
+    distractors = [row["target"] for row in row_list]
     examples: list[dict[str, str]] = []
-    for row in rows:
-        examples.extend(verifier_examples_for_row(row, rng))
+    for row in row_list:
+        examples.extend(verifier_examples_for_row(row, rng, distractors=distractors))
     rng.shuffle(examples)
     return examples
 

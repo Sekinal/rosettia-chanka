@@ -35,13 +35,30 @@ class TrainVerifierChankaUnslothTests(unittest.TestCase):
         self.assertLessEqual(min(label["score"] for label in labels), 0.05)
         self.assertTrue(any(example["candidate"] == "No es un buen esposo" for example in examples))
 
+    def test_verifier_examples_include_hard_chanka_negatives(self):
+        examples = verifier.verifier_examples_for_row(
+            {"source": "No es un buen esposo", "target": "Mana allin qusa", "source_name": "manual", "variant": "quy"},
+            random.Random(7),
+            distractors=["Allin punchaw taytay", "Huk punchawmi hamusaq"],
+        )
+        labels = [json.loads(example["label"]) for example in examples]
+        rationales = {label["rationale"] for label in labels}
+
+        self.assertIn("fluent_but_semantically_unrelated_chanka", rationales)
+        self.assertIn("mixed_translation_from_another_example", rationales)
+        self.assertIn("unsupported_extra_chanka_content", rationales)
+        self.assertTrue(any(0.1 <= label["score"] <= 0.7 for label in labels))
+
     def test_build_verifier_rows_expands_parallel_rows(self):
         rows = verifier.build_verifier_rows(
-            [{"source": "A", "target": "B", "source_name": "manual", "variant": "quy"}],
+            [
+                {"source": "A", "target": "B", "source_name": "manual", "variant": "quy"},
+                {"source": "C", "target": "D", "source_name": "manual", "variant": "quy"},
+            ],
             seed=1,
         )
 
-        self.assertGreaterEqual(len(rows), 4)
+        self.assertGreaterEqual(len(rows), 14)
 
 
 if __name__ == "__main__":
