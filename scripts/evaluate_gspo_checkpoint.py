@@ -97,6 +97,9 @@ def main() -> None:
         load_in_16bit=True,
         full_finetuning=False,
     )
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "left"
     FastLanguageModel.for_inference(model)
 
     predictions = generate_predictions_with_progress(
