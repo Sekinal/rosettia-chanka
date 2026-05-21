@@ -36,6 +36,10 @@ evaluate_checkpoint \
   "outputs/gspo_selected_checkpoints/learned_verifier_on_vibe112_checkpoint_56" \
   "learned_verifier_on_vibe112_checkpoint_56_preserved"
 
+evaluate_checkpoint \
+  "outputs/gspo_selected_checkpoints/learned_verifier_on_vibe112_checkpoint_112" \
+  "learned_verifier_on_vibe112_checkpoint_112_preserved"
+
 for checkpoint in 896 1008 1120 1232 1344 1456 1486; do
   evaluate_checkpoint \
     "outputs/gspo_full_contenders/vibethinker_2511_phase2_from112_eval112_20260521-0909/chanka_gspo/checkpoint-${checkpoint}" \
