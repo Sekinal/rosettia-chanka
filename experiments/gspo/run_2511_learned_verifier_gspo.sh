@@ -9,7 +9,8 @@ VERIFIER_OUTPUT_DIR="${VERIFIER_OUTPUT_DIR:-outputs/chanka_translation_verifier_
 VERIFIER_ADAPTER_PATH="${VERIFIER_ADAPTER_PATH:-$VERIFIER_OUTPUT_DIR/final_verifier_lora}"
 
 if [[ ! -d "$VERIFIER_ADAPTER_PATH" ]]; then
-  python scripts/train_verifier_chanka_unsloth.py \
+  verifier_args=(
+    scripts/train_verifier_chanka_unsloth.py
     --output-dir "$VERIFIER_OUTPUT_DIR" \
     --num-train-epochs "${VERIFIER_NUM_TRAIN_EPOCHS:-5}" \
     --max-steps "${VERIFIER_MAX_STEPS:--1}" \
@@ -20,12 +21,15 @@ if [[ ! -d "$VERIFIER_ADAPTER_PATH" ]]; then
     --per-device-eval-batch-size "${VERIFIER_EVAL_BATCH_SIZE:-4}" \
     --gradient-accumulation-steps "${VERIFIER_GRADIENT_ACCUMULATION_STEPS:-4}" \
     --evals-per-epoch "${VERIFIER_EVALS_PER_EPOCH:-8}" \
-    --logging-steps "${VERIFIER_LOGGING_STEPS:-10}" \
-    ${VERIFIER_MAX_TRAIN_SAMPLES:+--max-train-samples "$VERIFIER_MAX_TRAIN_SAMPLES"} \
-    ${VERIFIER_MAX_EVAL_SAMPLES:+--max-eval-samples "$VERIFIER_MAX_EVAL_SAMPLES"}
+    --logging-steps "${VERIFIER_LOGGING_STEPS:-10}"
+  )
+  [[ -n "${VERIFIER_MAX_TRAIN_SAMPLES:-}" ]] && verifier_args+=(--max-train-samples "$VERIFIER_MAX_TRAIN_SAMPLES")
+  [[ -n "${VERIFIER_MAX_EVAL_SAMPLES:-}" ]] && verifier_args+=(--max-eval-samples "$VERIFIER_MAX_EVAL_SAMPLES")
+  python "${verifier_args[@]}"
 fi
 
-python scripts/train_gspo_chanka_unsloth.py \
+gspo_args=(
+  scripts/train_gspo_chanka_unsloth.py
   --reward-profile "${GSPO_REWARD_PROFILE:-learned_verifier_2511}" \
   --verifier-adapter-path "$VERIFIER_ADAPTER_PATH" \
   --verifier-batch-size "${VERIFIER_REWARD_BATCH_SIZE:-4}" \
@@ -41,10 +45,14 @@ python scripts/train_gspo_chanka_unsloth.py \
   --logging-steps "${LOGGING_STEPS:-10}" \
   --no-log-completions \
   --temperature "${TEMPERATURE:-0.75}" \
-  --top-p "${TOP_P:-0.90}" \
-  ${MAX_STEPS:+--max-steps "$MAX_STEPS"} \
-  ${RESUME_FROM_CHECKPOINT:+--resume-from-checkpoint "$RESUME_FROM_CHECKPOINT"} \
-  ${MAX_TRAIN_SAMPLES:+--max-train-samples "$MAX_TRAIN_SAMPLES"} \
-  ${MAX_EVAL_SAMPLES:+--max-eval-samples "$MAX_EVAL_SAMPLES"} \
-  ${EVAL_STEPS:+--eval-steps "$EVAL_STEPS"} \
-  ${SAVE_STEPS:+--save-steps "$SAVE_STEPS"}
+  --top-p "${TOP_P:-0.90}"
+)
+
+[[ -n "${MAX_STEPS:-}" ]] && gspo_args+=(--max-steps "$MAX_STEPS")
+[[ -n "${RESUME_FROM_CHECKPOINT:-}" ]] && gspo_args+=(--resume-from-checkpoint "$RESUME_FROM_CHECKPOINT")
+[[ -n "${MAX_TRAIN_SAMPLES:-}" ]] && gspo_args+=(--max-train-samples "$MAX_TRAIN_SAMPLES")
+[[ -n "${MAX_EVAL_SAMPLES:-}" ]] && gspo_args+=(--max-eval-samples "$MAX_EVAL_SAMPLES")
+[[ -n "${EVAL_STEPS:-}" ]] && gspo_args+=(--eval-steps "$EVAL_STEPS")
+[[ -n "${SAVE_STEPS:-}" ]] && gspo_args+=(--save-steps "$SAVE_STEPS")
+
+python "${gspo_args[@]}"
