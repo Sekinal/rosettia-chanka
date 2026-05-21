@@ -54,5 +54,6 @@ gspo_args=(
 [[ -n "${MAX_EVAL_SAMPLES:-}" ]] && gspo_args+=(--max-eval-samples "$MAX_EVAL_SAMPLES")
 [[ -n "${EVAL_STEPS:-}" ]] && gspo_args+=(--eval-steps "$EVAL_STEPS")
 [[ -n "${SAVE_STEPS:-}" ]] && gspo_args+=(--save-steps "$SAVE_STEPS")
+[[ -n "${SECONDARY_VERIFIER_ADAPTER_PATH:-}" ]] && gspo_args+=(--secondary-verifier-adapter-path "$SECONDARY_VERIFIER_ADAPTER_PATH")
 
 python "${gspo_args[@]}"

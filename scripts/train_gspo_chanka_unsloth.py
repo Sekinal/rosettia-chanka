@@ -40,6 +40,7 @@ REWARD_PROFILES = (
     "rosettia_guard_v2",
     "learned_verifier_2511",
     "learned_verifier_vibe_2511",
+    "learned_verifier_ensemble_vibe_2511",
 )
 SPANISH_STOPWORDS = {
     "el",
@@ -125,6 +126,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--verifier-max-seq-length", type=int, default=512)
     parser.add_argument("--verifier-max-new-tokens", type=int, default=96)
     parser.add_argument("--verifier-batch-size", type=int, default=4)
+    parser.add_argument(
+        "--secondary-verifier-adapter-path",
+        type=Path,
+        default=None,
+        help="Optional second verifier LoRA for learned_verifier_ensemble_vibe_2511.",
+    )
     return parser.parse_args(argv)
 
 
@@ -648,6 +655,42 @@ def learned_verifier_rewards(
     return rewards
 
 
+def learned_verifier_ensemble_rewards(
+    primary_scorer: LearnedVerifierScorer,
+    secondary_scorer: LearnedVerifierScorer,
+    hypotheses: list[str],
+    references: list[str],
+    sources: list[str | None],
+) -> list[float]:
+    primary_scores = primary_scorer.score_many(sources, references, hypotheses)
+    secondary_scores = secondary_scorer.score_many(sources, references, hypotheses)
+    rewards: list[float] = []
+    for primary_score, secondary_score, hypothesis, reference, source in zip(
+        primary_scores,
+        secondary_scores,
+        hypotheses,
+        references,
+        sources,
+        strict=True,
+    ):
+        chrf = sentence_chrfpp(hypothesis, reference)
+        bleu = sentence_bleu(hypothesis, reference)
+        f1 = token_f1(hypothesis, reference)
+        length_score = length_ratio_score(hypothesis, reference)
+        guard_score = baseline_reward_score(hypothesis, reference, source, chrf, bleu, f1, length_score)
+        guard_penalty = (
+            0.35 * source_copy_ratio(hypothesis, source)
+            + 0.45 * spanish_leakage_penalty(hypothesis)
+            + 0.20 * repetition_penalty(hypothesis)
+            + 0.60 * chat_artifact_penalty(hypothesis)
+        )
+        if exact_source_copy(hypothesis, source):
+            guard_penalty += 0.50
+        verifier_score = (0.56 * primary_score) + (0.44 * secondary_score)
+        rewards.append((0.70 * verifier_score) + (0.30 * guard_score) - guard_penalty)
+    return rewards
+
+
 def add_vibethinker_diversity_bonus(rewards: list[float], hypotheses: list[str], sources: list[str | None]) -> list[float]:
     grouped: dict[str | None, list[int]] = {}
     for index, source in enumerate(sources):
@@ -687,18 +730,36 @@ def chanka_reward(
 def make_reward_fn(
     profile: str,
     verifier_adapter_path: Path | None = None,
+    secondary_verifier_adapter_path: Path | None = None,
     verifier_max_seq_length: int = 512,
     verifier_max_new_tokens: int = 96,
     verifier_batch_size: int = 4,
 ):
     verifier_scorer = None
-    if profile in {"learned_verifier_2511", "learned_verifier_vibe_2511"}:
+    secondary_verifier_scorer = None
+    learned_profiles = {
+        "learned_verifier_2511",
+        "learned_verifier_vibe_2511",
+        "learned_verifier_ensemble_vibe_2511",
+    }
+    if profile in learned_profiles:
         if verifier_adapter_path is None:
             raise ValueError(
                 "--verifier-adapter-path is required for learned-verifier reward profiles"
             )
         verifier_scorer = LearnedVerifierScorer(
             verifier_adapter_path,
+            max_seq_length=verifier_max_seq_length,
+            max_new_tokens=verifier_max_new_tokens,
+            batch_size=verifier_batch_size,
+        )
+    if profile == "learned_verifier_ensemble_vibe_2511":
+        if secondary_verifier_adapter_path is None:
+            raise ValueError(
+                "--secondary-verifier-adapter-path is required for learned_verifier_ensemble_vibe_2511"
+            )
+        secondary_verifier_scorer = LearnedVerifierScorer(
+            secondary_verifier_adapter_path,
             max_seq_length=verifier_max_seq_length,
             max_new_tokens=verifier_max_new_tokens,
             batch_size=verifier_batch_size,
@@ -713,6 +774,19 @@ def make_reward_fn(
             if profile == "learned_verifier_vibe_2511":
                 rewards = add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
             return rewards
+        if profile == "learned_verifier_ensemble_vibe_2511":
+            assert verifier_scorer is not None
+            assert secondary_verifier_scorer is not None
+            sources = list(source) if source is not None else [None] * len(target)
+            hypotheses = [completion_text(completion) for completion in completions]
+            rewards = learned_verifier_ensemble_rewards(
+                verifier_scorer,
+                secondary_verifier_scorer,
+                hypotheses,
+                list(target),
+                sources,
+            )
+            return add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
         return chanka_reward(completions, target, source=source, profile=profile, **kwargs)
 
     reward_fn.__name__ = f"chanka_reward_{profile}"
@@ -882,6 +956,7 @@ def main() -> None:
         reward_funcs=make_reward_fn(
             args.reward_profile,
             verifier_adapter_path=args.verifier_adapter_path,
+            secondary_verifier_adapter_path=args.secondary_verifier_adapter_path,
             verifier_max_seq_length=args.verifier_max_seq_length,
             verifier_max_new_tokens=args.verifier_max_new_tokens,
             verifier_batch_size=args.verifier_batch_size,

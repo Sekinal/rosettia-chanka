@@ -196,6 +196,16 @@ Update as of 2026-05-21 17:27 UTC:
 - Defaults: current best adapter as seed; candidate mining over `--split all`; two sampling settings (`temperature=0.75, top_p=0.90` and `temperature=0.95, top_p=0.95`); `4` return sequences per source; verifier max candidate examples `12000`; verifier max steps `1200`; GSPO canary max steps `24`.
 - Expected artifacts: candidates under `outputs/verifier_candidate_mining/20260521-verifier-v3-sampled`, verifier under `outputs/chanka_translation_verifier_sampled_candidates_v3_20260521-verifier-v3-sampled`, canary under `outputs/gspo_paper_profiles/2511_verifier_v3_sampled_candidates_on_best_20260521-verifier-v3-sampled`, eval summary under `outputs/gspo_checkpoint_evals/20260521-verifier-v3-sampled-verifier-v3-canary`.
 
+Update as of 2026-05-21 20:43 UTC:
+
+- Verifier-v3 completed end to end. Candidate mining generated two 4,220-row sampled candidate sets from the standing best adapter. The conservative set (`temperature=0.75`, `top_p=0.90`) scored chrF++ `38.5675`, BLEU `8.0288`, token F1 `22.4317`; the noisy set (`temperature=0.95`, `top_p=0.95`) scored chrF++ `34.2871`, BLEU `5.0552`, token F1 `17.9062`.
+- Verifier-v3 training used 7,150 deduped real candidate examples and 15,824 verifier examples total. Eval loss improved through the run and finished best at checkpoint `1200`: `0.07788554579019547`.
+- Verifier-v3 GSPO canary improved over verifier-v2 but did not beat the standing best. Eval dir: `outputs/gspo_checkpoint_evals/20260521-verifier-v3-sampled-verifier-v3-canary`. Ranking: checkpoint `16` selection `25.7042`, chrF++ `40.5972`, BLEU `5.8257`, token F1 `26.1197`, source-copy `2.6688%`, exact-copy `0.6329%`, leakage `0.6329%`, artifact `0.0%`, TER `89.6313`; checkpoint `24`/final selection `25.6788`; checkpoint `8` selection `25.1603`.
+- Added `learned_verifier_ensemble_vibe_2511`, which ensembles a primary and secondary learned verifier before applying the Vibe diversity bonus. It takes `--verifier-adapter-path` plus `--secondary-verifier-adapter-path`. The canary script is `experiments/gspo/run_verifier_ensemble_canary.sh`.
+- The v1+v3 ensemble canary also failed to beat the standing best and underperformed v3 alone. Eval dir: `outputs/gspo_checkpoint_evals/20260521-verifier-ensemble-v1-v3-verifier-ensemble-v1-v3-canary`. Best checkpoint `24` selection `25.2932`, chrF++ `40.1285`, BLEU `5.8648`, token F1 `25.1627`, source-copy `2.6688%`, exact-copy `0.6329%`, leakage `0.7911%`, artifact `0.0%`, TER `89.6313`.
+- Current best remains `learned_verifier_vibe_on_vibe896_4gen_canary` with selection `26.3808`, chrF++ `40.9703`, BLEU `8.1555`, token F1 `26.6169`, source-copy `2.8270%`, exact-copy `0.6329%`, leakage `0.6329%`, artifact `0.0%`, TER `88.7097`.
+- Interpretation: replacing or averaging the verifier is not enough. V3 adds harder discrimination, but it pushes BLEU down and does not improve the final policy. Next reward work should target policy dynamics rather than another verifier-only swap: shorter/lower-LR updates from the current best, reference-margin rewards, or explicit BLEU/terminology preservation blended with the v1 verifier signal.
+
 ## Smoke Results
 
 Remote: `root@216.81.248.197 -p 20299`, path `/root/rosettia-chanka`, GPU `NVIDIA L40S`.
