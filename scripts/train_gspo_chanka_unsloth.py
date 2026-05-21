@@ -26,6 +26,14 @@ CHANKA_FILE = "clean_chanka/manual_quechua_chanka_parallel_training_ready_augmen
 DEFAULT_SFT_CHECKPOINT = (
     "outputs/qwen35_2b_broad_lora_r64_a128_seq512_b16_ga1/broad/checkpoint-10400"
 )
+REWARD_PROFILE = "baseline"
+REWARD_PROFILES = (
+    "baseline",
+    "fg_severity_2411",
+    "severity_proxy_2310",
+    "self_verifier_2511",
+    "vibethinker_2511",
+)
 SPANISH_STOPWORDS = {
     "el",
     "la",
@@ -87,6 +95,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--evals-per-epoch", type=int, default=8)
     parser.add_argument("--logging-steps", type=int, default=5)
     parser.add_argument("--log-completions", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--reward-profile",
+        choices=REWARD_PROFILES,
+        default="baseline",
+        help="Paper-inspired reward profile to test independently.",
+    )
     parser.add_argument("--metrics-json", type=Path, default=None)
     parser.add_argument("--wandb-project", default=None)
     return parser.parse_args(argv)
@@ -165,18 +179,16 @@ def configure_step_schedule(args: argparse.Namespace, train_row_count: int) -> N
 
 
 def validate_grpo_batching(args: argparse.Namespace) -> None:
-    train_global_batch = args.per_device_train_batch_size * args.gradient_accumulation_steps
-    eval_global_batch = args.per_device_eval_batch_size
-    if train_global_batch % args.num_generations != 0:
+    if args.per_device_train_batch_size % args.num_generations != 0:
         raise ValueError(
-            "GRPO/GSPO requires train batch * gradient accumulation "
-            f"({train_global_batch}) to be divisible by num_generations "
+            "Unsloth GRPO/GSPO expects per-device train batch size "
+            f"({args.per_device_train_batch_size}) to be divisible by num_generations "
             f"({args.num_generations})."
         )
-    if eval_global_batch % args.num_generations != 0:
+    if args.per_device_eval_batch_size % args.num_generations != 0:
         raise ValueError(
-            "GRPO/GSPO requires eval batch "
-            f"({eval_global_batch}) to be divisible by num_generations "
+            "Unsloth GRPO/GSPO expects per-device eval batch size "
+            f"({args.per_device_eval_batch_size}) to be divisible by num_generations "
             f"({args.num_generations})."
         )
 
@@ -188,7 +200,8 @@ def prompt_messages(source: str) -> list[dict[str, str]]:
             "role": "user",
             "content": (
                 "Traduce del español al quechua chanka. Usa una traducción directa, "
-                "fiel y apropiada para contexto judicial.\n\n"
+                "natural y fiel. Conserva nombres, números y entidades; evita copiar "
+                "el español salvo cuando sea necesario.\n\n"
                 f"Español: {source}"
             ),
         },
@@ -212,6 +225,10 @@ def build_dataset(rows: Iterable[dict[str, str]]) -> Dataset:
 
 def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
+
+
+def word_tokens(text: str) -> list[str]:
+    return re.findall(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9]+", normalize_text(text).lower())
 
 
 def completion_text(completion: object) -> str:
@@ -243,8 +260,8 @@ def sentence_bleu(hypothesis: str, reference: str) -> float:
 
 
 def token_f1(hypothesis: str, reference: str) -> float:
-    hyp_tokens = normalize_text(hypothesis).lower().split()
-    ref_tokens = normalize_text(reference).lower().split()
+    hyp_tokens = word_tokens(hypothesis)
+    ref_tokens = word_tokens(reference)
     if not hyp_tokens or not ref_tokens:
         return 0.0
     ref_counts: dict[str, int] = {}
@@ -270,24 +287,207 @@ def length_ratio_score(hypothesis: str, reference: str) -> float:
 
 
 def spanish_leakage_penalty(hypothesis: str) -> float:
-    tokens = re.findall(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+", hypothesis.lower())
+    tokens = word_tokens(hypothesis)
     if not tokens:
         return 0.0
     leaked = sum(1 for token in tokens if token in SPANISH_STOPWORDS)
     return min(0.25, leaked / max(4, len(tokens)))
 
 
-def chanka_reward(completions: list, target: list[str], source: list[str] | None = None, **_: object) -> list[float]:
+def source_copy_ratio(hypothesis: str, source: str | None) -> float:
+    if not source:
+        return 0.0
+    hyp_tokens = [token for token in word_tokens(hypothesis) if token not in SPANISH_STOPWORDS]
+    source_tokens = [token for token in word_tokens(source) if token not in SPANISH_STOPWORDS]
+    if not hyp_tokens or not source_tokens:
+        return 0.0
+    source_set = set(source_tokens)
+    copied = sum(1 for token in hyp_tokens if token in source_set)
+    return copied / len(hyp_tokens)
+
+
+def exact_source_copy(hypothesis: str, source: str | None) -> bool:
+    return bool(source) and normalize_text(hypothesis).lower() == normalize_text(str(source)).lower()
+
+
+def repetition_penalty(hypothesis: str, ngram_size: int = 3) -> float:
+    tokens = word_tokens(hypothesis)
+    if len(tokens) < ngram_size * 2:
+        return 0.0
+    ngrams = [tuple(tokens[index : index + ngram_size]) for index in range(len(tokens) - ngram_size + 1)]
+    repeated = len(ngrams) - len(set(ngrams))
+    return min(0.20, repeated / max(1, len(ngrams)))
+
+
+def source_entities(source: str | None) -> set[str]:
+    if not source:
+        return set()
+    entities = set(re.findall(r"\b\d+(?:[.,]\d+)*\b", source))
+    entities.update(re.findall(r"\b[A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑa-záéíóúüñ]{2,}\b", source))
+    return entities
+
+
+def entity_preservation_score(hypothesis: str, source: str | None) -> float:
+    entities = source_entities(source)
+    if not entities:
+        return 1.0
+    hypothesis_lower = hypothesis.lower()
+    preserved = sum(1 for entity in entities if entity.lower() in hypothesis_lower)
+    return preserved / len(entities)
+
+
+def severity_penalty(
+    hypothesis: str,
+    reference: str,
+    source: str | None,
+    chrf: float,
+    f1: float,
+    length_score: float,
+) -> float:
+    """Transparent minor/major/critical severity map for translation failures."""
+    penalty = 0.0
+    copy_ratio = source_copy_ratio(hypothesis, source)
+    if exact_source_copy(hypothesis, source):
+        penalty += 0.55  # critical
+    elif copy_ratio >= 0.55:
+        penalty += 0.35  # major
+    elif copy_ratio >= 0.30:
+        penalty += 0.15  # minor
+
+    leakage = spanish_leakage_penalty(hypothesis)
+    if leakage >= 0.18:
+        penalty += 0.30
+    elif leakage >= 0.08:
+        penalty += 0.15
+    else:
+        penalty += leakage
+
+    if chrf < 0.18 and f1 < 0.12:
+        penalty += 0.35
+    elif chrf < 0.30 and f1 < 0.20:
+        penalty += 0.18
+
+    if length_score < 0.55:
+        penalty += 0.20
+    elif length_score < 0.70:
+        penalty += 0.10
+
+    entity_score = entity_preservation_score(hypothesis, source)
+    if entity_score < 0.5:
+        penalty += 0.25
+    elif entity_score < 1.0:
+        penalty += 0.10
+
+    penalty += repetition_penalty(hypothesis)
+    del reference
+    return min(1.0, penalty)
+
+
+def baseline_reward_score(
+    hypothesis: str,
+    reference: str,
+    source: str | None,
+    chrf: float,
+    bleu: float,
+    f1: float,
+    length_score: float,
+) -> float:
+    return (
+        (0.62 * chrf)
+        + (0.18 * bleu)
+        + (0.12 * f1)
+        + (0.08 * length_score)
+        - spanish_leakage_penalty(hypothesis)
+        - (0.20 * source_copy_ratio(hypothesis, source))
+    )
+
+
+def reward_score(
+    hypothesis: str,
+    reference: str,
+    source: str | None,
+    profile: str,
+) -> float:
+    chrf = sentence_chrfpp(hypothesis, reference)
+    bleu = sentence_bleu(hypothesis, reference)
+    f1 = token_f1(hypothesis, reference)
+    length_score = length_ratio_score(hypothesis, reference)
+    entity_score = entity_preservation_score(hypothesis, source)
+    severity = severity_penalty(hypothesis, reference, source, chrf, f1, length_score)
+    copy_ratio = source_copy_ratio(hypothesis, source)
+    leakage = spanish_leakage_penalty(hypothesis)
+    repetition = repetition_penalty(hypothesis)
+
+    if profile == "fg_severity_2411":
+        # 2411.05986: densify sparse sentence rewards with severity-weighted token/error signals.
+        return (0.42 * chrf) + (0.18 * f1) + (0.12 * bleu) + (0.14 * length_score) + (0.14 * entity_score) - severity
+    if profile == "severity_proxy_2310":
+        # 2310.10482 motivation only: sentence score plus transparent error severity.
+        # This is not xCOMET; it is a cheap ablation for severity-weighted rewards.
+        sentence_score = (0.48 * chrf) + (0.17 * bleu) + (0.15 * f1) + (0.10 * length_score) + (0.10 * entity_score)
+        return sentence_score - (0.85 * severity)
+    if profile == "self_verifier_2511":
+        # 2511.22570: verifier-style rubric; reward faithful translation plus explicit failure detection proxies.
+        meaning_score = (0.58 * chrf) + (0.27 * f1) + (0.15 * bleu)
+        verifier_score = (
+            (0.42 * meaning_score)
+            + (0.18 * (1.0 - min(1.0, copy_ratio * 1.8)))
+            + (0.16 * (1.0 - min(1.0, leakage * 4.0)))
+            + (0.12 * length_score)
+            + (0.08 * entity_score)
+            + (0.04 * (1.0 - min(1.0, repetition * 5.0)))
+        )
+        if exact_source_copy(hypothesis, source):
+            verifier_score -= 0.50
+        return verifier_score - (0.35 * severity)
+    if profile == "vibethinker_2511":
+        # 2511.06221: keep a broad candidate spectrum, then amplify the best signal.
+        return baseline_reward_score(hypothesis, reference, source, chrf, bleu, f1, length_score) - (0.25 * repetition)
+    return baseline_reward_score(hypothesis, reference, source, chrf, bleu, f1, length_score)
+
+
+def add_vibethinker_diversity_bonus(rewards: list[float], hypotheses: list[str], sources: list[str | None]) -> list[float]:
+    grouped: dict[str | None, list[int]] = {}
+    for index, source in enumerate(sources):
+        grouped.setdefault(source, []).append(index)
+    adjusted = rewards[:]
+    for indices in grouped.values():
+        normalized = [normalize_text(hypotheses[index]).lower() for index in indices]
+        counts = {text: normalized.count(text) for text in set(normalized)}
+        unique_count = len(counts)
+        for index, text in zip(indices, normalized, strict=True):
+            duplicate_penalty = 0.04 * max(0, counts[text] - 1)
+            diversity_bonus = 0.03 * (unique_count - 1) / max(1, len(indices) - 1)
+            adjusted[index] += diversity_bonus - duplicate_penalty
+    return adjusted
+
+
+def chanka_reward(
+    completions: list,
+    target: list[str],
+    source: list[str] | None = None,
+    profile: str | None = None,
+    **_: object,
+) -> list[float]:
+    active_profile = profile or REWARD_PROFILE
     rewards: list[float] = []
-    for completion, reference in zip(completions, target, strict=True):
+    hypotheses: list[str] = []
+    sources = list(source) if source is not None else [None] * len(target)
+    for completion, reference, source_text in zip(completions, target, sources, strict=True):
         hypothesis = completion_text(completion)
-        chrf = sentence_chrfpp(hypothesis, reference)
-        bleu = sentence_bleu(hypothesis, reference)
-        f1 = token_f1(hypothesis, reference)
-        length_score = length_ratio_score(hypothesis, reference)
-        copy_penalty = spanish_leakage_penalty(hypothesis)
-        rewards.append((0.62 * chrf) + (0.18 * bleu) + (0.12 * f1) + (0.08 * length_score) - copy_penalty)
+        hypotheses.append(hypothesis)
+        rewards.append(reward_score(hypothesis, reference, source_text, active_profile))
+    if active_profile == "vibethinker_2511":
+        rewards = add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
     return rewards
+
+
+def make_reward_fn(profile: str):
+    def reward_fn(completions: list, target: list[str], source: list[str] | None = None, **kwargs: object) -> list[float]:
+        return chanka_reward(completions, target, source=source, profile=profile, **kwargs)
+
+    reward_fn.__name__ = f"chanka_reward_{profile}"
+    return reward_fn
 
 
 def corpus_metrics(predictions: list[str], references: list[str], sources: list[str] | None = None) -> dict[str, float]:
@@ -320,9 +520,12 @@ def corpus_metrics(predictions: list[str], references: list[str], sources: list[
     }
     if sources:
         copied = 0
+        copy_ratios = []
         for prediction, source in zip(cleaned_predictions, sources, strict=True):
             copied += int(prediction.lower() == normalize_text(source).lower())
+            copy_ratios.append(source_copy_ratio(prediction, source))
         metrics["exact_source_copy_rate"] = 100.0 * copied / max(1, len(cleaned_predictions))
+        metrics["source_copy_ratio"] = 100.0 * sum(copy_ratios) / max(1, len(copy_ratios))
     return metrics
 
 
@@ -382,6 +585,8 @@ def make_jsonl_log_callback(path: Path):
 def main() -> None:
     args = parse_args()
     validate_grpo_batching(args)
+    global REWARD_PROFILE
+    REWARD_PROFILE = args.reward_profile
 
     from unsloth import FastLanguageModel
     import torch
@@ -430,14 +635,14 @@ def main() -> None:
     print(f"Validation rows: {len(eval_dataset):,}")
     print(f"Model or adapter: {model_name_or_adapter}")
     print('GSPO mode: GRPO with importance_sampling_level=\"sequence\"')
-    print(f"Reward: chrF++ + BLEU + token-F1 + length score - Spanish leakage penalty")
+    print(f"Reward profile: {args.reward_profile}")
     print(f"Validation: every {args.eval_steps} steps")
     print(f"Saving: every {args.save_steps} steps")
 
     trainer = GRPOTrainer(
         model=model,
         processing_class=tokenizer,
-        reward_funcs=chanka_reward,
+        reward_funcs=make_reward_fn(args.reward_profile),
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         callbacks=[make_jsonl_log_callback(run_dir / "scalar_logs.jsonl")],
@@ -494,6 +699,7 @@ def main() -> None:
     metrics["eval_rows"] = len(eval_rows)
     metrics["trainer_eval_reward"] = float(trainer_metrics.get("eval_reward", 0.0))
     metrics["final_adapter"] = str(final_dir)
+    metrics["reward_profile"] = args.reward_profile
     print(json.dumps(metrics, indent=2, sort_keys=True))
 
     metrics_path = args.metrics_json or (run_dir / "final_metrics.json")

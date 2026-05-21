@@ -16,15 +16,24 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             "outputs/qwen35_2b_broad_lora_r64_a128_seq512_b16_ga1/broad/checkpoint-10400",
         )
 
-    def test_prompt_is_chanka_judicial_translation_only(self):
+    def test_prompt_is_general_chanka_translation(self):
         messages = train_gspo.prompt_messages("Buenos dias.")
 
         self.assertEqual(messages[0]["role"], "system")
         self.assertIn("quechua chanka", messages[0]["content"])
         self.assertEqual(messages[1]["role"], "user")
-        self.assertIn("contexto judicial", messages[1]["content"])
+        self.assertIn("natural y fiel", messages[1]["content"])
+        self.assertIn("evita copiar", messages[1]["content"])
+        self.assertNotIn("contexto judicial", messages[1]["content"])
         self.assertIn("Buenos dias.", messages[1]["content"])
         self.assertNotIn("assistant", {message["role"] for message in messages})
+
+    def test_reward_profile_cli_accepts_paper_profiles(self):
+        for profile in train_gspo.REWARD_PROFILES:
+            args = train_gspo.parse_args(["--reward-profile", profile])
+            self.assertEqual(args.reward_profile, profile)
+
+        self.assertNotIn("xcomet_proxy_2310", train_gspo.REWARD_PROFILES)
 
     def test_build_dataset_keeps_targets_for_reward_not_sft_labels(self):
         dataset = train_gspo.build_dataset(
@@ -61,21 +70,30 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
 
     def test_grpo_batching_must_be_divisible_by_generations(self):
         valid = argparse.Namespace(
-            per_device_train_batch_size=1,
-            gradient_accumulation_steps=4,
+            per_device_train_batch_size=4,
+            gradient_accumulation_steps=1,
             per_device_eval_batch_size=4,
             num_generations=4,
         )
         train_gspo.validate_grpo_batching(valid)
 
-        invalid = argparse.Namespace(
-            per_device_train_batch_size=1,
+        invalid_train = argparse.Namespace(
+            per_device_train_batch_size=2,
             gradient_accumulation_steps=4,
+            per_device_eval_batch_size=4,
+            num_generations=4,
+        )
+        with self.assertRaises(ValueError):
+            train_gspo.validate_grpo_batching(invalid_train)
+
+        invalid_eval = argparse.Namespace(
+            per_device_train_batch_size=4,
+            gradient_accumulation_steps=1,
             per_device_eval_batch_size=1,
             num_generations=4,
         )
         with self.assertRaises(ValueError):
-            train_gspo.validate_grpo_batching(invalid)
+            train_gspo.validate_grpo_batching(invalid_eval)
 
     def test_completion_text_handles_conversational_completion(self):
         completion = [{"role": "assistant", "content": "  Allin   punchaw.  "}]
@@ -109,6 +127,25 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             train_gspo.spanish_leakage_penalty("allin punchaw taytay"),
         )
 
+    def test_source_copy_ratio_detects_copied_source_tokens(self):
+        self.assertGreater(
+            train_gspo.source_copy_ratio("Buenos dias autoridad.", "Buenos dias autoridad."),
+            train_gspo.source_copy_ratio("Allin punchaw kamachiq.", "Buenos dias autoridad."),
+        )
+
+    def test_severity_penalty_flags_exact_source_copy(self):
+        self.assertGreaterEqual(
+            train_gspo.severity_penalty(
+                "Buenos dias autoridad.",
+                "Allin punchaw kamachiq.",
+                "Buenos dias autoridad.",
+                chrf=0.1,
+                f1=0.0,
+                length_score=0.8,
+            ),
+            0.55,
+        )
+
     def test_reward_combines_metrics_and_penalty(self):
         with mock.patch.object(train_gspo, "sentence_chrfpp", return_value=0.8), mock.patch.object(
             train_gspo, "sentence_bleu", return_value=0.4
@@ -123,6 +160,14 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             )[0]
 
         self.assertGreater(good, leaked)
+
+    def test_vibethinker_profile_rewards_diverse_group(self):
+        base = [0.2, 0.2, 0.2, 0.2]
+        sources = ["a", "a", "a", "a"]
+        repeated = train_gspo.add_vibethinker_diversity_bonus(base, ["x", "x", "x", "x"], sources)
+        diverse = train_gspo.add_vibethinker_diversity_bonus(base, ["x", "y", "z", "w"], sources)
+
+        self.assertGreater(sum(diverse), sum(repeated))
 
 
 if __name__ == "__main__":
