@@ -70,6 +70,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=Path(DEFAULT_SFT_CHECKPOINT),
         help="Broad SFT LoRA checkpoint to continue from. Defaults to the current LoRA baseline checkpoint.",
     )
+    parser.add_argument(
+        "--resume-from-checkpoint",
+        type=Path,
+        default=None,
+        help="Trainer checkpoint to resume from, preserving optimizer and scheduler state.",
+    )
     parser.add_argument("--dataset-repo", default=DATASET_REPO)
     parser.add_argument("--dataset-file", default=CHANKA_FILE)
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/qwen35_2b_chanka_gspo"))
@@ -872,7 +878,11 @@ def main() -> None:
         ),
     )
 
-    trainer.train()
+    trainer.train(
+        resume_from_checkpoint=str(args.resume_from_checkpoint)
+        if args.resume_from_checkpoint
+        else None
+    )
     trainer_metrics = latest_eval_metrics(trainer.state.log_history)
     print(trainer_metrics)
 

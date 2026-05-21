@@ -52,5 +52,6 @@ python scripts/train_gspo_chanka_unsloth.py \
   --temperature "${TEMPERATURE:-0.75}" \
   --top-p "${TOP_P:-0.90}" \
   ${MAX_STEPS:+--max-steps "$MAX_STEPS"} \
+  ${RESUME_FROM_CHECKPOINT:+--resume-from-checkpoint "$RESUME_FROM_CHECKPOINT"} \
   ${MAX_TRAIN_SAMPLES:+--max-train-samples "$MAX_TRAIN_SAMPLES"} \
   ${MAX_EVAL_SAMPLES:+--max-eval-samples "$MAX_EVAL_SAMPLES"}

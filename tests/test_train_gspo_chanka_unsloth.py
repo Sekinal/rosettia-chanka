@@ -15,6 +15,16 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             str(args.adapter_path),
             "outputs/qwen35_2b_broad_lora_r64_a128_seq512_b16_ga1/broad/checkpoint-10400",
         )
+        self.assertIsNone(args.resume_from_checkpoint)
+
+    def test_resume_checkpoint_cli_is_optional(self):
+        args = train_gspo.parse_args(
+            ["--resume-from-checkpoint", "outputs/run/chanka_gspo/checkpoint-56"]
+        )
+
+        self.assertEqual(
+            str(args.resume_from_checkpoint), "outputs/run/chanka_gspo/checkpoint-56"
+        )
 
     def test_prompt_is_general_chanka_translation(self):
         messages = train_gspo.prompt_messages("Buenos dias.")
