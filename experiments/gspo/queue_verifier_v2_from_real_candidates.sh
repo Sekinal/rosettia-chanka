@@ -38,6 +38,7 @@ for path in "${candidate_jsonl[@]}"; do
   candidate_args+=(--candidate-jsonl "$path")
 done
 
+set +e
 python scripts/train_verifier_chanka_unsloth.py \
   --output-dir "$VERIFIER_OUTPUT_DIR" \
   "${candidate_args[@]}" \
@@ -53,6 +54,47 @@ python scripts/train_verifier_chanka_unsloth.py \
   --gradient-accumulation-steps "${VERIFIER_GRADIENT_ACCUMULATION_STEPS:-4}" \
   --evals-per-epoch "${VERIFIER_EVALS_PER_EPOCH:-8}" \
   --logging-steps "${VERIFIER_LOGGING_STEPS:-10}"
+verifier_status="$?"
+set -e
+
+verifier_adapter="$VERIFIER_OUTPUT_DIR/final_verifier_lora"
+if [[ ! -d "$verifier_adapter" ]]; then
+  verifier_adapter="$(
+    python - "$VERIFIER_OUTPUT_DIR" <<'PY'
+import json
+import math
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+best_path = None
+best_loss = math.inf
+for state_path in sorted(root.glob("checkpoint-*/trainer_state.json")):
+    try:
+        state = json.loads(state_path.read_text())
+    except Exception:
+        continue
+    for row in state.get("log_history", []):
+        if "eval_loss" not in row:
+            continue
+        loss = float(row["eval_loss"])
+        if loss < best_loss:
+            best_loss = loss
+            best_path = state_path.parent
+
+if best_path is None:
+    checkpoints = sorted(root.glob("checkpoint-*"), key=lambda p: int(p.name.split("-")[-1]))
+    best_path = checkpoints[-1] if checkpoints else None
+if best_path is None:
+    raise SystemExit("no verifier checkpoint found")
+print(best_path)
+PY
+  )"
+fi
+
+if [[ "$verifier_status" -ne 0 ]]; then
+  echo "Verifier training exited with status $verifier_status; continuing with checkpoint: $verifier_adapter" >&2
+fi
 
 best_adapter="$(
   python - "$FULL_EVAL_DIR/summary.jsonl" <<'PY'
@@ -70,7 +112,7 @@ PY
 env \
   ROOT_DIR="$ROOT_DIR" \
   GSPO_REWARD_PROFILE=learned_verifier_vibe_2511 \
-  VERIFIER_ADAPTER_PATH="$VERIFIER_OUTPUT_DIR/final_verifier_lora" \
+  VERIFIER_ADAPTER_PATH="$verifier_adapter" \
   VERIFIER_REWARD_BATCH_SIZE="${VERIFIER_REWARD_BATCH_SIZE:-2}" \
   SFT_ADAPTER_PATH="$best_adapter" \
   GSPO_OUTPUT_DIR="$CANARY_OUTPUT_DIR" \
