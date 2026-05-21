@@ -143,6 +143,13 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             train_gspo.chat_artifact_penalty("Allin punchaw taytay"),
         )
 
+    def test_strip_chat_artifacts_keeps_translation_prefix(self):
+        self.assertEqual(
+            train_gspo.strip_chat_artifacts("Allin punchaw user Allin punchaw assistant <think></think>"),
+            "Allin punchaw",
+        )
+        self.assertEqual(train_gspo.strip_chat_artifacts("Allin punchaw taytay"), "Allin punchaw taytay")
+
     def test_source_copy_ratio_detects_copied_source_tokens(self):
         self.assertGreater(
             train_gspo.source_copy_ratio("Buenos dias autoridad.", "Buenos dias autoridad."),

@@ -357,6 +357,17 @@ def chat_artifact_penalty(hypothesis: str) -> float:
     return min(0.60, 0.18 * hits)
 
 
+def strip_chat_artifacts(text: str) -> str:
+    normalized = normalize_text(text)
+    match = re.search(
+        r"(?i)(?:<think|</think|<\|im_start\|>|<\|im_end\|>|\b(?:assistant|user|system)\b)",
+        normalized,
+    )
+    if not match:
+        return normalized
+    return normalize_text(normalized[: match.start()])
+
+
 def source_entities(source: str | None) -> set[str]:
     if not source:
         return set()

@@ -28,6 +28,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--validation-fraction", type=float, default=0.15)
     parser.add_argument("--max-eval-samples", type=int, default=None)
     parser.add_argument("--progress-every", type=int, default=16)
+    parser.add_argument("--strip-chat-artifacts", action="store_true")
     parser.add_argument("--seed", type=int, default=3407)
     return parser.parse_args(argv)
 
@@ -39,6 +40,7 @@ def generate_predictions_with_progress(
     max_completion_length: int,
     batch_size: int,
     progress_every: int,
+    strip_chat_artifacts: bool,
 ) -> list[str]:
     import torch
 
@@ -69,7 +71,12 @@ def generate_predictions_with_progress(
             )
         for row_index in range(len(batch_rows)):
             completion_ids = output_ids[row_index, prompt_length:]
-            predictions.append(gspo.normalize_text(tokenizer.decode(completion_ids, skip_special_tokens=True)))
+            prediction = tokenizer.decode(completion_ids, skip_special_tokens=True)
+            if strip_chat_artifacts:
+                prediction = gspo.strip_chat_artifacts(prediction)
+            else:
+                prediction = gspo.normalize_text(prediction)
+            predictions.append(prediction)
         completed = min(total, start + len(batch_rows))
         if progress_every > 0 and (completed == total or completed % progress_every == 0):
             print(f"generated {completed}/{total} predictions", flush=True)
@@ -109,6 +116,7 @@ def main() -> None:
         args.max_completion_length,
         args.batch_size,
         args.progress_every,
+        args.strip_chat_artifacts,
     )
     references = [row["target"] for row in eval_rows]
     sources = [row["source"] for row in eval_rows]
