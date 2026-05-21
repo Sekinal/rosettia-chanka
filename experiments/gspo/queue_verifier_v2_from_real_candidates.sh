@@ -8,6 +8,7 @@ BASELINE_EVAL_DIR="${BASELINE_EVAL_DIR:-outputs/gspo_checkpoint_evals/20260521-e
 FULL_EVAL_DIR="${FULL_EVAL_DIR:-outputs/gspo_checkpoint_evals/20260521-vibe896-full-eval}"
 VERIFIER_OUTPUT_DIR="${VERIFIER_OUTPUT_DIR:-outputs/chanka_translation_verifier_real_candidates_v2_${STAMP}}"
 CANARY_OUTPUT_DIR="${CANARY_OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_verifier_v2_real_candidates_on_best_${STAMP}}"
+VERIFIER_SELECTED_DIR="${VERIFIER_SELECTED_DIR:-outputs/verifier_selected_checkpoints}"
 
 cd "$ROOT_DIR"
 source .venv/bin/activate
@@ -60,16 +61,18 @@ set -e
 verifier_adapter="$VERIFIER_OUTPUT_DIR/final_verifier_lora"
 if [[ ! -d "$verifier_adapter" ]]; then
   verifier_adapter="$(
-    python - "$VERIFIER_OUTPUT_DIR" <<'PY'
+    python - "$VERIFIER_OUTPUT_DIR" "$VERIFIER_SELECTED_DIR" <<'PY'
 import json
 import math
 import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
+selected = Path(sys.argv[2])
 best_path = None
 best_loss = math.inf
-for state_path in sorted(root.glob("checkpoint-*/trainer_state.json")):
+for search_root in (root, selected):
+  for state_path in sorted(search_root.glob("**/trainer_state.json")):
     try:
         state = json.loads(state_path.read_text())
     except Exception:
