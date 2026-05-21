@@ -341,6 +341,22 @@ def repetition_penalty(hypothesis: str, ngram_size: int = 3) -> float:
     return min(0.20, repeated / max(1, len(ngrams)))
 
 
+def chat_artifact_penalty(hypothesis: str) -> float:
+    normalized = normalize_text(hypothesis).lower()
+    artifacts = (
+        "<think",
+        "</think",
+        "<|im_start|>",
+        "<|im_end|>",
+        " assistant ",
+        " user ",
+        " system ",
+    )
+    padded = f" {normalized} "
+    hits = sum(padded.count(artifact) for artifact in artifacts)
+    return min(0.60, 0.18 * hits)
+
+
 def source_entities(source: str | None) -> set[str]:
     if not source:
         return set()
@@ -401,6 +417,7 @@ def severity_penalty(
         penalty += 0.10
 
     penalty += repetition_penalty(hypothesis)
+    penalty += chat_artifact_penalty(hypothesis)
     del reference
     return min(1.0, penalty)
 
@@ -421,6 +438,7 @@ def baseline_reward_score(
         + (0.08 * length_score)
         - spanish_leakage_penalty(hypothesis)
         - (0.20 * source_copy_ratio(hypothesis, source))
+        - chat_artifact_penalty(hypothesis)
     )
 
 
@@ -439,6 +457,7 @@ def reward_score(
     copy_ratio = source_copy_ratio(hypothesis, source)
     leakage = spanish_leakage_penalty(hypothesis)
     repetition = repetition_penalty(hypothesis)
+    artifacts = chat_artifact_penalty(hypothesis)
     anti_copy = 1.0 - min(1.0, copy_ratio * 1.8)
     anti_leakage = 1.0 - min(1.0, leakage * 4.0)
 
@@ -464,7 +483,7 @@ def reward_score(
     if exact_source_copy(hypothesis, source):
         verifier_score -= 0.50
     verifier_score -= 0.35 * severity
-    vibe_score = baseline_score - (0.25 * repetition)
+    vibe_score = baseline_score - (0.25 * repetition) - artifacts
 
     if profile == "fg_severity_2411":
         # 2411.05986: densify sparse sentence rewards with severity-weighted token/error signals.
@@ -492,15 +511,16 @@ def reward_score(
             + (0.10 * vibe_score)
             - (0.15 * copy_ratio)
             - (0.25 * leakage)
+            - (0.30 * artifacts)
         )
     if profile == "rosettia_guard_v1":
         quality = (0.45 * chrf) + (0.25 * f1) + (0.10 * bleu)
         guards = (0.08 * length_score) + (0.06 * entity_score) + (0.06 * anti_copy) + (0.06 * anti_leakage)
-        return quality + guards - (0.45 * severity) - (0.15 * repetition)
+        return quality + guards - (0.45 * severity) - (0.15 * repetition) - (0.20 * artifacts)
     if profile == "rosettia_guard_v2":
         quality = (0.34 * chrf) + (0.24 * f1) + (0.08 * bleu)
         guards = (0.12 * length_score) + (0.08 * entity_score) + (0.10 * anti_copy) + (0.08 * anti_leakage)
-        return quality + guards - (0.30 * severity) - (0.20 * repetition)
+        return quality + guards - (0.30 * severity) - (0.20 * repetition) - (0.25 * artifacts)
     return baseline_score
 
 
@@ -606,6 +626,7 @@ def learned_verifier_rewards(
             0.35 * source_copy_ratio(hypothesis, source)
             + 0.45 * spanish_leakage_penalty(hypothesis)
             + 0.20 * repetition_penalty(hypothesis)
+            + 0.60 * chat_artifact_penalty(hypothesis)
         )
         if exact_source_copy(hypothesis, source):
             guard_penalty += 0.50
@@ -710,6 +731,9 @@ def corpus_metrics(predictions: list[str], references: list[str], sources: list[
         / max(1, len(cleaned_predictions)),
         "spanish_leakage_penalty": 100.0
         * sum(spanish_leakage_penalty(prediction) for prediction in cleaned_predictions)
+        / max(1, len(cleaned_predictions)),
+        "chat_artifact_penalty": 100.0
+        * sum(chat_artifact_penalty(prediction) for prediction in cleaned_predictions)
         / max(1, len(cleaned_predictions)),
     }
     if sources:

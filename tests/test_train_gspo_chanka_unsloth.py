@@ -137,6 +137,12 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             train_gspo.spanish_leakage_penalty("allin punchaw taytay"),
         )
 
+    def test_chat_artifact_penalty_detects_role_tokens(self):
+        self.assertGreater(
+            train_gspo.chat_artifact_penalty("Allin punchaw user Allin punchaw assistant <think></think>"),
+            train_gspo.chat_artifact_penalty("Allin punchaw taytay"),
+        )
+
     def test_source_copy_ratio_detects_copied_source_tokens(self):
         self.assertGreater(
             train_gspo.source_copy_ratio("Buenos dias autoridad.", "Buenos dias autoridad."),
@@ -168,8 +174,13 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
                 completions=["el de la Allin punchaw taytay."],
                 target=["Allin punchaw taytay."],
             )[0]
+            artifact = train_gspo.chanka_reward(
+                completions=["Allin punchaw taytay. user Allin punchaw taytay. assistant <think></think>"],
+                target=["Allin punchaw taytay."],
+            )[0]
 
         self.assertGreater(good, leaked)
+        self.assertGreater(good, artifact)
 
     def test_vibethinker_profile_rewards_diverse_group(self):
         base = [0.2, 0.2, 0.2, 0.2]
