@@ -26,8 +26,44 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-completion-length", type=int, default=80)
     parser.add_argument("--validation-fraction", type=float, default=0.15)
     parser.add_argument("--max-eval-samples", type=int, default=None)
+    parser.add_argument("--progress-every", type=int, default=16)
     parser.add_argument("--seed", type=int, default=3407)
     return parser.parse_args(argv)
+
+
+def generate_predictions_with_progress(
+    model,
+    tokenizer,
+    rows: list[dict[str, str]],
+    max_completion_length: int,
+    progress_every: int,
+) -> list[str]:
+    import torch
+
+    predictions: list[str] = []
+    model.eval()
+    total = len(rows)
+    for index, row in enumerate(rows, start=1):
+        prompt = tokenizer.apply_chat_template(
+            gspo.prompt_messages(row["source"]),
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+        inputs = tokenizer(text=prompt, return_tensors="pt").to(model.device)
+        with torch.inference_mode():
+            output_ids = model.generate(
+                **inputs,
+                max_new_tokens=max_completion_length,
+                do_sample=False,
+                temperature=None,
+                top_p=None,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+        completion_ids = output_ids[0, inputs["input_ids"].shape[1] :]
+        predictions.append(gspo.normalize_text(tokenizer.decode(completion_ids, skip_special_tokens=True)))
+        if progress_every > 0 and (index == total or index % progress_every == 0):
+            print(f"generated {index}/{total} predictions", flush=True)
+    return predictions
 
 
 def main() -> None:
@@ -53,11 +89,12 @@ def main() -> None:
     )
     FastLanguageModel.for_inference(model)
 
-    predictions = gspo.generate_predictions(
+    predictions = generate_predictions_with_progress(
         model,
         tokenizer,
         eval_rows,
         args.max_completion_length,
+        args.progress_every,
     )
     references = [row["target"] for row in eval_rows]
     sources = [row["source"] for row in eval_rows]
