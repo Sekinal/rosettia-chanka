@@ -164,6 +164,13 @@ Update as of 2026-05-21 13:12 UTC:
 - Batched reload with `--batch-size 8` is clean but not identical: chrF++ `37.58967`, BLEU `5.69811`, token F1 `22.45106`, chat artifact penalty `0.0`, TER `93.54839`. Use batch-size 1 as the canonical comparison for checkpoint selection, and batch-size 8 only for faster triage.
 - The 8-generation artifact-guard canary was stopped early after checkpoint 16 because its reward stayed below 4-generation: checkpoint 8 reward `0.23739`, checkpoint 16 reward `0.23563`. The 4-generation artifact-guard adapter is the current stronger contender.
 
+Update as of 2026-05-21 13:55 UTC:
+
+- Re-ranking saved contenders after the EOS fix changed the decision point. `outputs/gspo_checkpoint_evals/20260521-eosfix-ranking/summary.md` ranks `vibethinker_phase2_checkpoint_896` above the earlier learned-verifier-on-Vibe112 checkpoints, and a new Vibe896-seeded learned-verifier+Vibe canary above both.
+- Canonical batch-size-1 evaluation for `outputs/gspo_selected_checkpoints/vibethinker_phase2_checkpoint_896`: selection `25.6181`, chrF++ `40.2643`, BLEU `5.8940`, token F1 `25.8484`, source-copy `2.5105%`, exact-copy `0.6329%`, leakage `0.7911%`, artifact `0.0%`, TER `88.7097`.
+- Canary `outputs/gspo_paper_profiles/2511_learned_verifier_vibe_on_vibe896_4gen_canary_20260521-133146` starts from `vibethinker_phase2_checkpoint_896` and uses `learned_verifier_vibe_2511`. Its saved-adapter batch-size-1 evaluation is now rank 1: selection `26.3808`, chrF++ `40.9703`, BLEU `8.1555`, token F1 `26.6169`, source-copy `2.8270%`, exact-copy `0.6329%`, leakage `0.6329%`, artifact `0.0%`, TER `88.7097`.
+- Because that canary beat the previous best saved adapter, a full serious contender was launched at `outputs/gspo_full_contenders/learned_verifier_vibe_on_vibe896_full_20260521-135419`, log `outputs/learned_verifier_vibe_on_vibe896_full_20260521-135419.log`. Configuration: seed adapter `outputs/gspo_selected_checkpoints/vibethinker_phase2_checkpoint_896`, reward `learned_verifier_vibe_2511`, verifier `outputs/chanka_translation_verifier_hard_r128/checkpoint-1368`, 897 train rows, 158 validation rows, `MAX_STEPS=224`, `EVAL_STEPS=56`, `SAVE_STEPS=56`, LR `7e-7`, warmup ratio `0.01`, `NUM_GENERATIONS=4`, train/eval batch `4`, gradient accumulation `2`.
+
 ## Smoke Results
 
 Remote: `root@216.81.248.197 -p 20299`, path `/root/rosettia-chanka`, GPU `NVIDIA L40S`.
