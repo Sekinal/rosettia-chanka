@@ -82,6 +82,21 @@ VERIFIER_MAX_STEPS=8 GSPO_MAX_STEPS=8 MAX_TRAIN_SAMPLES=32 MAX_EVAL_SAMPLES=8 ex
 
 Then run the best two full one-epoch profiles and compare against the existing GSPO baseline. Prioritize `self_verifier_2511` and the chained verifier path over the severity proxy if GPU time is not the constraint.
 
+For the finding phase, use a canary sweep instead of single-step smokes:
+
+```bash
+MAX_STEPS=24 MAX_TRAIN_SAMPLES=256 MAX_EVAL_SAMPLES=64 experiments/gspo/run_canary_sweep.sh
+```
+
+The canary sweep runs individual paper profiles plus mixed rewards:
+
+- `mix_severity_verifier`: fine-grained severity + severity proxy + verifier rubric;
+- `mix_verifier_vibe`: verifier rubric + VibeThinker diversity, with eight generations;
+- `mix_all_strict`: all paper-inspired signals plus stronger copy/leakage guards;
+- `rosettia_guard_v1` and `rosettia_guard_v2`: project-specific rewards designed to prioritize reference overlap, anti-copy behavior, anti-leakage behavior, length sanity, entity preservation, and repetition control.
+
+Each run writes `final_metrics.json`, and `scripts/summarize_gspo_canaries.py` produces `summary.jsonl` plus `summary.md` sorted by eval reward, chrF++, and source-copy ratio.
+
 ## Caveats
 
 - These are proxy implementations, not exact reproductions. We do not have a Chanka-capable xCOMET model, and the severity proxy should not be described as xCOMET.

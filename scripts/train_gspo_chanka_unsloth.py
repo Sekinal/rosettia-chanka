@@ -33,6 +33,11 @@ REWARD_PROFILES = (
     "severity_proxy_2310",
     "self_verifier_2511",
     "vibethinker_2511",
+    "mix_severity_verifier",
+    "mix_verifier_vibe",
+    "mix_all_strict",
+    "rosettia_guard_v1",
+    "rosettia_guard_v2",
 )
 SPANISH_STOPWORDS = {
     "el",
@@ -417,33 +422,69 @@ def reward_score(
     copy_ratio = source_copy_ratio(hypothesis, source)
     leakage = spanish_leakage_penalty(hypothesis)
     repetition = repetition_penalty(hypothesis)
+    anti_copy = 1.0 - min(1.0, copy_ratio * 1.8)
+    anti_leakage = 1.0 - min(1.0, leakage * 4.0)
+
+    baseline_score = baseline_reward_score(hypothesis, reference, source, chrf, bleu, f1, length_score)
+    fg_score = (0.42 * chrf) + (0.18 * f1) + (0.12 * bleu) + (0.14 * length_score) + (0.14 * entity_score) - severity
+    severity_score = (
+        (0.48 * chrf)
+        + (0.17 * bleu)
+        + (0.15 * f1)
+        + (0.10 * length_score)
+        + (0.10 * entity_score)
+        - (0.85 * severity)
+    )
+    meaning_score = (0.58 * chrf) + (0.27 * f1) + (0.15 * bleu)
+    verifier_score = (
+        (0.42 * meaning_score)
+        + (0.18 * anti_copy)
+        + (0.16 * anti_leakage)
+        + (0.12 * length_score)
+        + (0.08 * entity_score)
+        + (0.04 * (1.0 - min(1.0, repetition * 5.0)))
+    )
+    if exact_source_copy(hypothesis, source):
+        verifier_score -= 0.50
+    verifier_score -= 0.35 * severity
+    vibe_score = baseline_score - (0.25 * repetition)
 
     if profile == "fg_severity_2411":
         # 2411.05986: densify sparse sentence rewards with severity-weighted token/error signals.
-        return (0.42 * chrf) + (0.18 * f1) + (0.12 * bleu) + (0.14 * length_score) + (0.14 * entity_score) - severity
+        return fg_score
     if profile == "severity_proxy_2310":
         # 2310.10482 motivation only: sentence score plus transparent error severity.
         # This is not xCOMET; it is a cheap ablation for severity-weighted rewards.
-        sentence_score = (0.48 * chrf) + (0.17 * bleu) + (0.15 * f1) + (0.10 * length_score) + (0.10 * entity_score)
-        return sentence_score - (0.85 * severity)
+        return severity_score
     if profile == "self_verifier_2511":
         # 2511.22570: verifier-style rubric; reward faithful translation plus explicit failure detection proxies.
-        meaning_score = (0.58 * chrf) + (0.27 * f1) + (0.15 * bleu)
-        verifier_score = (
-            (0.42 * meaning_score)
-            + (0.18 * (1.0 - min(1.0, copy_ratio * 1.8)))
-            + (0.16 * (1.0 - min(1.0, leakage * 4.0)))
-            + (0.12 * length_score)
-            + (0.08 * entity_score)
-            + (0.04 * (1.0 - min(1.0, repetition * 5.0)))
-        )
-        if exact_source_copy(hypothesis, source):
-            verifier_score -= 0.50
-        return verifier_score - (0.35 * severity)
+        return verifier_score
     if profile == "vibethinker_2511":
         # 2511.06221: keep a broad candidate spectrum, then amplify the best signal.
-        return baseline_reward_score(hypothesis, reference, source, chrf, bleu, f1, length_score) - (0.25 * repetition)
-    return baseline_reward_score(hypothesis, reference, source, chrf, bleu, f1, length_score)
+        return vibe_score
+    if profile == "mix_severity_verifier":
+        return (0.45 * fg_score) + (0.25 * severity_score) + (0.30 * verifier_score)
+    if profile == "mix_verifier_vibe":
+        return (0.58 * verifier_score) + (0.42 * vibe_score)
+    if profile == "mix_all_strict":
+        return (
+            (0.22 * baseline_score)
+            + (0.28 * fg_score)
+            + (0.20 * severity_score)
+            + (0.20 * verifier_score)
+            + (0.10 * vibe_score)
+            - (0.15 * copy_ratio)
+            - (0.25 * leakage)
+        )
+    if profile == "rosettia_guard_v1":
+        quality = (0.45 * chrf) + (0.25 * f1) + (0.10 * bleu)
+        guards = (0.08 * length_score) + (0.06 * entity_score) + (0.06 * anti_copy) + (0.06 * anti_leakage)
+        return quality + guards - (0.45 * severity) - (0.15 * repetition)
+    if profile == "rosettia_guard_v2":
+        quality = (0.34 * chrf) + (0.24 * f1) + (0.08 * bleu)
+        guards = (0.12 * length_score) + (0.08 * entity_score) + (0.10 * anti_copy) + (0.08 * anti_leakage)
+        return quality + guards - (0.30 * severity) - (0.20 * repetition)
+    return baseline_score
 
 
 def add_vibethinker_diversity_bonus(rewards: list[float], hypotheses: list[str], sources: list[str | None]) -> list[float]:
@@ -477,7 +518,7 @@ def chanka_reward(
         hypothesis = completion_text(completion)
         hypotheses.append(hypothesis)
         rewards.append(reward_score(hypothesis, reference, source_text, active_profile))
-    if active_profile == "vibethinker_2511":
+    if active_profile in {"vibethinker_2511", "mix_verifier_vibe"}:
         rewards = add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
     return rewards
 

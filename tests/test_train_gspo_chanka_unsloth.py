@@ -169,6 +169,53 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
 
         self.assertGreater(sum(diverse), sum(repeated))
 
+    def test_mixed_profiles_are_available_for_canary_sweeps(self):
+        expected = {
+            "mix_severity_verifier",
+            "mix_verifier_vibe",
+            "mix_all_strict",
+            "rosettia_guard_v1",
+            "rosettia_guard_v2",
+        }
+
+        self.assertTrue(expected.issubset(set(train_gspo.REWARD_PROFILES)))
+
+    def test_rosettia_guard_penalizes_source_copy(self):
+        with mock.patch.object(train_gspo, "sentence_chrfpp", return_value=0.65), mock.patch.object(
+            train_gspo, "sentence_bleu", return_value=0.30
+        ):
+            translated = train_gspo.reward_score(
+                "Allin punchaw kamachiq.",
+                "Allin punchaw kamachiq.",
+                "Buenos dias autoridad.",
+                "rosettia_guard_v2",
+            )
+            copied = train_gspo.reward_score(
+                "Buenos dias autoridad.",
+                "Allin punchaw kamachiq.",
+                "Buenos dias autoridad.",
+                "rosettia_guard_v2",
+            )
+
+        self.assertGreater(translated, copied)
+
+    def test_mix_verifier_vibe_uses_diversity_bonus(self):
+        with mock.patch.object(train_gspo, "reward_score", return_value=0.2):
+            repeated = train_gspo.chanka_reward(
+                completions=["x", "x", "x", "x"],
+                target=["a", "a", "a", "a"],
+                source=["s", "s", "s", "s"],
+                profile="mix_verifier_vibe",
+            )
+            diverse = train_gspo.chanka_reward(
+                completions=["x", "y", "z", "w"],
+                target=["a", "a", "a", "a"],
+                source=["s", "s", "s", "s"],
+                profile="mix_verifier_vibe",
+            )
+
+        self.assertGreater(sum(diverse), sum(repeated))
+
 
 if __name__ == "__main__":
     unittest.main()
