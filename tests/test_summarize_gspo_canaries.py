@@ -12,10 +12,10 @@ class SummarizeGspoCanariesTests(unittest.TestCase):
     def test_collect_metrics_sorts_by_reward_then_quality_and_copy(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            for name, reward, chrf, copy in [
-                ("weak", 0.1, 30.0, 1.0),
-                ("best", 0.2, 25.0, 0.5),
-                ("tie_lower_quality", 0.2, 20.0, 0.1),
+            for name, reward, chrf, token_f1, copy in [
+                ("weak_high_reward", 0.9, 20.0, 10.0, 1.0),
+                ("best_external_metrics", 0.2, 35.0, 25.0, 0.5),
+                ("middle_external_metrics", 0.4, 30.0, 20.0, 0.1),
             ]:
                 metrics_path = root / name / "chanka_gspo" / "final_metrics.json"
                 metrics_path.parent.mkdir(parents=True)
@@ -25,14 +25,24 @@ class SummarizeGspoCanariesTests(unittest.TestCase):
                             "reward_profile": name,
                             "trainer_eval_reward": reward,
                             "chrf++": chrf,
+                            "bleu": 5.0,
+                            "token_f1": token_f1,
+                            "length_ratio_score": 50.0,
                             "source_copy_ratio": copy,
+                            "exact_source_copy_rate": 0.0,
+                            "spanish_leakage_penalty": 0.0,
+                            "ter": 100.0,
                         }
                     )
                 )
 
             records = summarize.collect_metrics(root)
 
-        self.assertEqual([record["reward_profile"] for record in records], ["best", "tie_lower_quality", "weak"])
+        self.assertEqual(
+            [record["reward_profile"] for record in records],
+            ["best_external_metrics", "middle_external_metrics", "weak_high_reward"],
+        )
+        self.assertIn("selection_score", records[0])
 
     def test_write_markdown_includes_profile_table(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -57,6 +67,7 @@ class SummarizeGspoCanariesTests(unittest.TestCase):
 
         self.assertIn("rosettia_guard_v2", content)
         self.assertIn("Eval reward", content)
+        self.assertIn("Selection", content)
 
 
 if __name__ == "__main__":

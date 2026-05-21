@@ -9,6 +9,7 @@ from typing import Any, Sequence
 
 
 CORE_METRICS = (
+    "selection_score",
     "trainer_eval_reward",
     "chrf++",
     "bleu",
@@ -18,6 +19,28 @@ CORE_METRICS = (
     "spanish_leakage_penalty",
     "ter",
 )
+
+
+def selection_score(record: dict[str, Any]) -> float:
+    """Profile-comparable score from external metrics, not reward scale."""
+    chrf = float(record.get("chrf++", 0.0))
+    bleu = float(record.get("bleu", 0.0))
+    token_f1 = float(record.get("token_f1", 0.0))
+    length_score = float(record.get("length_ratio_score", 0.0))
+    source_copy = float(record.get("source_copy_ratio", 0.0))
+    exact_copy = float(record.get("exact_source_copy_rate", 0.0))
+    leakage = float(record.get("spanish_leakage_penalty", 0.0))
+    ter = float(record.get("ter", 100.0))
+    return (
+        (0.45 * chrf)
+        + (0.15 * bleu)
+        + (0.25 * token_f1)
+        + (0.05 * length_score)
+        - (0.30 * source_copy)
+        - (0.40 * exact_copy)
+        - (0.25 * leakage)
+        - (0.03 * ter)
+    )
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -31,6 +54,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def load_metrics(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text())
     payload["metrics_path"] = str(path)
+    payload["selection_score"] = selection_score(payload)
     return payload
 
 
@@ -39,7 +63,7 @@ def collect_metrics(sweep_dir: Path) -> list[dict[str, Any]]:
     return sorted(
         records,
         key=lambda record: (
-            float(record.get("trainer_eval_reward", 0.0)),
+            float(record.get("selection_score", 0.0)),
             float(record.get("chrf++", 0.0)),
             -float(record.get("source_copy_ratio", 100.0)),
         ),
@@ -65,8 +89,10 @@ def write_markdown(records: list[dict[str, Any]], path: Path) -> None:
     lines = [
         "# GSPO Canary Summary",
         "",
-        "| Rank | Profile | Eval reward | chrF++ | BLEU | token F1 | source copy % | exact copy % | leakage % |",
-        "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "Ranking uses `selection_score`, which is based on external corpus metrics. It does not rank by profile-local trainer reward because reward scales differ across profiles.",
+        "",
+        "| Rank | Profile | Selection | Eval reward | chrF++ | BLEU | token F1 | source copy % | exact copy % | leakage % |",
+        "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for rank, record in enumerate(records, start=1):
         lines.append(
@@ -75,6 +101,7 @@ def write_markdown(records: list[dict[str, Any]], path: Path) -> None:
                 [
                     str(rank),
                     str(record.get("reward_profile", "unknown")),
+                    format_value(record.get("selection_score", 0.0)),
                     format_value(record.get("trainer_eval_reward", 0.0)),
                     format_value(record.get("chrf++", 0.0)),
                     format_value(record.get("bleu", 0.0)),
