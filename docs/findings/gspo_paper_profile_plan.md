@@ -189,6 +189,13 @@ Update as of 2026-05-21 16:35 UTC:
 - Current best remains `learned_verifier_vibe_on_vibe896_4gen_canary` from `outputs/gspo_paper_profiles/2511_learned_verifier_vibe_on_vibe896_4gen_canary_20260521-133146/chanka_gspo/final_gspo_lora`, with selection `26.3808`, chrF++ `40.9703`, BLEU `8.1555`, token F1 `26.6169`, source-copy `2.8270%`, exact-copy `0.6329%`, leakage `0.6329%`, artifact `0.0%`, TER `88.7097`.
 - Interpretation: the verifier idea is not disproven, but this v2 data mix was too small on real candidates to move the policy. The next serious verifier attempt should mine sampled train/all candidates from the current best adapter (`--split train` or `--split all`, `--do-sample`, multiple returns) and train a verifier-v3 from a much larger real-output pool. Repeating eval-only candidate mining is unlikely to help.
 
+Update as of 2026-05-21 17:27 UTC:
+
+- Added `experiments/gspo/queue_verifier_v3_sampled_candidates.sh` for the next verifier escalation. It mines sampled real candidates from the current best adapter, trains a stronger verifier on the larger candidate pool, runs a 24-step canary, and batch-size-1 evaluates checkpoint `8`, `16`, `24`, and final.
+- Remote verifier-v3 queue launched with `STAMP=20260521-verifier-v3-sampled`, log `outputs/queue_verifier_v3_sampled_candidates_20260521.log`.
+- Defaults: current best adapter as seed; candidate mining over `--split all`; two sampling settings (`temperature=0.75, top_p=0.90` and `temperature=0.95, top_p=0.95`); `4` return sequences per source; verifier max candidate examples `12000`; verifier max steps `1200`; GSPO canary max steps `24`.
+- Expected artifacts: candidates under `outputs/verifier_candidate_mining/20260521-verifier-v3-sampled`, verifier under `outputs/chanka_translation_verifier_sampled_candidates_v3_20260521-verifier-v3-sampled`, canary under `outputs/gspo_paper_profiles/2511_verifier_v3_sampled_candidates_on_best_20260521-verifier-v3-sampled`, eval summary under `outputs/gspo_checkpoint_evals/20260521-verifier-v3-sampled-verifier-v3-canary`.
+
 ## Smoke Results
 
 Remote: `root@216.81.248.197 -p 20299`, path `/root/rosettia-chanka`, GPU `NVIDIA L40S`.
