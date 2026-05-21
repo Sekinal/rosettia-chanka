@@ -97,6 +97,14 @@ The canary sweep runs individual paper profiles plus mixed rewards:
 
 Each run writes `final_metrics.json`, and `scripts/summarize_gspo_canaries.py` produces `summary.jsonl` plus `summary.md`. The summary ranks by a profile-comparable `selection_score` based on external corpus metrics: chrF++, BLEU, token F1, length sanity, source-copy rate, exact-copy rate, Spanish leakage, and TER. Do not rank mixed profiles by trainer eval reward alone because each reward profile has a different scale.
 
+Once a sweep completes, launch the top-ranked full contender with:
+
+```bash
+SWEEP_DIR=outputs/gspo_canary_sweeps/20260521-paper-mix-v1 experiments/gspo/run_best_canary_full.sh
+```
+
+The full-contender launcher reruns the summary, selects the first `summary.jsonl` profile unless `PROFILE` is set, and defaults to two epochs over the full clean Chanka corpus with validation/checkpoints every 28 steps.
+
 ## Caveats
 
 - These are proxy implementations, not exact reproductions. We do not have a Chanka-capable xCOMET model, and the severity proxy should not be described as xCOMET.
