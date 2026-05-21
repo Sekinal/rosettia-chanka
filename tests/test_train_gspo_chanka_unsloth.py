@@ -335,6 +335,8 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             device = "cpu"
 
             def generate(self, **kwargs):
+                self.generate_kwargs = kwargs
+
                 class FakeOutput:
                     def __getitem__(self, key):
                         return [4]
@@ -357,6 +359,7 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
         self.assertEqual(scorer.score_many(["src"], ["ref"], ["hyp"]), [0.5])
         self.assertEqual(scorer.tokenizer.args, ())
         self.assertEqual(scorer.tokenizer.kwargs["text"], ["prompt"])
+        self.assertEqual(scorer.model.generate_kwargs["eos_token_id"], 0)
 
 
 if __name__ == "__main__":

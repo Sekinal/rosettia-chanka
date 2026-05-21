@@ -67,6 +67,7 @@ def generate_predictions_with_progress(
                 do_sample=False,
                 temperature=None,
                 top_p=None,
+                eos_token_id=tokenizer.eos_token_id,
                 pad_token_id=tokenizer.eos_token_id,
             )
         for row_index in range(len(batch_rows)):
@@ -107,6 +108,8 @@ def main() -> None:
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
+    model.generation_config.eos_token_id = tokenizer.eos_token_id
+    model.generation_config.pad_token_id = tokenizer.eos_token_id
     FastLanguageModel.for_inference(model)
 
     predictions = generate_predictions_with_progress(

@@ -143,8 +143,26 @@ Update as of 2026-05-21 10:17 UTC:
 
 - These are proxy implementations, not exact reproductions. We do not have a Chanka-capable xCOMET model, and the severity proxy should not be described as xCOMET. It is only a cheap ablation/guardrail; serious reward-model work should prioritize the learned Chanka verifier.
 - Do not use the xCOMET-inspired proxy as the optimization target. It is useful only for triage and transparent failure accounting. Since a real Chanka-capable xCOMET judge is unavailable, the DeepSeek-style trained verifier plus external lexical sanity metrics is the more defensible reward direction.
+- Treat any xCOMET-like proxy as a cheap filter, not as the scoreboard. If we will not have real xCOMET for Chanka, the higher-upside path is to train stronger verifier models from real model outputs, pairwise/listwise preference labels, and hard negative categories: chat artifacts, source copying, Spanish leakage, wrong-language outputs, unsupported additions, semantic drift, and fluent unrelated Chanka. The verifier should be audited against held-out references and qualitative examples; if it disagrees with clear human/clean-reference judgments, retrain the verifier rather than chasing its score.
 - BLEU/chrF alone are not sufficient. The previous GSPO final adapter showed source-copy risk, so qualitative samples and copy/leakage metrics must be reviewed.
 - The VibeThinker profile is slower because it defaults to eight generations and therefore needs `TRAIN_BATCH_SIZE=8` / `EVAL_BATCH_SIZE=8` unless `NUM_GENERATIONS` is lowered.
+
+## Artifact Guard Follow-Up
+
+Update as of 2026-05-21 12:26 UTC:
+
+- The saved/reloaded full learned-verifier-on-Vibe checkpoints failed artifact-aware evaluation: chrF++ around `20.2`, BLEU around `0.44`, TER around `676`, and chat artifact penalty around `58`. These checkpoints should not be used as final contenders even though their in-memory training metrics looked much better.
+- The artifact-penalized `learned_verifier_vibe_2511` 4-generation canary finished at `outputs/gspo_paper_profiles/2511_artifact_guard_learned_verifier_vibe_4gen_canary_20260521-115915b`. Its in-memory final metrics were chrF++ `38.19053`, BLEU `7.22303`, token F1 `19.49405`, source-copy ratio `4.1667%`, exact-source-copy `1.5625%`, Spanish leakage `0.390625%`, chat artifact penalty `0.0`, TER `97.10983`, and trainer eval reward `0.24584`.
+- Do not accept the 4-generation canary on in-memory metrics alone. The required next check is saved-adapter reload evaluation with `scripts/evaluate_gspo_checkpoint.py --batch-size 1`, first raw and then with `--strip-chat-artifacts`, so we can distinguish a genuinely cleaner adapter from a serving-time salvage artifact.
+- The 8-generation artifact-penalized canary started immediately after the 4-generation run at `outputs/gspo_paper_profiles/2511_artifact_guard_learned_verifier_vibe_8gen_canary_20260521-115915b`.
+
+Update as of 2026-05-21 13:12 UTC:
+
+- The apparent reload artifact collapse was caused primarily by EOS mismatch, not by the 4-generation artifact-guard adapter itself. Reloaded Qwen3.5 adapters had tokenizer/processor EOS `<|im_end|>` id `248046`, but model generation config EOS id `248044`; generation did not stop at `<|im_end|>` unless `eos_token_id=tokenizer.eos_token_id` was passed explicitly.
+- `scripts/evaluate_gspo_checkpoint.py` and `scripts/train_gspo_chanka_unsloth.py` now align `model.generation_config.eos_token_id` and pass `eos_token_id=tokenizer.eos_token_id` in direct generation calls, including learned-verifier generation.
+- After the EOS fix, raw saved-adapter reload for the 4-generation artifact-guard canary with `--batch-size 1` produced chrF++ `37.99378`, BLEU `8.22530`, token F1 `22.55735`, source-copy ratio `2.9114%`, exact-source-copy `0.6329%`, Spanish leakage `0.7911%`, chat artifact penalty `0.0`, and TER `92.62673` over 158 eval rows. This exactly matched the previous trim/salvage metrics, so trimming is no longer required for this adapter.
+- Batched reload with `--batch-size 8` is clean but not identical: chrF++ `37.58967`, BLEU `5.69811`, token F1 `22.45106`, chat artifact penalty `0.0`, TER `93.54839`. Use batch-size 1 as the canonical comparison for checkpoint selection, and batch-size 8 only for faster triage.
+- The 8-generation artifact-guard canary was stopped early after checkpoint 16 because its reward stayed below 4-generation: checkpoint 8 reward `0.23739`, checkpoint 16 reward `0.23563`. The 4-generation artifact-guard adapter is the current stronger contender.
 
 ## Smoke Results
 

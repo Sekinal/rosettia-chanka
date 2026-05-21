@@ -584,6 +584,8 @@ class LearnedVerifierScorer:
         )
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.model.generation_config.eos_token_id = self.tokenizer.eos_token_id
+        self.model.generation_config.pad_token_id = self.tokenizer.eos_token_id
         FastLanguageModel.for_inference(self.model)
         self.model.eval()
 
@@ -610,6 +612,7 @@ class LearnedVerifierScorer:
                     do_sample=False,
                     temperature=None,
                     top_p=None,
+                    eos_token_id=self.tokenizer.eos_token_id,
                     pad_token_id=self.tokenizer.eos_token_id,
                 )
             for row_index in range(len(batch_prompts)):
@@ -777,6 +780,7 @@ def generate_predictions(model, tokenizer, rows: list[dict[str, str]], max_compl
                 do_sample=False,
                 temperature=None,
                 top_p=None,
+                eos_token_id=tokenizer.eos_token_id,
                 pad_token_id=tokenizer.eos_token_id,
             )
         completion_ids = output_ids[0, inputs["input_ids"].shape[1] :]
@@ -855,6 +859,10 @@ def main() -> None:
         load_in_16bit=True,
         full_finetuning=False,
     )
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    model.generation_config.eos_token_id = tokenizer.eos_token_id
+    model.generation_config.pad_token_id = tokenizer.eos_token_id
 
     train_dataset = build_dataset(train_rows)
     eval_dataset = build_dataset(eval_rows)
