@@ -41,6 +41,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--validation-fraction", type=float, default=0.15)
     parser.add_argument("--max-train-samples", type=int, default=None)
     parser.add_argument("--max-eval-samples", type=int, default=None)
+    parser.add_argument(
+        "--candidate-jsonl",
+        action="append",
+        type=Path,
+        default=[],
+        help="Optional prediction JSONL files with source/reference/prediction fields for real hard-negative verifier examples.",
+    )
+    parser.add_argument("--candidate-max-examples", type=int, default=None)
     parser.add_argument("--num-train-epochs", type=float, default=3.0)
     parser.add_argument("--max-steps", type=int, default=-1)
     parser.add_argument("--learning-rate", type=float, default=5.0e-5)
@@ -235,6 +243,86 @@ def build_verifier_rows(rows: Iterable[dict[str, str]], seed: int) -> list[dict[
     return examples
 
 
+def candidate_score(source: str, reference: str, candidate: str) -> float:
+    chrf = gspo.sentence_chrfpp(candidate, reference)
+    bleu = gspo.sentence_bleu(candidate, reference)
+    f1 = gspo.token_f1(candidate, reference)
+    length = gspo.length_ratio_score(candidate, reference)
+    score = (0.42 * chrf) + (0.28 * f1) + (0.10 * bleu) + (0.20 * length)
+    score -= 0.35 * gspo.source_copy_ratio(candidate, source)
+    score -= 0.45 * gspo.spanish_leakage_penalty(candidate)
+    score -= 0.20 * gspo.repetition_penalty(candidate)
+    if gspo.exact_source_copy(candidate, source):
+        score -= 0.50
+    if gspo.normalize_text(candidate).lower() == gspo.normalize_text(reference).lower():
+        score = max(score, 0.98)
+    return max(0.0, min(0.98, score))
+
+
+def severity_for_score(score: float) -> str:
+    if score >= 0.90:
+        return "none"
+    if score >= 0.70:
+        return "minor"
+    if score >= 0.40:
+        return "major"
+    return "critical"
+
+
+def rationale_for_candidate(source: str, reference: str, candidate: str, score: float) -> str:
+    if gspo.exact_source_copy(candidate, source):
+        return "model_output_copied_spanish_source"
+    if gspo.spanish_leakage_penalty(candidate) >= 0.08:
+        return "model_output_has_spanish_leakage"
+    if gspo.source_copy_ratio(candidate, source) >= 0.25:
+        return "model_output_copies_source_terms"
+    if gspo.repetition_penalty(candidate) > 0.0:
+        return "model_output_repetition"
+    if score < 0.40:
+        return "model_output_low_reference_agreement"
+    if score < 0.70:
+        return "model_output_partial_or_noisy_translation"
+    return "model_output_near_reference_translation"
+
+
+def load_candidate_verifier_rows(paths: Sequence[Path], max_examples: int | None, seed: int) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for path in paths:
+        with path.open() as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                payload = json.loads(line)
+                source = str(payload.get("source") or "")
+                reference = str(payload.get("reference") or payload.get("target") or "")
+                candidate = str(payload.get("prediction") or payload.get("candidate") or payload.get("hypothesis") or "")
+                if not source or not reference or not candidate:
+                    continue
+                key = (gspo.normalize_text(source), gspo.normalize_text(reference), gspo.normalize_text(candidate))
+                if key in seen:
+                    continue
+                seen.add(key)
+                score = candidate_score(source, reference, candidate)
+                rows.append(
+                    {
+                        "source": source,
+                        "reference": reference,
+                        "candidate": candidate,
+                        "label": verifier_target(
+                            score,
+                            severity_for_score(score),
+                            rationale_for_candidate(source, reference, candidate, score),
+                        ),
+                    }
+                )
+    rng = random.Random(seed)
+    rng.shuffle(rows)
+    if max_examples is not None:
+        rows = rows[:max_examples]
+    return rows
+
+
 def optimizer_steps_per_epoch(row_count: int, batch_size: int, gradient_accumulation_steps: int) -> int:
     effective_batch_size = max(1, batch_size) * max(1, gradient_accumulation_steps)
     return max(1, math.ceil(row_count / effective_batch_size))
@@ -287,6 +375,8 @@ def main() -> None:
 
     rows = gspo.load_chanka_rows(args.dataset_repo, args.dataset_file)
     verifier_rows = build_verifier_rows(rows, args.seed)
+    candidate_rows = load_candidate_verifier_rows(args.candidate_jsonl, args.candidate_max_examples, args.seed)
+    verifier_rows.extend(candidate_rows)
     train_rows, eval_rows = gspo.split_rows(
         verifier_rows,
         validation_fraction=args.validation_fraction,
@@ -370,6 +460,7 @@ def main() -> None:
         )
 
     print(f"Base rows: {len(rows):,}")
+    print(f"Real candidate verifier examples: {len(candidate_rows):,}")
     print(f"Verifier examples: {len(verifier_rows):,}")
     print(f"Train examples: {len(train_rows):,}")
     print(f"Validation examples: {len(eval_rows):,}")
