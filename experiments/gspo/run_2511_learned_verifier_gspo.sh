@@ -32,6 +32,7 @@ python scripts/train_gspo_chanka_unsloth.py \
   --adapter-path "${SFT_ADAPTER_PATH:-outputs/qwen35_2b_broad_lora_r64_a128_seq512_b16_ga1/broad/checkpoint-10400}" \
   --output-dir "${GSPO_OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_learned_verifier}" \
   --learning-rate "${LEARNING_RATE:-1e-6}" \
+  --warmup-ratio "${WARMUP_RATIO:-0.05}" \
   --num-train-epochs "${NUM_TRAIN_EPOCHS:-2}" \
   --per-device-train-batch-size "${TRAIN_BATCH_SIZE:-4}" \
   --per-device-eval-batch-size "${EVAL_BATCH_SIZE:-4}" \
