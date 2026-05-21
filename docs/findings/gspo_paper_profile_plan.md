@@ -108,6 +108,20 @@ SWEEP_DIR=outputs/gspo_canary_sweeps/20260521-paper-mix-v1 experiments/gspo/run_
 
 The full-contender launcher reruns the summary, selects the first `summary.jsonl` profile unless `PROFILE` is set, and defaults to two epochs over the full clean Chanka corpus with validation/checkpoints every 28 steps.
 
+## Canary Results
+
+Remote: `root@216.81.248.197 -p 20299`, path `/root/rosettia-chanka`, GPU `NVIDIA L40S`.
+
+Date: 2026-05-21
+
+Canary sweep: `outputs/gspo_canary_sweeps/20260521-paper-mix-v1`
+
+The sweep ranked candidates by external corpus metrics rather than raw trainer reward. `vibethinker_2511` was the best canary with selection score `21.0148`, chrF++ `37.0672`, BLEU `6.4582`, token F1 `18.2594`, source-copy ratio `4.0551%`, exact-copy rate `1.5625%`, and Spanish leakage `0.3906%`.
+
+The first full VibeThinker contender reached `checkpoint-196` with eval reward `0.30345`, but the process later stopped using GPU SM while still holding GPU memory. It had been launched with completion-table logging every two steps. The serious run was restarted from that GSPO checkpoint as `outputs/gspo_full_contenders/vibethinker_2511_continued_no_tables_20260521-083900` with `--no-log-completions` and `MAX_STEPS=1598`, preserving the useful checkpoint progress while avoiding the logging bottleneck.
+
+Hard-negative verifier SFT is running at `outputs/chanka_translation_verifier_hard_r128`. As of checkpoint `684`, the best validation loss remains `0.00255`; current eval loss was `0.00272`. Treat additional verifier loss gains as secondary to whether the learned verifier improves GSPO outcomes.
+
 ## Caveats
 
 - These are proxy implementations, not exact reproductions. We do not have a Chanka-capable xCOMET model, and the severity proxy should not be described as xCOMET. It is only a cheap ablation/guardrail; serious reward-model work should prioritize the learned Chanka verifier.
