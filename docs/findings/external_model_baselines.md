@@ -45,6 +45,8 @@ Earlier full baseline:
 
 ## Unsloth Compatibility
 
+`scripts/train_sft_unsloth.py` supports both `--stage broad` and `--stage chanka` for model-family canaries. The Chanka stage uses the reviewed clean Chanka corpus and keeps validation/checkpointing enabled.
+
 Tiny Gemma 4 E2B SFT smoke:
 
 ```bash
@@ -67,6 +69,81 @@ Result: passed with validation enabled and wrote `outputs/smoke_gemma4_e2b_broad
 
 Important fix: response-only SFT masking must use Gemma 4 markers `"<|turn>user\n"` and `"<|turn>model\n"`. The previous Qwen-only markers masked out every Gemma 4 training row.
 
+Hy-MT2 1.8B SFT smoke:
+
+```bash
+.venv/bin/python scripts/train_sft_unsloth.py \
+  --stage chanka \
+  --model-id tencent/Hy-MT2-1.8B \
+  --max-train-samples 8 \
+  --max-eval-samples 4 \
+  --max-steps 2 \
+  --eval-steps 1 \
+  --save-steps 1 \
+  --per-device-train-batch-size 1 \
+  --per-device-eval-batch-size 1 \
+  --gradient-accumulation-steps 1 \
+  --max-seq-length 128 \
+  --output-dir outputs/smoke_hymt2_1_8b_chanka_lora2
+```
+
+Result: passed with validation enabled and wrote `outputs/smoke_hymt2_1_8b_chanka_lora2/chanka/final_lora`. Unsloth recognizes this model as `Hunyuan_V1_Dense`. Final smoke eval loss was `6.7444`.
+
+Important fix: response-only SFT masking must also detect Hy-MT2 markers `"<｜hy_User｜>"` and `"<｜hy_Assistant｜>"`.
+
+## Gemma 4 E4B Chanka SFT
+
+Small clean-Chanka canary:
+
+```bash
+.venv/bin/python scripts/train_sft_unsloth.py \
+  --stage chanka \
+  --model-id google/gemma-4-E4B-it \
+  --max-train-samples 128 \
+  --max-eval-samples 32 \
+  --max-steps 32 \
+  --eval-steps 8 \
+  --save-steps 8 \
+  --per-device-train-batch-size 1 \
+  --per-device-eval-batch-size 1 \
+  --gradient-accumulation-steps 4 \
+  --max-seq-length 128 \
+  --learning-rate 2e-5 \
+  --lora-r 64 \
+  --lora-alpha 128 \
+  --output-dir outputs/gemma4_e4b_chanka_lora_canary_r64_a128_s128_32steps
+```
+
+This verified that Gemma 4 E4B can train on the clean Chanka corpus. Eval loss improved from `6.665` at step 8 to `5.905` after final eval. Full held-out generation from `final_lora` was still weak: chrF++ `15.1027`, BLEU `1.0070`, token F1 `4.1937`, TER `174.8848`.
+
+Two-epoch clean-Chanka SFT:
+
+```bash
+.venv/bin/python scripts/train_sft_unsloth.py \
+  --stage chanka \
+  --model-id google/gemma-4-E4B-it \
+  --num-train-epochs 2 \
+  --eval-steps 56 \
+  --save-steps 56 \
+  --per-device-train-batch-size 1 \
+  --per-device-eval-batch-size 1 \
+  --gradient-accumulation-steps 4 \
+  --max-seq-length 128 \
+  --learning-rate 2e-5 \
+  --lora-r 64 \
+  --lora-alpha 128 \
+  --output-dir outputs/gemma4_e4b_chanka_lora_full_r64_a128_s128_2ep
+```
+
+Training loss and eval loss improved, but generated translation quality remained far below the standing Qwen adapter:
+
+| Adapter | chrF++ | BLEU | Token F1 | TER | Notes |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `checkpoint-392` | `16.1325` | `1.4071` | `4.1030` | `142.8571` | Best external generation among tested checkpoints. |
+| `checkpoint-450` | `15.4580` | `1.2037` | `4.1537` | `157.6037` | Best trainer eval loss, worse generation metrics. |
+
+Qualitative pattern: the model stops emitting explanations and starts producing Chanka-like text, but it is often generic or semantically wrong. Examples from `checkpoint-392`: `¿En qué calle vive? -> ¿Imayna riqsi?`, `Yo vivo en Quinua -> Ñuqa Quinuawan kachkani`, `No es un buen esposo -> Mana allin waynaqmi`, and `Tengo 45 años -> 45 uraymi kani`.
+
 ## Decision
 
-Do not spend a full eval on these zero-shot models yet. The only plausible path for Gemma 4 or Hy-MT2 is supervised adaptation. For the next serious model-family experiment, run a controlled broad-SFT smoke-to-small-run on Gemma 4 E4B or Hy-MT2 and evaluate the resulting LoRA against the same clean Chanka split.
+Gemma 4 E4B and Hy-MT2 can both be used with Unsloth after chat-marker fixes, but Gemma 4 E4B clean-Chanka SFT is not competitive with the current Qwen3.5 adapter. It does not justify replacing the Qwen base. If these families are revisited, they need broad Quechua SFT first, then clean Chanka SFT/GSPO, not clean Chanka alone.
