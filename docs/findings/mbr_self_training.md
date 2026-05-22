@@ -104,3 +104,84 @@ Conclusion:
 - Clean anchors fixed the severe BLEU collapse seen in pseudo-only self-training, but still did not beat the standing best overall.
 - The terminology-prompt wrapper on mixed `checkpoint-48` gives the highest BLEU seen in these triage runs (`8.6205`), but selection and chrF++ remain below the previous terminology-prompt best.
 - Do not scale this exact K8 mixed recipe. The next MBR/self-training variant should use higher-confidence pseudo-labels, likely from the K16 conservative pool or a consensus-thresholded builder, before any longer SFT continuation.
+
+## 2026-05-22 K16 Confident MBR + Clean Anchors
+
+Purpose: test the next MBR/self-training variant from the K8 mixed result: use a K16 conservative candidate pool and train only on high-confidence MBR pseudo-labels.
+
+Code added:
+
+- `scripts/build_confident_mbr_pseudo_labels.py`: selects MBR candidates only when they pass score-margin, peer-utility, copy, leakage, exact-copy, and artifact filters. It writes `target` plus diagnostics so it can feed the JSONL SFT trainer.
+- `tests/test_build_confident_mbr_pseudo_labels.py`: covers ranking, filtering, and emitted diagnostic fields.
+
+K16 train candidate pool:
+
+- Candidate generation: `outputs/verifier_candidate_mining/20260522-train-k16-t065-p090/train_k16_predictions.jsonl`
+- Source adapter: `outputs/gspo_paper_profiles/2511_learned_verifier_vibe_on_vibe896_4gen_canary_20260521-133146/chanka_gspo/final_gspo_lora`
+- Split: `train`, max train samples `512`
+- Sampling: `num_return_sequences=16`, temperature `0.65`, top-p `0.90`, top-k `50`
+- Full sampled candidate metrics across all 8,192 candidates: chrF++ `40.2802`, BLEU `7.8637`, token F1 `24.6964`
+- Unfiltered K16 MBR selection over 510 groups:
+  - selection `27.6782`
+  - chrF++ `42.5243`
+  - BLEU `9.0977`
+  - token F1 `26.1104`
+  - source-copy `2.3506%`
+  - leakage `0.1471%`
+  - TER `88.1036`
+- Oracle over the same K16 train pool:
+  - selection `36.3301`
+  - chrF++ `51.4576`
+  - BLEU `15.9508`
+  - token F1 `37.1061`
+
+Confidence sweep:
+
+All rows used `min_candidates=8`, `min_mean_peer_utility=0.20`, max source-copy ratio `0.60`, max Spanish leakage penalty `0.25`, and no chat artifacts.
+
+| Min MBR margin | Kept rows | Kept rate | Selection | chrF++ | BLEU | token F1 |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0.000 | 483 | 94.7% | 28.4200 | 43.0887 | 9.1948 | 27.3629 |
+| 0.005 | 225 | 44.1% | 27.1629 | 41.6430 | 9.9757 | 25.2411 |
+| 0.010 | 171 | 33.5% | 27.5078 | 41.9927 | 11.3886 | 25.2158 |
+| 0.020 | 115 | 22.5% | 28.4099 | 43.2937 | 13.4162 | 25.5096 |
+| 0.030 | 82 | 16.1% | 27.6520 | 42.3816 | 13.2851 | 24.1641 |
+
+SFT setup:
+
+- Pseudo-labels used: margin `0.020`
+- Mixed data: `outputs/mbr_self_training_data/20260522-k16-train512-t065-p090/mixed_clean512_confident_margin002_target.jsonl`
+- Builder rows: 621 total
+  - 510 clean anchors
+  - 111 confident MBR pseudo-labels after dedupe
+- Trainer rows after filters: 618 total
+  - 526 train
+  - 92 validation
+- Output: `outputs/mbr_self_training_sft/20260522-k16-confident-margin002-clean512-lr8e-7-48steps`
+- LR: `8e-7`
+- Max steps: `48`
+- Batch: per-device `4`, gradient accumulation `2`
+- Validation/save: every `8` optimizer steps
+
+Held-out clean Chanka eval:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-32` | 25.9900 | 40.9140 | 6.3575 | 26.1317 | 2.6688 | 0.4747 | 89.1705 |
+| `checkpoint-40` | 26.3578 | 41.0006 | 8.5802 | 26.0488 | 2.8270 | 0.4747 | 88.9401 |
+| `checkpoint-48` | 25.6825 | 40.3648 | 6.1680 | 25.9207 | 2.6688 | 0.4747 | 89.4009 |
+| `final_lora` | 25.6825 | 40.3648 | 6.1680 | 25.9207 | 2.6688 | 0.4747 | 89.4009 |
+
+Terminology-prompt eval on best confident checkpoint:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-40` + terminology top-1 | 26.4760 | 41.0961 | 8.9872 | 25.9870 | 2.8270 | 0.4747 | 88.4793 |
+
+Conclusion:
+
+- This is the first self-training variant that edges past the previous deployable best when paired with terminology prompting.
+- New deployable best for now: `checkpoint-40` from `20260522-k16-confident-margin002-clean512-lr8e-7-48steps` with terminology top-1.
+- It improves selection slightly over the previous terminology-prompt best (`26.4760` vs `26.4615`) and improves BLEU more clearly (`8.9872` vs `8.6118`), while chrF++ is also higher (`41.0961` vs `41.0248`).
+- The final checkpoint regresses; use `checkpoint-40`, not `final_lora`.
+- Next step should expand the high-confidence K16 pool beyond 512 train rows or try margin `0.000`/`0.020` as separate mixtures. Margin `0.020` is high-BLEU but only 111 pseudo-labels after dedupe; margin `0.000` has better hidden-reference selection/F1 and far more rows.
