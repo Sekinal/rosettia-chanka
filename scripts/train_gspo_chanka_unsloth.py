@@ -224,17 +224,28 @@ def validate_grpo_batching(args: argparse.Namespace) -> None:
         )
 
 
-def prompt_messages(source: str) -> list[dict[str, str]]:
+def prompt_messages(source: str, terminology: Sequence[tuple[str, str]] | None = None) -> list[dict[str, str]]:
+    user_content = (
+        "Traduce del español al quechua chanka. Usa una traducción directa, "
+        "natural y fiel. Conserva nombres, números y entidades; evita copiar "
+        "el español salvo cuando sea necesario."
+    )
+    if terminology:
+        glossary_lines = [
+            f"- {spanish_term} = {chanka_term}"
+            for spanish_term, chanka_term in terminology
+        ]
+        user_content += (
+            "\n\nGlosario sugerido: usa estos terminos solo si aplican al texto; "
+            "no fuerces terminos irrelevantes.\n"
+            + "\n".join(glossary_lines)
+        )
+    user_content += f"\n\nEspañol: {source}"
     return [
         {"role": "system", "content": "Eres un traductor profesional español-quechua chanka."},
         {
             "role": "user",
-            "content": (
-                "Traduce del español al quechua chanka. Usa una traducción directa, "
-                "natural y fiel. Conserva nombres, números y entidades; evita copiar "
-                "el español salvo cuando sea necesario.\n\n"
-                f"Español: {source}"
-            ),
+            "content": user_content,
         },
     ]
 

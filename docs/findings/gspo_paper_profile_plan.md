@@ -257,6 +257,14 @@ Update as of 2026-05-22 07:55 UTC:
   - QE reranking: larger candidate pools help when the QE metric is strong. Our scalar source-only QE attempt failed, so pairwise/listwise QE should be tried before another scalar scorer.
   - Terminology constraints: Dinu et al. and LeCA-style data augmentation both train models to use provided terminology at inference by adding target terms to the source input. This fits our observed failures (`sirayuq`, `wiraqucha`, `raymi`, locatives/evidentials) better than another generic reward tweak. Next high-upside data experiment: build glossary-triggered prompt augmentation and synthetic short phrase pairs from PanLex/Chanka glossary sources.
 
+Update as of 2026-05-22 09:35 UTC:
+
+- Added terminology-conditioned inference to `scripts/evaluate_gspo_checkpoint.py`. It can load a glossary parquet from the HF dataset repo, match Spanish source terms, and pass a compact "Glosario sugerido" block into `prompt_messages` only for rows with matched terms. This implements a small inference-time version of the terminology-constraint papers before doing SFT/GSPO data augmentation.
+- Remote eval dir: `outputs/gspo_checkpoint_evals/20260522-terminology-prompt-current-best`. Tested top-k `1`, `3`, and `6` glossary matches from `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet` against the standing best adapter. All three variants were identical because the held-out rows usually matched at most one simple glossary term.
+- Terminology prompting produced a small but real triage-score improvement over the previous standing eval: selection `26.4615` vs `26.3808`, chrF++ `41.0248` vs `40.9703`, BLEU `8.6118` vs `8.1555`, TER `88.2488` vs `88.7097`, leakage `0.4747%` vs `0.6329%`. Token F1 dipped from `26.6169` to `26.3793`; source-copy and exact-copy were unchanged. Only `21/158` rows matched a glossary term.
+- Row audit: terminology exactly fixed `¿Es usted casado?` and `¿Es usted casada?` from `Casarasqa...` forms to reference-matching `¿Warmiyuqchu kanki?` / `¿Qusayuqchu kanki?`. It also regressed a few already-good rows by over-steering, e.g. `Yo soy culpable` changed from near-reference `Ñuqam huchayoq kani` to shorter `Huchayuqmi kani`.
+- Interpretation: glossary prompting is worth keeping as a deployable option and confirms the terminology papers are relevant, but the current manual glossary covers too few held-out rows to move toward chrF 60 by itself. The next terminology step should be training-time augmentation: add glossary-triggered source prompts and synthetic short phrase pairs, then SFT/GSPO with validation, rather than continuing prompt-only sweeps.
+
 ## Smoke Results
 
 Remote: `root@216.81.248.197 -p 20299`, path `/root/rosettia-chanka`, GPU `NVIDIA L40S`.

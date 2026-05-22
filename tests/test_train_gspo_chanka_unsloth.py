@@ -38,6 +38,17 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
         self.assertIn("Buenos dias.", messages[1]["content"])
         self.assertNotIn("assistant", {message["role"] for message in messages})
 
+    def test_prompt_can_include_optional_terminology(self):
+        messages = train_gspo.prompt_messages(
+            "La señora vive en Quinua.",
+            [("señora", "mama"), ("vive", "tiyan")],
+        )
+
+        self.assertIn("Glosario sugerido", messages[1]["content"])
+        self.assertIn("- señora = mama", messages[1]["content"])
+        self.assertIn("no fuerces", messages[1]["content"])
+        self.assertIn("La señora vive en Quinua.", messages[1]["content"])
+
     def test_reward_profile_cli_accepts_paper_profiles(self):
         for profile in train_gspo.REWARD_PROFILES:
             args = train_gspo.parse_args(["--reward-profile", profile])
