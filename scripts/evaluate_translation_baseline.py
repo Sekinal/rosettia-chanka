@@ -172,12 +172,19 @@ def generate_causal_chat(args: argparse.Namespace, rows: list[dict[str, str]]) -
         prompt = causal_translation_prompt(row["source"])
         messages = [{"role": "user", "content": prompt}]
         if getattr(tokenizer, "chat_template", None):
-            inputs = tokenizer.apply_chat_template(
-                messages,
-                add_generation_prompt=True,
-                return_tensors="pt",
-                return_dict=True,
-            ).to(model.device)
+            chat_template_kwargs = {
+                "add_generation_prompt": True,
+                "return_tensors": "pt",
+                "return_dict": True,
+            }
+            try:
+                inputs = tokenizer.apply_chat_template(
+                    messages,
+                    enable_thinking=False,
+                    **chat_template_kwargs,
+                ).to(model.device)
+            except TypeError:
+                inputs = tokenizer.apply_chat_template(messages, **chat_template_kwargs).to(model.device)
         else:
             fallback_prompt = f"{prompt}\n\nQuechua Chanka:"
             inputs = tokenizer(fallback_prompt, return_tensors="pt", truncation=True).to(model.device)
