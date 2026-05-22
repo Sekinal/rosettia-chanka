@@ -111,3 +111,44 @@ Decision:
 - Do not enable source-root or glossary features for the current deployable reranker.
 - Keep the features in code as opt-in diagnostics for future richer terminology pools.
 - The better fix for `Fiestapi` is likely data generation or candidate generation with a glossary that actually includes `fiesta -> raymi`; the K16 candidate pool for `En la fiesta` contained only `Fiestapi`/`Fiestapim` variants, so no selector could choose `Raymipim`.
+
+## 2026-05-22 Reference-Free Inference Wrapper
+
+Code added:
+
+- `scripts/generate_feature_reranked_translations.py`: loads a LoRA adapter, generates K sampled candidates for arbitrary Spanish source strings, applies saved feature-reranker weights, and writes selected Chanka translations without references.
+- `tests/test_generate_feature_reranked_translations.py`: covers source loading, candidate grouping, and feature-model selection without requiring a GPU.
+
+Current best deployment command pattern:
+
+```bash
+.venv/bin/python scripts/generate_feature_reranked_translations.py \
+  --adapter-path outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8 \
+  --weights-json outputs/feature_candidate_reranker_evals/20260522-feature-reranker-train-current-deployable-term-eval-current-deployable-k16/feature_k16_current_term_weights.json \
+  --input-path sources.txt \
+  --output-jsonl predictions.jsonl \
+  --candidates-jsonl candidates.jsonl \
+  --num-return-sequences 16 \
+  --temperature 0.65 \
+  --top-p 0.90 \
+  --top-k 50 \
+  --terminology-file clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet \
+  --terminology-top-k 1
+```
+
+Remote smoke:
+
+- Output: `outputs/manual_inference_smokes/20260522-feature-reranked-smoke`
+- Adapter and weights matched the current best, but K was reduced to `4` for speed.
+- Inputs:
+  - `Yo vivo en Quinua`
+  - `Tengo 45 años`
+- Selected outputs:
+  - `Kunamantaqu kawsakuni Quinua llaqtapi`
+  - `Tawa chunka pichqayoq watayuqmi kani`
+
+Notes:
+
+- The wrapper is deployment plumbing, not a new quality result.
+- Use K16 for quality comparisons; K4 was only a smoke check.
+- The first smoke row shows why we still need qualitative review: one of the unselected candidates, `Ñuqaqa Quinua llaqtapim kawsani`, looks better than the selected row. The held-out K16 metrics remain the authoritative aggregate evidence for now.

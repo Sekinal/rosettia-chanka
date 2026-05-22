@@ -104,6 +104,27 @@ This writes local, git-ignored terminology artifacts:
 
 The glossary is kept separate from sentence-pair training data. It is useful for terminology, retrieval, evaluation, and later augmentation.
 
+## Feature-Reranked Inference
+
+The current best deployment path samples multiple candidates from the trained adapter and selects one with the feature reranker.
+
+```bash
+python scripts/generate_feature_reranked_translations.py \
+  --adapter-path outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8 \
+  --weights-json outputs/feature_candidate_reranker_evals/20260522-feature-reranker-train-current-deployable-term-eval-current-deployable-k16/feature_k16_current_term_weights.json \
+  --input-path sources.txt \
+  --output-jsonl predictions.jsonl \
+  --candidates-jsonl candidates.jsonl \
+  --num-return-sequences 16 \
+  --temperature 0.65 \
+  --top-p 0.90 \
+  --top-k 50 \
+  --terminology-file clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet \
+  --terminology-top-k 1
+```
+
+This requires the trained local adapter and reranker weights on the machine running inference. The script writes generated artifacts, so keep outputs under ignored directories such as `outputs/`.
+
 ## Preprocess Dirty Broad Quechua SFT Data
 
 The SomosNLP 2022 Spanish-to-Quechua Hugging Face dataset is useful as broad, dirty translation SFT data before the clean Chanka judicial fine-tune. It is **not** treated as Chanka-verified data.
