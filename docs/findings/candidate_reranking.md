@@ -372,3 +372,44 @@ Decision:
 - Mixed text-aware reranking has the best selection and token F1 seen so far, but it gives up too much chrF++ and BLEU compared with the conservative K32 ensemble.
 - Mixed score ensemble has the best TER seen so far, but also trails conservative K32 ensemble on selection/chrF++/BLEU.
 - Keep conservative K32 score ensemble as the best overall deployable profile. Mixed-distribution training is promising but needs a stronger selector/QE model before using the higher-headroom mixed pool for deployment.
+
+## 2026-05-22 Qwen3.5 4B Full-SFT Candidate Pool
+
+Purpose: test whether the strong Qwen3.5 4B broad -> clean Chanka curriculum, followed by short full-SFT refinement, is useful as a candidate generator for the existing reranking stack.
+
+Candidate pool:
+
+- Current deployable K32 pool: `outputs/rerank_candidate_evals/20260522-current-deployable-k32-t065-p090-term/candidates_predictions.jsonl`
+- 4B full-SFT K16 pool: `outputs/rerank_candidate_evals/20260522-qwen35-4b-full-chanka48-k16-t065-p090-term/candidates_predictions.jsonl`
+- Merged eval pool: `outputs/rerank_candidate_evals/20260522-current-k32-plus-qwen35-4b-full-k16-term/candidates_predictions.jsonl`
+- Matching merged train pool: `outputs/verifier_candidate_mining/20260522-train-current-k32-plus-qwen35-4b-full-k16-term/train_current_k32_plus_4bfull_k16_predictions.jsonl`
+
+Pool diagnostics:
+
+- Eval groups: 158
+- Eval records after dedupe: 4,279
+- Mean candidates/group: 27.08
+- Oracle: selection `50.0788`, chrF++ `63.5158`, BLEU `35.7333`, token F1 `54.9308`, TER `51.3825`
+
+The old K32 score ensemble transferred poorly to this new pool: selection `29.4916`, chrF++ `42.8544`, BLEU `12.9017`, TER `79.0323`. The pool has much more headroom, but the selector must be trained on the matching candidate distribution.
+
+Matching-distribution selectors:
+
+- Feature weights: `outputs/feature_candidate_reranker_evals/20260522-feature-listwise-current-k32-plus-qwen35-4b-full-k16-term/feature_listwise_current_k32_plus_4bfull_k16_weights.json`
+- Text model: `outputs/text_candidate_reranker_evals/20260522-text-train-current-k32-plus-qwen35-4b-full-k16-term/text_current_k32_plus_4bfull_k16_model.json`
+- Score ensemble: `outputs/score_ensemble_reranker_evals/20260522-ensemble-train-current-k32-plus-qwen35-4b-full-k16-term/ensemble_current_k32_plus_4bfull_k16_ensemble.json`
+
+| Method | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| previous conservative K32 ensemble | 29.7584 | 43.8064 | 13.2505 | 30.4677 | 3.1118 | 0.0000 | 81.3364 |
+| merged-pool feature selector | 30.4668 | 43.8848 | 14.8210 | 29.4766 | 2.0042 | 0.0000 | 76.4977 |
+| merged-pool text reranker | 33.9542 | 46.9533 | 21.3086 | 34.0165 | 2.6793 | 0.0000 | 72.8111 |
+| merged-pool score ensemble | 35.5481 | 48.1624 | 24.0635 | 35.9579 | 2.4156 | 0.0000 | 70.5069 |
+| merged-pool oracle | 50.0788 | 63.5158 | 35.7333 | 54.9308 | 2.0992 | 0.0000 | 51.3825 |
+
+Decision:
+
+- This is the new best held-out profile by every headline metric.
+- Full-SFT did not become the best greedy model, but it did create high-value candidate diversity.
+- The current best deployable direction is multi-model candidate generation plus a matching-distribution text/score reranker.
+- The remaining oracle gap is still huge, so more candidate diversity from 9B/35B-A3B SFT or a stronger QE/listwise selector is more promising than another plain continuation from the 2B policy.

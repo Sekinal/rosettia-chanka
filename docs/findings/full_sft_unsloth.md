@@ -118,11 +118,13 @@ Current evidence:
 - A Qwen3.5 4B JSONL-only LoRA canary is also negative after fixing no-thinking prompt formatting, so full-tuning 4B on that same data mix would likely spend more GPU without solving the data/curriculum issue.
 - Qwen3.5 4B broad -> clean Chanka LoRA is the first 4B SFT result worth keeping: best checkpoint `outputs/qwen35_4b_curriculum/20260522-broad512-chanka-r64-a128-s128-256steps/chanka/checkpoint-224` scored selection `30.3580`, chrF++ `43.2858`, BLEU `16.3507`, token F1 `30.1583`.
 - Merge -> full SFT from that 4B LoRA checkpoint is feasible and slightly improves the external triage score: best checkpoint `outputs/full_sft_canaries/20260522-qwen35-4b-merged-broad512-chanka224-full-chanka-lr1e-6-64steps/chanka/checkpoint-48` scored selection `30.4393`, chrF++ `43.3102`, BLEU `16.2178`, token F1 `30.6209`.
+- The same 4B full-SFT checkpoint became highly useful as a candidate generator. Current K32 candidates plus 4B-full K16 candidates, with a matching-distribution score ensemble, reached selection `35.5481`, chrF++ `48.1624`, BLEU `24.0635`, token F1 `35.9579`, TER `70.5069`. This is the best held-out profile so far.
 
 Next best SFT path:
 
 1. Train larger Qwen variants through the full broad Quechua -> clean Chanka curriculum with no-thinking chat templates.
 2. Evaluate generation quality at checkpoints, not just trainer eval loss.
 3. Only if a larger LoRA checkpoint approaches or beats the current 2B adapter, merge it and run a short full-SFT continuation from that strong state.
+4. Evaluate larger full-SFT checkpoints both greedily and as candidate generators. The 4B result shows the reranked candidate pool can improve even when the single-model greedy metrics only move slightly.
 
 Details: `docs/findings/qwen35_4b_curriculum_sft.md`.

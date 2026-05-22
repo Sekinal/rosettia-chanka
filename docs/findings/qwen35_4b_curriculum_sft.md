@@ -117,6 +117,27 @@ Decision:
 
 ## Next Steps
 
-- Use `checkpoint-224` LoRA and `checkpoint-48` full-SFT as candidate generators in a mixed pool with the current 2B deployable model; the diversity is likely more valuable than greedy replacement.
+- Use `checkpoint-224` LoRA and `checkpoint-48` full-SFT as candidate generators in a mixed pool with the current 2B deployable model; the diversity is likely more valuable than greedy replacement. Done: the K32 current + K16 4B-full pool with matched score ensemble reached selection `35.5481`, chrF++ `48.1624`, BLEU `24.0635`, token F1 `35.9579`, TER `70.5069`.
 - Try the same broad -> clean curriculum on Qwen3.5 9B if memory allows.
 - If full SFT is revisited, test short low-LR refinements from the best 9B/35B-A3B merged checkpoint rather than scaling the 4B full run blindly.
+
+## Candidate-Generator Result
+
+The 4B full-SFT checkpoint is not a greedy replacement for the conservative K32 ensemble, but it is the strongest candidate-diversity source so far.
+
+Merged eval pool:
+
+- Current deployable K32 candidates plus Qwen3.5 4B full-SFT K16 candidates.
+- Eval rows: 158 groups, 4,279 deduped candidates, mean 27.08 candidates/group.
+- Matching train pool: 886 groups, 23,786 candidates.
+
+Best matched selector:
+
+- Ensemble: `outputs/score_ensemble_reranker_evals/20260522-ensemble-train-current-k32-plus-qwen35-4b-full-k16-term/ensemble_current_k32_plus_4bfull_k16_ensemble.json`
+- Metrics: selection `35.5481`, chrF++ `48.1624`, BLEU `24.0635`, token F1 `35.9579`, source-copy `2.4156%`, leakage `0.0%`, TER `70.5069`.
+- Oracle: selection `50.0788`, chrF++ `63.5158`, BLEU `35.7333`, token F1 `54.9308`, TER `51.3825`.
+
+Takeaway:
+
+- The 4B curriculum/full-SFT path is worth scaling, but primarily as a multi-candidate generator.
+- The next base-model improvement experiment should be Qwen3.5 9B broad -> clean Chanka LoRA first; only merge and full-SFT it if the LoRA checkpoint has strong external generation metrics.
