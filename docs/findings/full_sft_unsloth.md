@@ -58,3 +58,50 @@ Decision:
 - The 16-step canary did not improve generation metrics. It was almost neutral, with a tiny BLEU increase but lower chrF++ and token F1.
 - Next full-SFT experiment should not be raw-base full tuning. Try merged current best with either a slightly higher LR (`2e-6`), longer horizon with early evals, or JSONL terminology/MBR data via `train_jsonl_sft_unsloth.py --training-mode full`.
 - Keep all merged/full model artifacts out of git.
+
+## 2026-05-22 Merged Full SFT On JSONL Terminology/MBR Mix
+
+Purpose: test the most relevant full-finetuning setup: start from the merged current-best LoRA model, then continue full SFT on the same terminology-conditioned MBR/clean JSONL mixture that produced the current best LoRA checkpoint.
+
+Setup:
+
+- Model id: `outputs/merged_full_models/20260522-current-best-checkpoint8-merged16`
+- JSONL: `outputs/mbr_self_training_data/20260522-k16-full-newbest-noterm-t065-p090/mixed_clean512_confident_margin000_target.jsonl`
+- Output: `outputs/full_sft_canaries/20260522-current-best-merged-jsonl-term-full-sft-lr2e-6-32step`
+- Terminology prompt: `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet`, top-k `1`
+- Rows after filtering: 1,332 total, 1,133 train, 199 validation
+- Terminology-matched rows: 143 train, 25 validation
+- LR: `2e-6`
+- Max steps: `32`
+- Batch: per-device `1`, gradient accumulation `8`
+- Validation/save: every `8` optimizer steps
+
+Trainer eval loss:
+
+| Checkpoint | eval loss |
+| --- | ---: |
+| checkpoint-8 | 0.6429 |
+| checkpoint-16 | 0.6417 |
+| checkpoint-24 | 0.6409 |
+| checkpoint-32/final | 0.6417 |
+
+Held-out clean Chanka terminology-prompt eval:
+
+| Checkpoint | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| checkpoint-16 | 26.3055 | 41.0008 | 6.7101 | 26.8596 | 2.6688 | 0.4747 | 88.0184 |
+| checkpoint-24 | 26.4243 | 41.2338 | 6.8438 | 26.9119 | 2.6688 | 0.4747 | 88.4793 |
+| checkpoint-32/final | 26.5312 | 41.2908 | 6.7858 | 27.2479 | 2.6688 | 0.3165 | 88.2488 |
+
+K8 candidate-pool check from checkpoint-32:
+
+- Candidate output: `outputs/full_sft_canaries/20260522-current-best-merged-jsonl-term-full-sft-lr2e-6-32step-k8-candidates/k8_predictions.jsonl`
+- First candidate: selection `25.0974`, chrF++ `39.0863`, BLEU `10.2628`, token F1 `24.0793`, TER `90.3226`
+- MBR: selection `26.4580`, chrF++ `41.8282`, BLEU `7.3718`, token F1 `25.4410`, TER `91.9355`
+- Oracle: selection `35.7023`, chrF++ `50.4212`, BLEU `16.3823`, token F1 `38.7261`, TER `75.1152`
+
+Decision:
+
+- This is a negative result for deployment. It does not beat the current LoRA checkpoint (`checkpoint-8` from `20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps`) and is far below the conservative K32 score ensemble.
+- It also is not useful as a candidate diversity generator: its K8 oracle is below the previous conservative and mixed candidate pools.
+- Full SFT is viable mechanically, but current evidence says it should be reserved for larger/model-scale experiments or a better data mix. Do not scale this exact JSONL full-SFT recipe.
