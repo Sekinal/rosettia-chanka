@@ -120,6 +120,19 @@ def causal_translation_prompt(source: str) -> str:
     )
 
 
+def gemma4_model_id(model_id: str) -> bool:
+    return model_id.lower().startswith("google/gemma-4-")
+
+
+def parse_processor_response(processor, text: str) -> str:
+    if hasattr(processor, "parse_response"):
+        parsed = processor.parse_response(text)
+        if isinstance(parsed, dict) and "content" in parsed:
+            return str(parsed["content"])
+        return str(parsed)
+    return text
+
+
 def generate_seq2seq_chat(args: argparse.Namespace, rows: list[dict[str, str]]) -> list[str]:
     import torch
     from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -156,22 +169,43 @@ def generate_seq2seq_chat(args: argparse.Namespace, rows: list[dict[str, str]]) 
 
 def generate_causal_chat(args: argparse.Namespace, rows: list[dict[str, str]]) -> list[str]:
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import AutoModelForCausalLM, AutoProcessor, AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True)
+    if gemma4_model_id(args.model_id):
+        processor = AutoProcessor.from_pretrained(args.model_id, trust_remote_code=True)
+    else:
+        processor = None
+    tokenizer = None if processor is not None else AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
         args.model_id,
         device_map="auto",
         torch_dtype=torch_dtype(args.torch_dtype),
         trust_remote_code=True,
     )
-    if tokenizer.pad_token is None:
+    if tokenizer is not None and tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     predictions: list[str] = []
     for row in rows:
         prompt = causal_translation_prompt(row["source"])
-        messages = [{"role": "user", "content": prompt}]
-        if getattr(tokenizer, "chat_template", None):
+        messages = [
+            {"role": "system", "content": "You are a translation engine. Return only the final translation."},
+            {"role": "user", "content": prompt},
+        ]
+        if processor is not None:
+            text = processor.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False,
+            )
+            inputs = processor(text=text, return_tensors="pt").to(model.device)
+            decode = lambda generated: parse_processor_response(
+                processor,
+                processor.decode(generated, skip_special_tokens=False),
+            )
+            eos_token_id = getattr(processor, "eos_token_id", None)
+            pad_token_id = getattr(processor, "eos_token_id", None)
+        elif getattr(tokenizer, "chat_template", None):
             chat_template_kwargs = {
                 "add_generation_prompt": True,
                 "return_tensors": "pt",
@@ -185,19 +219,25 @@ def generate_causal_chat(args: argparse.Namespace, rows: list[dict[str, str]]) -
                 ).to(model.device)
             except TypeError:
                 inputs = tokenizer.apply_chat_template(messages, **chat_template_kwargs).to(model.device)
+            decode = lambda generated: tokenizer.decode(generated, skip_special_tokens=True)
+            eos_token_id = tokenizer.eos_token_id
+            pad_token_id = tokenizer.eos_token_id
         else:
             fallback_prompt = f"{prompt}\n\nQuechua Chanka:"
             inputs = tokenizer(fallback_prompt, return_tensors="pt", truncation=True).to(model.device)
+            decode = lambda generated: tokenizer.decode(generated, skip_special_tokens=True)
+            eos_token_id = tokenizer.eos_token_id
+            pad_token_id = tokenizer.eos_token_id
         with torch.inference_mode():
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=args.max_new_tokens,
                 do_sample=False,
-                eos_token_id=tokenizer.eos_token_id,
-                pad_token_id=tokenizer.eos_token_id,
+                eos_token_id=eos_token_id,
+                pad_token_id=pad_token_id,
             )
         prompt_len = inputs["input_ids"].shape[-1]
-        predictions.append(gspo.strip_chat_artifacts(tokenizer.decode(outputs[0][prompt_len:], skip_special_tokens=True)))
+        predictions.append(gspo.strip_chat_artifacts(decode(outputs[0][prompt_len:])))
         print(f"generated {len(predictions)}/{len(rows)}", flush=True)
     return predictions
 
