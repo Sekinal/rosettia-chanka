@@ -181,7 +181,8 @@ Terminology-prompt eval on best confident checkpoint:
 Conclusion:
 
 - This is the first self-training variant that edges past the previous deployable best when paired with terminology prompting.
-- New deployable best for now: `checkpoint-40` from `20260522-k16-confident-margin002-clean512-lr8e-7-48steps` with terminology top-1.
+- This became the deployable best at the time, but is superseded by the full-train terminology-MBR follow-up below.
+- Superseded adapter: `checkpoint-40` from `20260522-k16-confident-margin002-clean512-lr8e-7-48steps` with terminology top-1.
 - It improves selection slightly over the previous terminology-prompt best (`26.4760` vs `26.4615`) and improves BLEU more clearly (`8.9872` vs `8.6118`), while chrF++ is also higher (`41.0961` vs `41.0248`).
 - The final checkpoint regresses; use `checkpoint-40`, not `final_lora`.
 - Next step should expand the high-confidence K16 pool beyond 512 train rows or try margin `0.000`/`0.020` as separate mixtures. Margin `0.020` is high-BLEU but only 111 pseudo-labels after dedupe; margin `0.000` has better hidden-reference selection/F1 and far more rows.
@@ -219,5 +220,70 @@ Conclusion:
 
 - Margin `0.000` is worse than margin `0.020` despite much stronger hidden-reference training-set selection/F1.
 - The denser pseudo-label mix appears to increase Spanish leakage and hurts held-out selection, chrF++, and token F1.
-- Do not use this run as the deployable checkpoint. Keep `20260522-k16-confident-margin002-clean512-lr8e-7-48steps/checkpoint-40` with terminology top-1 as the current best.
+- Do not use this run as the deployable checkpoint. At the time, `20260522-k16-confident-margin002-clean512-lr8e-7-48steps/checkpoint-40` with terminology top-1 remained best, but it is now superseded by the full-train terminology-MBR follow-up below.
 - The next high-upside self-training run should expand the K16 high-margin pool over more train rows, not lower the confidence threshold on the same 512-row pool.
+
+### Full-Train Terminology-MBR Follow-Up
+
+Purpose: expand the K16 MBR pseudo-label pool over the full training split, using the previous deployable best adapter plus terminology prompting during candidate generation.
+
+Candidate generation:
+
+- Adapter: `outputs/mbr_self_training_sft/20260522-k16-confident-margin002-clean512-lr8e-7-48steps/checkpoint-40`
+- Terminology prompting: `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet`, top-k `1`
+- Split: full train split, 897 rows
+- Sampling: K16, temperature `0.65`, top-p `0.90`, top-k `50`
+- Candidate pool: `outputs/verifier_candidate_mining/20260522-train-k16-full-currentbest-term-t065-p090/train_k16_predictions.jsonl`
+
+Reference-aware pool diagnostics:
+
+| Selector/filter | Rows | Selection | chrF++ | BLEU | token F1 | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Unfiltered MBR | 897 | 27.2143 | 41.7980 | 8.9381 | 25.4103 | 0.0988 | 89.2220 |
+| Oracle | 897 | 36.2968 | 51.0586 | 17.2767 | 36.8458 | - | - |
+| Filter-only margin `0.000` | 836 | 28.0242 | 42.4862 | 9.0517 | 26.6908 | 0.1047 | - |
+| Margin `0.010` | 322 | 24.6006 | 39.0731 | 3.3570 | 23.7600 | - | - |
+| Margin `0.020` | 208 | 25.1325 | 39.6352 | 3.2470 | 24.7401 | - | - |
+| Margin `0.030` | 133 | 25.4397 | 40.1825 | 3.3205 | 25.9127 | - | - |
+
+Observation: high-margin filtering behaved badly on this terminology-mined pool. Unlike the earlier non-terminology 512-row pool, the margin threshold mostly selected low-BLEU rows. The only viable follow-up was the filter-only margin `0.000` mixture.
+
+SFT setup:
+
+- Pseudo-labels used: full-train terminology MBR, filter-only margin `0.000`
+- Mixed data: `outputs/mbr_self_training_data/20260522-k16-full-currentbest-term-t065-p090/mixed_clean512_confident_margin000_target.jsonl`
+- Builder rows: 1296 total
+  - 510 clean anchors
+  - 786 pseudo-labels after dedupe
+- Trainer rows after filters: 1293 total
+  - 1100 train
+  - 193 validation
+- Output: `outputs/mbr_self_training_sft/20260522-k16-fullterm-margin000-clean512-lr4e-7-32steps`
+- Starting adapter: `outputs/mbr_self_training_sft/20260522-k16-confident-margin002-clean512-lr8e-7-48steps/checkpoint-40`
+- LR: `4e-7`
+- Max steps: `32`
+- Batch: per-device `4`, gradient accumulation `2`
+- Validation/save: every `8` optimizer steps
+
+Held-out clean Chanka eval:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-16` | 25.8105 | 40.5802 | 6.3858 | 25.9609 | 2.6688 | 0.4747 | 89.1705 |
+| `checkpoint-24` | 25.9777 | 40.7881 | 6.5035 | 26.1724 | 2.6688 | 0.4747 | 88.9401 |
+| `checkpoint-32` | 26.4340 | 40.8884 | 9.0799 | 26.2899 | 2.8270 | 0.4747 | 88.4793 |
+| `final_lora` | 25.9777 | 40.7881 | 6.5035 | 26.1724 | 2.6688 | 0.4747 | 88.9401 |
+
+Terminology-prompt eval on the close checkpoint:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-32` + terminology top-1 | 26.5515 | 40.8942 | 9.4839 | 26.3462 | 2.8270 | 0.3165 | 88.0184 |
+
+Conclusion:
+
+- This is the new deployable best as of 2026-05-22.
+- Use `outputs/mbr_self_training_sft/20260522-k16-fullterm-margin000-clean512-lr4e-7-32steps/checkpoint-32` with terminology top-1 inference.
+- It beats the previous deployable best (`26.5515` vs `26.4760` selection) mainly through BLEU (`9.4839` vs `8.9872`) and lower TER (`88.0184` vs `88.4793`), while chrF++ is slightly lower than the previous checkpoint-40 terminology eval (`40.8942` vs `41.0961`).
+- Do not use `final_lora`; it reverted to the checkpoint-24 behavior.
+- The broader terminology-mined pseudo-label pool is useful only with a very low continuation LR and early checkpoint selection. More steps or stricter MBR-margin filtering are not justified by this result.
