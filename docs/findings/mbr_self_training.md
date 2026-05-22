@@ -401,3 +401,44 @@ Conclusion:
 - It improves over the previous deployable best on selection (`27.0396` vs `26.8011`), chrF++ (`41.4823` vs `41.3017`), BLEU (`9.7158` vs `9.5399`), token F1 (`27.0736` vs `26.6291`), and TER (`87.3272` vs `87.5576`).
 - The gain is from the combination of terminology-aware SFT and terminology-aware inference. The same checkpoint without terminology prompting is not better than the previous deployable wrapper.
 - As before, early checkpoint selection matters: checkpoint-8 is best, while checkpoint-16 regresses and checkpoint-24/final are below checkpoint-8.
+
+### Raw Term-Pair Augmentation Follow-Up
+
+Purpose: test whether compact glossary term pairs can improve terminology behavior beyond prompt-conditioned training. `scripts/build_terminology_pair_jsonl.py` now builds regenerable JSONL rows from the simple glossary. The generated file is an artifact, not a git-tracked dataset.
+
+Data setup:
+
+- Generated terminology JSONL: `outputs/terminology_augmented_data/20260522-simple-terms/terminology_pairs_target.jsonl`
+- Source glossary: `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet`
+- Rows: 128 simple Spanish->Chanka term pairs
+- Mixed with: `outputs/mbr_self_training_data/20260522-k16-full-newbest-noterm-t065-p090/mixed_clean512_confident_margin000_target.jsonl`
+- Loaded rows after filtering: 1460
+  - 1241 train
+  - 219 validation
+- Terminology-matched rows:
+  - 250 train
+  - 46 validation
+
+SFT setup:
+
+- Starting adapter: `outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8`
+- Output: `outputs/mbr_self_training_sft/20260522-k16-termtrain-best-plus-termpairs-lr1e-7-16steps`
+- LR: `1e-7`
+- Max steps: `16`
+- Batch: per-device `4`, gradient accumulation `2`
+- Validation/save: every `8` optimizer steps
+
+Held-out clean Chanka terminology-prompt eval:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-8` + terminology top-1 | 26.6310 | 41.2503 | 9.2259 | 26.2614 | 2.8270 | 0.4747 | 88.2488 |
+| `checkpoint-16` + terminology top-1 | 26.2615 | 40.8117 | 6.8115 | 26.4517 | 2.5105 | 0.3165 | 87.5576 |
+| `final_lora` + terminology top-1 | 26.2615 | 40.8117 | 6.8115 | 26.4517 | 2.5105 | 0.3165 | 87.5576 |
+
+Conclusion:
+
+- Negative result. Do not use `20260522-k16-termtrain-best-plus-termpairs-lr1e-7-16steps`.
+- The best term-pair checkpoint scored `26.6310`, below the current deployable best `27.0396`.
+- Trainer eval loss improved because the validation set included easy short term pairs, but original held-out sentence translation regressed.
+- Future terminology augmentation should use glossary-triggered sentence or phrase-context examples, not standalone raw term-pair SFT.
