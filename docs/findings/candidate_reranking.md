@@ -339,3 +339,36 @@ Decision:
 
 - K32 score ensemble is the new best deployable profile by selection, chrF++, BLEU, token F1, and TER.
 - It is still below K32 oracle by a wide margin, so the next selector work should keep moving toward richer QE/verifier signals or better candidate pools rather than more shallow numerical blends.
+
+## 2026-05-22 Mixed-Distribution Text And Ensemble Selectors
+
+Purpose: test whether the mixed/exploratory pool's larger oracle headroom can be harvested by training selectors on the matching mixed distribution rather than transferring conservative K32 selectors.
+
+Mixed text-aware reranker:
+
+- Train pool: `outputs/verifier_candidate_mining/20260522-train-mixed-k32-current-deployable-term/train_mixed_k32_predictions.jsonl`
+- Eval pool: `outputs/rerank_candidate_evals/20260522-current-deployable-mixed-k32-term/candidates_predictions.jsonl`
+- Model: `outputs/text_candidate_reranker_evals/20260522-text-ranker-train-mixed-k32-eval-mixed-k32-term/text_ranker_mixed_k32_model.json`
+- Metrics: selection `29.8740`, chrF++ `43.2738`, BLEU `11.7439`, token F1 `30.9609`, source-copy `2.0570%`, leakage `0.0%`, TER `81.5668`.
+
+Mixed score ensemble:
+
+- Feature weights: `outputs/feature_candidate_reranker_evals/20260522-feature-reranker-train-mixed-k32-eval-mixed-k32-term/feature_mixed_k32_weights.json`
+- Text model: `outputs/text_candidate_reranker_evals/20260522-text-ranker-train-mixed-k32-eval-mixed-k32-term/text_ranker_mixed_k32_model.json`
+- Ensemble: `outputs/score_ensemble_reranker_evals/20260522-ensemble-feature-mixed-text-mixed-eval-mixed-k32-term/ensemble_mixed_k32_ensemble.json`
+- Metrics: selection `29.3974`, chrF++ `42.4715`, BLEU `11.5927`, token F1 `30.4566`, source-copy `2.1624%`, leakage `0.0%`, TER `81.1060`.
+
+Comparison:
+
+| Selector | Pool | Selection | chrF++ | BLEU | token F1 | TER |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| conservative K32 score ensemble | conservative K32 | 29.7584 | 43.8064 | 13.2505 | 30.4677 | 81.3364 |
+| mixed text-aware reranker | mixed K32 | 29.8740 | 43.2738 | 11.7439 | 30.9609 | 81.5668 |
+| mixed score ensemble | mixed K32 | 29.3974 | 42.4715 | 11.5927 | 30.4566 | 81.1060 |
+| mixed oracle | mixed K32 | 41.3016 | 55.0908 | 22.6396 | 45.0686 | 67.2811 |
+
+Decision:
+
+- Mixed text-aware reranking has the best selection and token F1 seen so far, but it gives up too much chrF++ and BLEU compared with the conservative K32 ensemble.
+- Mixed score ensemble has the best TER seen so far, but also trails conservative K32 ensemble on selection/chrF++/BLEU.
+- Keep conservative K32 score ensemble as the best overall deployable profile. Mixed-distribution training is promising but needs a stronger selector/QE model before using the higher-headroom mixed pool for deployment.
