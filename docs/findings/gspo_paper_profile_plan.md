@@ -272,6 +272,16 @@ Update as of 2026-05-22 10:25 UTC:
 - Result: terminology-conditioned GSPO did not beat prompt-only terminology inference or the standing adapter. Best reload checkpoint was `checkpoint-16` / final with selection `25.7517`, chrF++ `40.5832`, BLEU `6.3632`, token F1 `25.6711`, source-copy `2.6688%`, exact-copy `0.6329%`, leakage `0.6329%`, artifact `0.0%`, TER `88.7097`. Checkpoint `8` scored selection `25.7467`, chrF++ `40.5199`, BLEU `6.4529`, token F1 `25.5882`.
 - Interpretation: on the current small glossary coverage, actual GSPO updates hurt BLEU/token-F1 more than they help terminology. Keep terminology prompting as an inference option, but do not full-run terminology-conditioned GSPO until we have broader glossary-triggered training data or synthetic phrase pairs.
 
+Update as of 2026-05-22 11:15 UTC:
+
+- Added pairwise/listwise candidate selector tooling:
+  - `scripts/train_pairwise_candidate_reranker_chanka_unsloth.py`: trains a response-only SFT reranker on hidden-reference pairwise labels. The prompt sees Spanish source plus candidate A/B only; references are used only to pick the training winner.
+  - `scripts/evaluate_pairwise_candidate_reranker.py`: runs a tournament over all candidates in each K-sample group and reports `first`, learned `pairwise`, reference-free `mbr`, and hidden-reference `oracle`.
+- Remote training run: `outputs/chanka_pairwise_candidate_reranker_20260522-pairwise-v1`, using train candidates from `outputs/candidate_reranker_runs/20260522-source-only-reranker-v1/train_candidates_predictions.jsonl`. It built 7,791 pairwise examples, split into 7,012 train / 779 validation, ran 100 steps with validation/checkpoints every 25 steps, LoRA r128/a256, LR `2e-5`, batch 4, gradient accumulation 4. Best logged eval loss was checkpoint `100` at `0.06099`; final saved adapter is `final_pairwise_reranker_lora`.
+- Held-out K=8 eval: `outputs/pairwise_candidate_reranker_evals/20260522-pairwise-v1-final` on `outputs/rerank_candidate_evals/20260522-current-best-k8/candidates_predictions.jsonl`. The pairwise model parsed 100% of 4,424 pair decisions and selected non-first candidates on 51.90% of rows, so it did learn to move off candidate 0. Metrics: selection `22.3770`, chrF++ `35.4515`, BLEU `8.7623`, token F1 `21.0439`, source-copy `3.2173%`, leakage `0.1582%`, TER `90.0922`.
+- Comparison on the same file: first candidate selection `22.1104`; MBR selection `25.0776`, chrF++ `40.1105`, BLEU `7.0165`, token F1 `23.9195`; oracle selection `34.0593`, chrF++ `48.4914`, BLEU `13.9889`, token F1 `36.3623`. Pairwise improves first-candidate BLEU/TER but loses chrF++/token-F1 and is far below MBR.
+- Interpretation: pairwise SFT is directionally better than the failed scalar scorer because it does not collapse to candidate 0, but this prompt/model still learns the wrong preference shape. Keep MBR as the better deployable reranker. A future learned selector should either train against MBR+oracle features jointly, use a discriminative head/cross-encoder, or train directly on listwise ranked groups instead of independent JSON pair judgments.
+
 ## Smoke Results
 
 Remote: `root@216.81.248.197 -p 20299`, path `/root/rosettia-chanka`, GPU `NVIDIA L40S`.
