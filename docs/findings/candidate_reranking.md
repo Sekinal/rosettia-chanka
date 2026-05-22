@@ -152,3 +152,43 @@ Notes:
 - The wrapper is deployment plumbing, not a new quality result.
 - Use K16 for quality comparisons; K4 was only a smoke check.
 - The first smoke row shows why we still need qualitative review: one of the unselected candidates, `Ñuqaqa Quinua llaqtapim kawsani`, looks better than the selected row. The held-out K16 metrics remain the authoritative aggregate evidence for now.
+
+## 2026-05-22 Mixed Candidate Pool
+
+Purpose: adapt the TranslateGemma multi-sample/QE idea by combining conservative and exploratory candidate pools before reranking.
+
+Code added:
+
+- `scripts/merge_candidate_prediction_pools.py`: merges multiple candidate JSONL files by source/reference/source_name/variant, dedupes normalized predictions, and reindexes candidates within each merged group.
+- `tests/test_merge_candidate_prediction_pools.py`: covers dedupe, reindexing, and summary counts.
+
+Held-out pools:
+
+- Conservative: `outputs/rerank_candidate_evals/20260522-current-deployable-k16-t065-p090-term/candidates_predictions.jsonl`
+- Exploratory: `outputs/rerank_candidate_evals/20260522-current-deployable-k16-t095-p095-term/candidates_predictions.jsonl`
+- Merged: `outputs/rerank_candidate_evals/20260522-current-deployable-mixed-k32-term/candidates_predictions.jsonl`
+- Merged pool stats after dedupe: `158` groups, `3,501` candidates, mean `22.1582` candidates/group.
+
+Held-out mixed-pool results:
+
+| Method | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| first | 25.1206 | 39.9330 | 8.1285 | 23.9645 | 2.5352 | 0.2215 | 93.7788 |
+| MBR | 27.6564 | 42.3236 | 7.1796 | 27.4644 | 1.6139 | 0.1582 | 91.7051 |
+| old K16 feature weights | 27.4724 | 41.7903 | 6.1268 | 27.3172 | 1.1498 | 0.0000 | 88.2488 |
+| mixed-pool feature refit | 28.3403 | 42.0763 | 9.3382 | 27.1946 | 0.8966 | 0.0000 | 85.2535 |
+| oracle | 41.3016 | 55.0908 | 22.6396 | 45.0686 | 1.9409 | 0.0000 | 67.2811 |
+
+Train mixed pool:
+
+- Conservative train: `outputs/verifier_candidate_mining/20260522-train-k16-current-deployable-term-t065-p090/train_k16_predictions.jsonl`
+- Exploratory train: `outputs/verifier_candidate_mining/20260522-train-k16-current-deployable-term-t095-p095/train_k16_predictions.jsonl`
+- Merged train: `outputs/verifier_candidate_mining/20260522-train-mixed-k32-current-deployable-term/train_mixed_k32_predictions.jsonl`
+- Merged train stats after dedupe: `886` groups, `19,485` candidates, mean `21.9921` candidates/group.
+- Mixed feature weights: `outputs/feature_candidate_reranker_evals/20260522-feature-reranker-train-mixed-k32-eval-mixed-k32-term/feature_mixed_k32_weights.json`
+
+Decision:
+
+- Do not deploy mixed K32 with the current linear feature reranker. It underperforms the current K16 feature best (`28.5647` selection, chrF++ `42.9352`, BLEU `11.0872`).
+- The mixed pool is still extremely valuable: oracle reaches chrF++ `55.0908` and BLEU `22.6396`, much closer to the project target.
+- Next selector work should be listwise/QE-style, not another linear feature refit. Good labels are rows where exploratory sampling adds a better oracle candidate than conservative K16.
