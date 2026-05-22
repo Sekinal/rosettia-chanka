@@ -218,6 +218,13 @@ Update as of 2026-05-21 21:59 UTC:
 - BLEU-margin did not work. Eval dir: `outputs/gspo_checkpoint_evals/20260521-bleu-margin-current-best-bleu-margin-canary`. Best checkpoint `8` selection `25.5784`, chrF++ `40.3062`, BLEU `5.8180`, token F1 `25.7731`, source-copy `2.5105%`, exact-copy `0.6329%`, leakage `0.6329%`, artifact `0.0%`, TER `89.4009`; checkpoint `24`/final selection `25.3610`; checkpoint `16` selection `25.2748`.
 - Interpretation: changing the guard formula did not reproduce the low-LR BLEU gain. The strongest pattern remains the original v1 learned-verifier+Vibe reward seeded from Vibe896, with very short updates. The next canary should test temperature/exploration or sample count around that reward, not another verifier/guard rewrite.
 
+Update as of 2026-05-22 02:18 UTC:
+
+- Added `experiments/gspo/run_temperature_refinement_sweep.sh` to test generation entropy around the standing-best reward instead of changing verifiers or guards again. It runs two 16-step variants from the current best adapter with original `learned_verifier_vibe_2511`: conservative (`temperature=0.60`, `top_p=0.85`) and exploratory (`temperature=0.90`, `top_p=0.95`), both LR `5e-7`.
+- Temperature refinement did not beat the standing best. Eval dir: `outputs/gspo_checkpoint_evals/20260521-temp-refine-current-best-temperature-refine-sweep`. Best result was conservative checkpoint `8`: selection `25.9604`, chrF++ `40.5150`, BLEU `8.3218`, token F1 `25.4867`, source-copy `2.6688%`, exact-copy `0.6329%`, leakage `0.7911%`, artifact `0.0%`, TER `88.4793`.
+- Exploratory checkpoint `16`/final ranked second with selection `25.6289`, chrF++ `40.3853`, BLEU `5.9831`, token F1 `25.8785`, source-copy `2.6688%`, leakage `0.6329%`, TER `89.6313`.
+- Interpretation: simple continuations from the current best can trade among BLEU, TER, and token F1, but they are not improving the overall selection score. The standing best remains the earlier Vibe896-seeded 4-generation canary. Further gains likely require more held-out data, better preference labels, or a different training signal than reference-metric/verifier tweaking on the same 1,055 clean rows.
+
 ## Smoke Results
 
 Remote: `root@216.81.248.197 -p 20299`, path `/root/rosettia-chanka`, GPU `NVIDIA L40S`.
