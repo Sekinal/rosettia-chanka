@@ -235,6 +235,16 @@ Update as of 2026-05-22 05:55 UTC:
 - The reference-rerank GSPO canary did not beat the standing best. Eval dir: `outputs/gspo_checkpoint_evals/20260522-reference-rerank-current-best-reference-rerank-canary`. Best checkpoint was `checkpoint-16`: selection `25.7927`, chrF++ `40.3605`, BLEU `8.1634`, token F1 `25.4745`, source-copy `2.6914%`, exact-copy `0.6329%`, leakage `0.7911%`, artifact `0.0%`, TER `89.6313`. Checkpoint `8` scored selection `25.4039`; checkpoint `24`/final scored `25.2253`.
 - Conclusion: direct metric-rerank reward optimization is not enough. The K=8 oracle gap remains valuable, but the next serious experiment should train a deployable candidate selector, pairwise/listwise reranker, or verifier from oracle-picked sampled candidates and then use it for inference-time reranking or as a reward-model component. The standing best remains `outputs/gspo_paper_profiles/2511_learned_verifier_vibe_on_vibe896_4gen_canary_20260521-133146/chanka_gspo/final_gspo_lora`.
 
+Update as of 2026-05-22 06:45 UTC:
+
+- Added source-only reranker tooling:
+  - `scripts/train_candidate_reranker_chanka_unsloth.py`: trains a JSON quality scorer from Spanish source + candidate Chanka only. References are used only to create hidden labels.
+  - `scripts/evaluate_candidate_reranker.py`: scores multi-candidate prediction JSONL files and compares `first`, `learned`, and `oracle` selections.
+- Candidate reranker v1 training data: generated 4,096 train candidates from 512 train rows using the current best adapter with K=8 sampling (`temperature=0.85`, `top_p=0.95`). Train-candidate aggregate metrics: chrF++ `36.7177`, BLEU `5.2610`, token F1 `20.7578`, source-copy `2.6371%`, exact-copy `0.3418%`, leakage `0.1774%`, TER `97.9690`.
+- Reranker v1 training run: `outputs/chanka_candidate_reranker_20260522-source-only-reranker-v1`. After adding clean/reference and source-copy anchors, the trainer used 5,050 train examples and 561 validation examples. The run was stopped at checkpoint `100` as a canary; checkpoint `100` eval loss was `0.1866`.
+- Held-out K=8 eval results were negative. Checkpoint `50` selected non-first candidates on only `6.96%` of rows and scored selection `22.0813`, slightly below first-candidate selection `22.1104`. Checkpoint `100` selected candidate 0 for every row, exactly matching first-candidate metrics: selection `22.1104`, chrF++ `35.9965`, BLEU `6.9190`, token F1 `21.2375`, TER `99.0783`.
+- Interpretation: the source-only scalar JSON SFT scorer did not learn useful within-group ordering. It appears to learn a broad "this looks plausible" score rather than discriminate among similar sampled candidates. The next selector attempt should be pairwise/listwise: train directly on `(source, candidate A, candidate B) -> winner` or use a discriminative cross-encoder/logit head if practical, then evaluate non-first selection rate and external metrics before using it in inference.
+
 ## Smoke Results
 
 Remote: `root@216.81.248.197 -p 20299`, path `/root/rosettia-chanka`, GPU `NVIDIA L40S`.
