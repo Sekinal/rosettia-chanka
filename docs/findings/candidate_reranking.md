@@ -211,3 +211,39 @@ Decision:
 
 - The listwise linear objective is not a deployable improvement. It improves TER relative to MBR, but it gives up too much chrF++/BLEU/selection score.
 - The negative result points to feature expressiveness, not just optimization. A stronger selector likely needs candidate text modeling or richer learned QE/verifier features, not another objective over the same linear feature set.
+
+## 2026-05-22 K32 Conservative Sampling
+
+Purpose: test whether the current feature selector can improve by sampling more candidates from the same conservative distribution, without mixing in noisier exploratory/soup candidates.
+
+Held-out K32 pool:
+
+- Candidate file: `outputs/rerank_candidate_evals/20260522-current-deployable-k32-t065-p090-term/candidates_predictions.jsonl`
+- Adapter: `outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8`
+- Decoding: K32, temperature `0.65`, top-p `0.90`, top-k `50`, terminology top-1.
+
+K16 feature weights transferred to the K32 pool:
+
+- Output: `outputs/feature_candidate_reranker_evals/20260522-current-k32-term-current-k16-weights`
+- Weights: `outputs/feature_candidate_reranker_evals/20260522-feature-reranker-train-current-deployable-term-eval-current-deployable-k16/feature_k16_current_term_weights.json`
+
+| Method | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| previous K16 feature best | 28.5647 | 42.9352 | 11.0872 | 27.7860 | 2.0359 | 0.0000 | 84.1014 |
+| K32 + transferred K16 feature weights | 28.6939 | 43.3398 | 9.2082 | 28.4464 | 2.0992 | 0.0000 | 82.9493 |
+| K32 MBR | 27.1236 | 42.0596 | 7.0919 | 27.1913 | 1.9937 | 0.3165 | 89.4009 |
+| K32 oracle | 40.1555 | 54.4572 | 22.0831 | 43.9097 | 2.5814 | 0.0000 | 66.8203 |
+
+Matching K32 train-pool refit:
+
+- Train pool: `outputs/verifier_candidate_mining/20260522-train-k32-current-deployable-term-t065-p090/train_k32_predictions.jsonl`
+- Train stats: `897` source rows, `28,704` candidates.
+- Output: `outputs/feature_candidate_reranker_evals/20260522-feature-reranker-train-k32-current-deployable-term-eval-k32`
+- Feature result: selection `28.3664`, chrF++ `43.1674`, BLEU `7.3568`, token F1 `28.3078`, TER `84.3318`.
+
+Decision:
+
+- K32 with the existing K16 feature weights is the new best deployable setting for selection, chrF++, token F1, and TER.
+- K16 remains the better BLEU setting (`11.0872` vs `9.2082`). Because the project wants much higher BLEU too, this is not a complete replacement; keep both profiles depending on metric priority.
+- Matched K32 refitting over-selected late/high-index candidates and hurt BLEU, so keep using the K16-trained feature weights for K32 inference.
+- The K32 oracle is higher than K16 oracle but lower than mixed K32 oracle, so same-distribution K32 is a safer deployable gain while mixed/exploratory pools remain a selector research target.

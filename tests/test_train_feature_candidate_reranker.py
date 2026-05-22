@@ -129,6 +129,39 @@ class TrainFeatureCandidateRerankerTests(unittest.TestCase):
         self.assertEqual(diagnostics["training_objective"], "listwise")
         self.assertGreaterEqual(feature_reranker.mean_oracle_objective(rows, model), 1.0)
 
+    def test_train_boosted_stump_model_can_learn_non_linear_preference(self):
+        group = [
+            oracle_rerank.Candidate("src", "ref", "a", candidate_index=0),
+            oracle_rerank.Candidate("src", "ref", "middle target", candidate_index=1),
+            oracle_rerank.Candidate("src", "ref", "too long wrong", candidate_index=2),
+        ]
+        with mock.patch.object(
+            feature_reranker.oracle_rerank,
+            "candidate_oracle_score",
+            side_effect=lambda candidate: 1.0 if candidate.prediction == "middle target" else 0.0,
+        ):
+            rows = feature_reranker.featurize_groups([group])
+
+        model, diagnostics = feature_reranker.train_boosted_stump_model(
+            rows,
+            feature_names=["target_token_count"],
+            seed=1,
+            estimators=8,
+            learning_rate=1.0,
+            threshold_count=4,
+            min_leaf=1,
+            init_mode="mean",
+            search_iterations=0,
+            initial_noise=0.0,
+            min_noise=0.0,
+        )
+
+        selected = feature_reranker.select_feature(rows, model)
+
+        self.assertEqual(diagnostics["training_objective"], "boosted-stumps")
+        self.assertGreater(len(model.stumps), 0)
+        self.assertEqual(selected[0].candidate.prediction, "middle target")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,7 +13,7 @@ import math
 import random
 import statistics
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -63,6 +63,8 @@ class FeatureModel:
     means: dict[str, float]
     stds: dict[str, float]
     weights: dict[str, float]
+    bias: float = 0.0
+    stumps: list[dict[str, float | str]] = field(default_factory=list)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -75,12 +77,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--search-iterations", type=int, default=3000)
     parser.add_argument("--initial-noise", type=float, default=0.35)
     parser.add_argument("--min-noise", type=float, default=0.01)
-    parser.add_argument("--training-objective", choices=["hillclimb", "listwise"], default="hillclimb")
+    parser.add_argument("--training-objective", choices=["hillclimb", "listwise", "boosted-stumps"], default="hillclimb")
     parser.add_argument("--listwise-epochs", type=int, default=80)
     parser.add_argument("--listwise-learning-rate", type=float, default=0.03)
     parser.add_argument("--listwise-temperature", type=float, default=0.04)
     parser.add_argument("--listwise-l2", type=float, default=0.001)
     parser.add_argument("--listwise-target", choices=["soft", "best"], default="soft")
+    parser.add_argument("--boosted-estimators", type=int, default=120)
+    parser.add_argument("--boosted-learning-rate", type=float, default=0.08)
+    parser.add_argument("--boosted-thresholds", type=int, default=32)
+    parser.add_argument("--boosted-min-leaf", type=int, default=8)
+    parser.add_argument("--boosted-init", choices=["mean", "hillclimb"], default="hillclimb")
     parser.add_argument(
         "--terminology-file",
         default=None,
@@ -272,7 +279,17 @@ def normalized_feature(row: CandidateFeatures, model: FeatureModel, name: str) -
 
 
 def candidate_score(row: CandidateFeatures, model: FeatureModel) -> float:
-    return sum(model.weights.get(name, 0.0) * normalized_feature(row, model, name) for name in model.feature_names)
+    score = model.bias + sum(
+        model.weights.get(name, 0.0) * normalized_feature(row, model, name) for name in model.feature_names
+    )
+    for stump in model.stumps:
+        feature = str(stump["feature"])
+        value = normalized_feature(row, model, feature)
+        if value <= float(stump["threshold"]):
+            score += float(stump["left_value"])
+        else:
+            score += float(stump["right_value"])
+    return score
 
 
 def stable_softmax(values: Sequence[float], temperature: float = 1.0) -> list[float]:
@@ -439,12 +456,177 @@ def train_listwise_model(
     return model, diagnostics
 
 
+def flatten_rows(groups: Sequence[Sequence[CandidateFeatures]]) -> list[CandidateFeatures]:
+    return [row for group in groups for row in group]
+
+
+def normalized_matrix(
+    rows: Sequence[CandidateFeatures],
+    feature_names: Sequence[str],
+    means: dict[str, float],
+    stds: dict[str, float],
+) -> Any:
+    import numpy as np
+
+    return np.asarray(
+        [[(row.raw[name] - means[name]) / stds[name] for name in feature_names] for row in rows],
+        dtype="float64",
+    )
+
+
+def candidate_scores_for_rows(rows: Sequence[CandidateFeatures], model: FeatureModel) -> list[float]:
+    return [candidate_score(row, model) for row in rows]
+
+
+def candidate_thresholds(values: Any, threshold_count: int) -> list[float]:
+    import numpy as np
+
+    unique = np.unique(values)
+    if len(unique) <= 1:
+        return []
+    if len(unique) <= threshold_count + 1:
+        return [float((left + right) / 2.0) for left, right in zip(unique[:-1], unique[1:], strict=True)]
+    quantiles = np.linspace(0.0, 1.0, threshold_count + 2, dtype="float64")[1:-1]
+    return [float(value) for value in np.unique(np.quantile(values, quantiles))]
+
+
+def best_residual_stump(
+    values: Any,
+    residuals: Any,
+    threshold_count: int,
+    min_leaf: int,
+) -> dict[str, float] | None:
+    import numpy as np
+
+    best: dict[str, float] | None = None
+    best_loss = float("inf")
+    row_count = len(values)
+    if row_count < max(2, min_leaf * 2):
+        return None
+    for threshold in candidate_thresholds(values, threshold_count):
+        left_mask = values <= threshold
+        left_count = int(left_mask.sum())
+        right_count = row_count - left_count
+        if left_count < min_leaf or right_count < min_leaf:
+            continue
+        right_mask = ~left_mask
+        left_value = float(residuals[left_mask].mean())
+        right_value = float(residuals[right_mask].mean())
+        loss = float(
+            np.square(residuals[left_mask] - left_value).sum()
+            + np.square(residuals[right_mask] - right_value).sum()
+        )
+        if loss < best_loss:
+            best_loss = loss
+            best = {
+                "threshold": float(threshold),
+                "left_value": left_value,
+                "right_value": right_value,
+                "loss": best_loss,
+            }
+    return best
+
+
+def train_boosted_stump_model(
+    train_groups: Sequence[Sequence[CandidateFeatures]],
+    feature_names: Sequence[str],
+    seed: int,
+    estimators: int,
+    learning_rate: float,
+    threshold_count: int,
+    min_leaf: int,
+    init_mode: str,
+    search_iterations: int,
+    initial_noise: float,
+    min_noise: float,
+) -> tuple[FeatureModel, dict[str, Any]]:
+    import numpy as np
+
+    feature_names = list(feature_names)
+    means, stds = normalization_stats(train_groups, feature_names)
+    rows = flatten_rows(train_groups)
+    y = np.asarray([row.oracle_score for row in rows], dtype="float64")
+    x = normalized_matrix(rows, feature_names, means, stds)
+
+    if init_mode == "hillclimb":
+        base_model, base_diagnostics = train_model(
+            train_groups,
+            feature_names=feature_names,
+            seed=seed,
+            search_iterations=search_iterations,
+            initial_noise=initial_noise,
+            min_noise=min_noise,
+        )
+        predictions = np.asarray(candidate_scores_for_rows(rows, base_model), dtype="float64")
+        weights = dict(base_model.weights)
+        bias = base_model.bias
+        initial_objective = base_diagnostics["best_objective"]
+    else:
+        base_diagnostics = {}
+        bias = float(y.mean()) if len(y) else 0.0
+        weights = {name: 0.0 for name in feature_names}
+        predictions = np.full(len(y), bias, dtype="float64")
+        initial_objective = mean_oracle_objective(
+            train_groups,
+            FeatureModel(feature_names, means, stds, weights, bias=bias),
+        )
+
+    stumps: list[dict[str, float | str]] = []
+    rng = random.Random(seed)
+    feature_order = list(range(len(feature_names)))
+    for _step in range(max(0, estimators)):
+        rng.shuffle(feature_order)
+        residuals = y - predictions
+        best: dict[str, float | str] | None = None
+        best_loss = float("inf")
+        for feature_index in feature_order:
+            stump = best_residual_stump(x[:, feature_index], residuals, threshold_count, min_leaf)
+            if stump is None:
+                continue
+            if float(stump["loss"]) < best_loss:
+                best_loss = float(stump["loss"])
+                best = {
+                    "feature": feature_names[feature_index],
+                    "threshold": float(stump["threshold"]),
+                    "left_value": learning_rate * float(stump["left_value"]),
+                    "right_value": learning_rate * float(stump["right_value"]),
+                }
+        if best is None:
+            break
+        feature_index = feature_names.index(str(best["feature"]))
+        update = np.where(
+            x[:, feature_index] <= float(best["threshold"]),
+            float(best["left_value"]),
+            float(best["right_value"]),
+        )
+        predictions += update
+        stumps.append(best)
+
+    model = FeatureModel(feature_names, means, stds, weights, bias=bias, stumps=stumps)
+    diagnostics = {
+        "training_objective": "boosted-stumps",
+        "boosted_init": init_mode,
+        "base_diagnostics": base_diagnostics,
+        "initial_objective": initial_objective,
+        "best_objective": mean_oracle_objective(train_groups, model),
+        "boosted_estimators_requested": estimators,
+        "boosted_estimators_fit": len(stumps),
+        "boosted_learning_rate": learning_rate,
+        "boosted_thresholds": threshold_count,
+        "boosted_min_leaf": min_leaf,
+        "train_mse": float(np.square(y - predictions).mean()) if len(y) else 0.0,
+    }
+    return model, diagnostics
+
+
 def model_to_json(model: FeatureModel, diagnostics: dict[str, Any]) -> dict[str, Any]:
     return {
         "feature_names": model.feature_names,
         "means": model.means,
         "stds": model.stds,
         "weights": model.weights,
+        "bias": model.bias,
+        "stumps": model.stumps,
         "diagnostics": diagnostics,
     }
 
@@ -455,6 +637,8 @@ def model_from_json(payload: dict[str, Any]) -> FeatureModel:
         means={key: float(value) for key, value in payload["means"].items()},
         stds={key: float(value) for key, value in payload["stds"].items()},
         weights={key: float(value) for key, value in payload["weights"].items()},
+        bias=float(payload.get("bias", 0.0)),
+        stumps=list(payload.get("stumps", [])),
     )
 
 
@@ -596,6 +780,20 @@ def main() -> None:
                 target_temperature=args.listwise_temperature,
                 l2=args.listwise_l2,
                 target_mode=args.listwise_target,
+            )
+        elif args.training_objective == "boosted-stumps":
+            model, diagnostics = train_boosted_stump_model(
+                train_groups,
+                feature_names=feature_names,
+                seed=args.seed,
+                estimators=args.boosted_estimators,
+                learning_rate=args.boosted_learning_rate,
+                threshold_count=args.boosted_thresholds,
+                min_leaf=args.boosted_min_leaf,
+                init_mode=args.boosted_init,
+                search_iterations=args.search_iterations,
+                initial_noise=args.initial_noise,
+                min_noise=args.min_noise,
             )
         else:
             model, diagnostics = train_model(

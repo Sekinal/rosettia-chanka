@@ -107,6 +107,7 @@ The glossary is kept separate from sentence-pair training data. It is useful for
 ## Feature-Reranked Inference
 
 The current best deployment path samples multiple candidates from the trained adapter and selects one with the feature reranker.
+K32 is the current best chrF++/selection/TER setting; K16 remains the better BLEU setting.
 
 ```bash
 python scripts/generate_feature_reranked_translations.py \
@@ -115,7 +116,7 @@ python scripts/generate_feature_reranked_translations.py \
   --input-path sources.txt \
   --output-jsonl predictions.jsonl \
   --candidates-jsonl candidates.jsonl \
-  --num-return-sequences 16 \
+  --num-return-sequences 32 \
   --temperature 0.65 \
   --top-p 0.90 \
   --top-k 50 \
