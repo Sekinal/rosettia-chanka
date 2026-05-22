@@ -201,6 +201,69 @@ Training loss and eval loss improved, but generated translation quality remained
 
 Qualitative pattern: the model stops emitting explanations and starts producing Chanka-like text, but it is often generic or semantically wrong. Examples from `checkpoint-392`: `¿En qué calle vive? -> ¿Imayna riqsi?`, `Yo vivo en Quinua -> Ñuqa Quinuawan kachkani`, `No es un buen esposo -> Mana allin waynaqmi`, and `Tengo 45 años -> 45 uraymi kani`.
 
+Broad-to-Chanka SFT:
+
+```bash
+.venv/bin/python scripts/train_sft_unsloth.py \
+  --stage broad \
+  --model-id google/gemma-4-E4B-it \
+  --max-train-samples 2048 \
+  --max-eval-samples 128 \
+  --max-steps 96 \
+  --eval-steps 24 \
+  --save-steps 24 \
+  --per-device-train-batch-size 1 \
+  --per-device-eval-batch-size 1 \
+  --gradient-accumulation-steps 4 \
+  --max-seq-length 256 \
+  --learning-rate 1e-4 \
+  --lora-r 64 \
+  --lora-alpha 128 \
+  --output-dir outputs/gemma4_e4b_broad_lora_r64_a128_s256_96steps
+```
+
+Broad validation improved overall but was not monotonic.
+
+| Checkpoint | Eval loss |
+| --- | ---: |
+| `checkpoint-24` | `5.327` |
+| `checkpoint-48` | `4.812` |
+| `checkpoint-72` | `4.640` |
+| `checkpoint-96` | `4.740` |
+| `final_lora` | `4.5090` |
+
+Chanka continuation from the broad adapter:
+
+```bash
+.venv/bin/python scripts/train_sft_unsloth.py \
+  --stage chanka \
+  --model-id google/gemma-4-E4B-it \
+  --adapter-path outputs/gemma4_e4b_broad_lora_r64_a128_s256_96steps/broad/final_lora \
+  --max-train-samples 512 \
+  --max-eval-samples 128 \
+  --max-steps 96 \
+  --eval-steps 24 \
+  --save-steps 24 \
+  --per-device-train-batch-size 1 \
+  --per-device-eval-batch-size 1 \
+  --gradient-accumulation-steps 4 \
+  --max-seq-length 128 \
+  --learning-rate 2e-5 \
+  --lora-r 64 \
+  --lora-alpha 128 \
+  --output-dir outputs/gemma4_e4b_broad96_chanka_lora_s128_96steps
+```
+
+Chanka validation improved from `4.362` at step 24 to `4.1666` final. Full held-out generation was worse than the clean-only checkpoint eval:
+
+| Adapter | chrF++ | BLEU | Token F1 | Source copy % | Leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `outputs/gemma4_e4b_broad96_chanka_lora_s128_96steps/chanka/final_lora` | `14.9705` | `0.7609` | `2.4589` | `3.6920` | `0.0` | `129.4931` |
+
+Important evaluator fix: PEFT cannot attach Gemma 4 LoRA adapters to `Gemma4ClippableLinear`, so Gemma 4 adapter eval must use the Unsloth adapter loader. `scripts/evaluate_translation_baseline.py` now supports `--adapter-loader auto|peft|unsloth`; `auto` uses Unsloth for Gemma 4 adapters and PEFT otherwise. The Unsloth path loads the saved LoRA directory with `FastLanguageModel.from_pretrained`, calls `FastLanguageModel.for_inference`, and preserves the Gemma chat template.
+
+Qualitative pattern: broad+Chanka SFT did not fix the core semantic issue. It avoids Spanish leakage and emits Chanka-looking fragments, but the translations are usually wrong: `¿En qué calle vive? -> Imay kancha?`, `No es un buen esposo -> Chanka uyaytaqtaq`, `En la fiesta -> Pachamamañan`, `Tengo 45 años -> 45 qillqayni`.
+
 ## Hy-MT2 7B Broad-to-Chanka SFT
 
 Purpose: test the strongest plausible Hy-MT2 path after zero-shot source-copying: first teach broad Spanish-to-Quechua behavior, then specialize to the clean Chanka split.
@@ -290,4 +353,4 @@ Decision: this is a useful negative result. Hy-MT2 7B can be adapted technically
 
 ## Decision
 
-Gemma 4 E4B and Hy-MT2 can both be used with Unsloth after chat-marker fixes, but Gemma 4 E4B clean-Chanka SFT and the tiny Hy-MT2 7B broad-to-Chanka run are not competitive with the current Qwen3.5 adapter. Neither justifies replacing the Qwen base from current results. If these families are revisited, they need much larger broad Quechua SFT before clean Chanka SFT/GSPO, with generation evals at checkpoints rather than relying on trainer loss.
+Gemma 4 E4B and Hy-MT2 can both be used with Unsloth after chat-marker fixes, but Gemma 4 E4B clean-only SFT, Gemma 4 E4B broad-to-Chanka SFT, and the tiny Hy-MT2 7B broad-to-Chanka run are not competitive with the current Qwen3.5 adapter. Neither family justifies replacing the Qwen base from current results. If these families are revisited, they need much larger broad Quechua SFT before clean Chanka SFT/GSPO, with generation evals at checkpoints rather than relying on trainer loss.

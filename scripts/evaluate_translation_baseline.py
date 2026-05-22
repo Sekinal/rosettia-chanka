@@ -26,6 +26,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Optional PEFT/LoRA adapter to attach before generation.",
     )
     parser.add_argument(
+        "--adapter-loader",
+        choices=["auto", "peft", "unsloth"],
+        default="auto",
+        help="How to load --adapter-path. Auto uses Unsloth for Gemma 4 adapters, PEFT otherwise.",
+    )
+    parser.add_argument(
         "--prompt-style",
         choices=["generic", "hymt2"],
         default="generic",
@@ -41,6 +47,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=3407)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--max-new-tokens", type=int, default=80)
+    parser.add_argument("--max-seq-length", type=int, default=512)
     parser.add_argument("--source-lang", default="spa_Latn")
     parser.add_argument("--target-lang", default="quy_Latn")
     parser.add_argument("--torch-dtype", choices=["auto", "float16", "bfloat16", "float32"], default="auto")
@@ -88,6 +95,16 @@ def attach_adapter_if_requested(model, adapter_path: Path | None):
     from peft import PeftModel
 
     return PeftModel.from_pretrained(model, adapter_path)
+
+
+def should_load_adapter_with_unsloth(args: argparse.Namespace) -> bool:
+    if args.adapter_path is None:
+        return False
+    if args.adapter_loader == "unsloth":
+        return True
+    if args.adapter_loader == "peft":
+        return False
+    return gemma4_model_id(args.model_id)
 
 
 def generate_nllb(args: argparse.Namespace, rows: list[dict[str, str]]) -> list[str]:
@@ -229,6 +246,9 @@ def generate_causal_chat(args: argparse.Namespace, rows: list[dict[str, str]]) -
     import torch
     from transformers import AutoModelForCausalLM, AutoProcessor, AutoTokenizer
 
+    if should_load_adapter_with_unsloth(args):
+        return generate_unsloth_causal_chat(args, rows)
+
     if gemma4_model_id(args.model_id):
         processor = AutoProcessor.from_pretrained(args.model_id, trust_remote_code=True)
     else:
@@ -296,6 +316,56 @@ def generate_causal_chat(args: argparse.Namespace, rows: list[dict[str, str]]) -
     return predictions
 
 
+def generate_unsloth_causal_chat(args: argparse.Namespace, rows: list[dict[str, str]]) -> list[str]:
+    import torch
+    from unsloth import FastLanguageModel
+
+    model_name = str(args.adapter_path) if args.adapter_path else args.model_id
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=model_name,
+        max_seq_length=args.max_seq_length,
+        load_in_4bit=False,
+        load_in_16bit=True,
+    )
+    FastLanguageModel.for_inference(model)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    predictions: list[str] = []
+    for row in rows:
+        messages = causal_messages(args, row["source"])
+        chat_template_kwargs = {
+            "add_generation_prompt": True,
+            "return_tensors": "pt",
+            "return_dict": True,
+        }
+        try:
+            inputs = tokenizer.apply_chat_template(
+                messages,
+                enable_thinking=False,
+                **chat_template_kwargs,
+            )
+        except TypeError:
+            inputs = tokenizer.apply_chat_template(messages, **chat_template_kwargs)
+        if isinstance(inputs, str):
+            inputs = tokenizer(
+                text=inputs,
+                return_tensors="pt",
+                truncation=True,
+                max_length=args.max_seq_length,
+            )
+        inputs = inputs.to(model.device)
+        kwargs = generation_kwargs(args)
+        kwargs["eos_token_id"] = tokenizer.eos_token_id
+        kwargs["pad_token_id"] = tokenizer.eos_token_id
+        with torch.inference_mode():
+            outputs = model.generate(**inputs, **kwargs)
+        prompt_len = inputs["input_ids"].shape[-1]
+        prediction = tokenizer.decode(outputs[0][prompt_len:], skip_special_tokens=True)
+        predictions.append(gspo.strip_chat_artifacts(prediction))
+        print(f"generated {len(predictions)}/{len(rows)}", flush=True)
+    return predictions
+
+
 def generate_translategemma(args: argparse.Namespace, rows: list[dict[str, str]]) -> list[str]:
     import torch
     from transformers import AutoModelForImageTextToText, AutoProcessor
@@ -356,6 +426,7 @@ def main() -> None:
             "backend": args.backend,
             "model_id": args.model_id,
             "adapter_path": str(args.adapter_path) if args.adapter_path else None,
+            "adapter_loader": args.adapter_loader,
             "prompt_style": args.prompt_style,
             "split": args.split,
             "eval_rows": len(rows),

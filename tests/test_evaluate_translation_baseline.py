@@ -38,6 +38,77 @@ class EvaluateTranslationBaselineTests(unittest.TestCase):
 
         self.assertEqual(args.adapter_path, Path("outputs/hymt2/chanka/final_lora"))
 
+    def test_parse_args_accepts_unsloth_adapter_loader_and_context_length(self):
+        args = baseline.parse_args(
+            [
+                "--backend",
+                "causal-chat",
+                "--model-id",
+                "google/gemma-4-E4B-it",
+                "--adapter-path",
+                "outputs/gemma4/chanka/final_lora",
+                "--adapter-loader",
+                "unsloth",
+                "--max-seq-length",
+                "128",
+                "--output-json",
+                "outputs/baselines/smoke.json",
+            ]
+        )
+
+        self.assertEqual(args.adapter_loader, "unsloth")
+        self.assertEqual(args.max_seq_length, 128)
+
+    def test_gemma4_adapter_uses_unsloth_loader_by_default(self):
+        args = baseline.parse_args(
+            [
+                "--backend",
+                "causal-chat",
+                "--model-id",
+                "google/gemma-4-E4B-it",
+                "--adapter-path",
+                "outputs/gemma4/chanka/final_lora",
+                "--output-json",
+                "outputs/baselines/smoke.json",
+            ]
+        )
+
+        self.assertTrue(baseline.should_load_adapter_with_unsloth(args))
+
+    def test_non_gemma_adapter_uses_peft_loader_by_default(self):
+        args = baseline.parse_args(
+            [
+                "--backend",
+                "causal-chat",
+                "--model-id",
+                "tencent/Hy-MT2-7B",
+                "--adapter-path",
+                "outputs/hymt2/chanka/final_lora",
+                "--output-json",
+                "outputs/baselines/smoke.json",
+            ]
+        )
+
+        self.assertFalse(baseline.should_load_adapter_with_unsloth(args))
+
+    def test_explicit_peft_loader_overrides_gemma4_auto(self):
+        args = baseline.parse_args(
+            [
+                "--backend",
+                "causal-chat",
+                "--model-id",
+                "google/gemma-4-E4B-it",
+                "--adapter-path",
+                "outputs/gemma4/chanka/final_lora",
+                "--adapter-loader",
+                "peft",
+                "--output-json",
+                "outputs/baselines/smoke.json",
+            ]
+        )
+
+        self.assertFalse(baseline.should_load_adapter_with_unsloth(args))
+
     def test_attach_adapter_noops_without_adapter(self):
         model = object()
 
