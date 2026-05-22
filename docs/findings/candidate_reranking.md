@@ -51,14 +51,30 @@ Feature weights from the older train pool evaluated on the fresh current-deploya
 | MBR | 27.0751 | 41.7348 | 8.1092 | 26.8743 | 2.1414 | 0.3165 | 89.6313 |
 | oracle | 38.3462 | 52.6971 | 19.7691 | 41.8353 | 2.6899 | 0.0000 | 69.8157 |
 
+Matching current-deployable train-pool refit:
+
+- Train candidate file: `outputs/verifier_candidate_mining/20260522-train-k16-current-deployable-term-t065-p090/train_k16_predictions.jsonl`
+- Train candidates: `14,352`
+- Train groups after candidate grouping: `886`
+- Search iterations: `2,500`
+- Accepted updates: `28`
+- Eval candidate file: `outputs/rerank_candidate_evals/20260522-current-deployable-k16-t065-p090-term/candidates_predictions.jsonl`
+- Weights path on remote: `outputs/feature_candidate_reranker_evals/20260522-feature-reranker-train-current-deployable-term-eval-current-deployable-k16/feature_k16_current_term_weights.json`
+
+| Method | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER | non-first % |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| first | 25.1206 | 39.9330 | 8.1285 | 23.9645 | 2.5352 | 0.2215 | 93.7788 | 0.0000 |
+| feature | 28.5647 | 42.9352 | 11.0872 | 27.7860 | 2.0359 | 0.0000 | 84.1014 | 98.1013 |
+| MBR | 27.0751 | 41.7348 | 8.1092 | 26.8743 | 2.1414 | 0.3165 | 89.6313 | 86.7089 |
+| oracle | 38.3462 | 52.6971 | 19.7691 | 41.8353 | 2.6899 | 0.0000 | 69.8157 | 86.7089 |
+
 Decision:
 
-- This is the current best deployable selector by selection, chrF++, token F1, leakage, and TER.
-- It still does not beat the previous greedy/terminology best BLEU (`9.4148` vs `9.7158`), so keep both results visible.
+- The matching-pool feature refit is now the current best deployable selector by all headline metrics: selection, chrF++, BLEU, token F1, leakage, and TER.
+- It also beats the previous greedy/terminology best BLEU (`11.0872` vs `9.7158`), unlike the older-weight feature run.
 - The oracle gap remains large. The model distribution contains far better translations; selector quality is now a high-upside path.
 
 Next checks:
 
-- Refit feature weights on a matching current-deployable train K16 terminology-prompt pool and evaluate against the same held-out pool.
 - Add glossary-root leakage features such as `fiesta -> raymi` versus `fiestapi`, because current Spanish-leakage metrics miss Spanish roots with Quechua suffixes.
 - Consider a listwise/discriminative reranker after the feature baseline is stable.
