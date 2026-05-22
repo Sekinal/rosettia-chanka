@@ -1,0 +1,122 @@
+# Qwen3.5 4B Curriculum SFT
+
+Date: 2026-05-22
+
+Purpose: test whether the weak Qwen3.5 4B JSONL-only result was a model problem or a curriculum problem, and whether Unsloth full finetuning can improve a strong merged 4B checkpoint.
+
+## Broad -> Clean Chanka LoRA
+
+Broad stage:
+
+- Model: `unsloth/Qwen3.5-4B`
+- Output: `outputs/qwen35_4b_curriculum/20260522-broad-r64-a128-s256-512steps/broad`
+- Data: broad Quechua/Spanish SFT stage from `scripts/train_sft_unsloth.py --stage broad`
+- Rows: 169,877 loaded, 166,480 train, 3,397 validation
+- LoRA: r64 / alpha128
+- Sequence length: 256
+- Max steps: 512
+- Effective batch: 16
+- LR: `5e-5`
+- Validation/save: every 128 steps
+
+Broad eval loss:
+
+| Checkpoint | eval loss |
+| --- | ---: |
+| checkpoint-128 | 1.7978 |
+| checkpoint-256 | 1.5536 |
+| checkpoint-384 | 1.4371 |
+| checkpoint-512 | 1.3870 |
+
+The final post-save eval printed `nan`, so `checkpoint-512` is the reliable continuation point.
+
+Clean Chanka continuation:
+
+- Adapter start: `outputs/qwen35_4b_curriculum/20260522-broad-r64-a128-s256-512steps/broad/checkpoint-512`
+- Output: `outputs/qwen35_4b_curriculum/20260522-broad512-chanka-r64-a128-s128-256steps/chanka`
+- Rows: 1,055 loaded, 897 train, 158 validation
+- LoRA: r64 / alpha128
+- Sequence length: 128
+- Max steps: 256
+- Effective batch: 8
+- LR: `2e-5`
+- Validation/save: every 32 steps
+
+Chanka eval loss:
+
+| Checkpoint | eval loss |
+| --- | ---: |
+| checkpoint-64 | 1.209 |
+| checkpoint-96 | 1.122 |
+| checkpoint-128 | 1.085 |
+| checkpoint-160 | 1.056 |
+| checkpoint-224 | 1.012 |
+| checkpoint-256/final | 1.020 |
+
+External held-out eval with terminology top-1:
+
+| Checkpoint | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| checkpoint-224 | 30.3580 | 43.2858 | 16.3507 | 30.1583 | 2.1624 | 0.0000 | 85.0230 |
+| final_lora | 30.3580 | 43.2858 | 16.3507 | 30.1583 | 2.1624 | 0.0000 | 85.0230 |
+| checkpoint-256 | 29.4458 | 42.5682 | 15.4622 | 28.9673 | 2.1624 | 0.0000 | 88.4793 |
+| checkpoint-192 | 29.2875 | 42.4893 | 16.2026 | 27.1505 | 2.2152 | 0.0000 | 82.0276 |
+
+Decision:
+
+- The 4B model is not the problem. Raw 4B JSONL-only SFT was the wrong data order.
+- Broad -> clean Chanka curriculum gives the best 4B result so far and a strong diversity candidate.
+- It still trails the current K32 ensemble on chrF++ (`43.2858` vs `43.8064`), but beats it on BLEU (`16.3507` vs `13.2505`) and selection (`30.3580` vs `29.7584`).
+
+## Merge -> Full SFT Refinement
+
+Merged model:
+
+- Adapter source: `outputs/qwen35_4b_curriculum/20260522-broad512-chanka-r64-a128-s128-256steps/chanka/checkpoint-224`
+- Merged model: `outputs/merged_full_models/20260522-qwen35-4b-broad512-chanka224-merged16`
+- Export: `scripts/export_unsloth_merged_model.py --save-method merged_16bit`
+
+Full-SFT canary:
+
+- Model id: `outputs/merged_full_models/20260522-qwen35-4b-broad512-chanka224-merged16`
+- Output: `outputs/full_sft_canaries/20260522-qwen35-4b-merged-broad512-chanka224-full-chanka-lr1e-6-64steps/chanka`
+- Training mode: `--training-mode full`
+- Trainable parameters: 4,539,265,536 / 4,539,265,536
+- Data: clean Chanka stage, 897 train / 158 validation
+- Sequence length: 128
+- Max steps: 64
+- Effective batch: 8
+- LR: `1e-6`
+- Validation/save: every 16 steps
+- Note: `save_total_limit=3` retained checkpoint 16, 48, 64, and `final_full_model`.
+
+Trainer eval loss:
+
+| Checkpoint | eval loss |
+| --- | ---: |
+| checkpoint-16 | 0.9938 |
+| checkpoint-32 | 0.9946 |
+| checkpoint-48 | 0.9960 |
+| checkpoint-64/final | 0.9952 |
+
+External held-out eval with terminology top-1:
+
+| Checkpoint | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| checkpoint-48 | 30.4393 | 43.3102 | 16.2178 | 30.6209 | 2.1624 | 0.0000 | 85.2535 |
+| checkpoint-64 | 30.0848 | 43.0061 | 15.2830 | 30.5873 | 2.1308 | 0.0000 | 88.0184 |
+| final_full_model | 30.0848 | 43.0061 | 15.2830 | 30.5873 | 2.1308 | 0.0000 | 88.0184 |
+| checkpoint-16 | 30.0356 | 43.0186 | 15.3739 | 30.2638 | 2.4789 | 0.0000 | 85.0230 |
+
+Decision:
+
+- Full finetuning is feasible for Qwen3.5 4B on the L40S with Unsloth bf16 full mode and 8-bit Adam.
+- Full SFT gives a tiny refinement over the 4B LoRA checkpoint in selection (`30.4393` vs `30.3580`) and token F1 (`30.6209` vs `30.1583`), with a small chrF++ gain (`43.3102` vs `43.2858`) and a small BLEU drop (`16.2178` vs `16.3507`).
+- It is not yet a deployable replacement for the K32 ensemble because chrF++ is still lower (`43.3102` vs `43.8064`).
+- The useful recipe is not raw full SFT. Use full SFT only after a strong LoRA curriculum checkpoint has been merged.
+
+## Next Steps
+
+- Use `checkpoint-224` LoRA and `checkpoint-48` full-SFT as candidate generators in a mixed pool with the current 2B deployable model; the diversity is likely more valuable than greedy replacement.
+- Try the same broad -> clean curriculum on Qwen3.5 9B if memory allows.
+- If full SFT is revisited, test short low-LR refinements from the best 9B/35B-A3B merged checkpoint rather than scaling the 4B full run blindly.
