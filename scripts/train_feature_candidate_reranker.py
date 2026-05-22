@@ -75,6 +75,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--search-iterations", type=int, default=3000)
     parser.add_argument("--initial-noise", type=float, default=0.35)
     parser.add_argument("--min-noise", type=float, default=0.01)
+    parser.add_argument("--training-objective", choices=["hillclimb", "listwise"], default="hillclimb")
+    parser.add_argument("--listwise-epochs", type=int, default=80)
+    parser.add_argument("--listwise-learning-rate", type=float, default=0.03)
+    parser.add_argument("--listwise-temperature", type=float, default=0.04)
+    parser.add_argument("--listwise-l2", type=float, default=0.001)
+    parser.add_argument("--listwise-target", choices=["soft", "best"], default="soft")
     parser.add_argument(
         "--terminology-file",
         default=None,
@@ -269,6 +275,17 @@ def candidate_score(row: CandidateFeatures, model: FeatureModel) -> float:
     return sum(model.weights.get(name, 0.0) * normalized_feature(row, model, name) for name in model.feature_names)
 
 
+def stable_softmax(values: Sequence[float], temperature: float = 1.0) -> list[float]:
+    if not values:
+        return []
+    temperature = max(1e-6, temperature)
+    scaled = [value / temperature for value in values]
+    max_value = max(scaled)
+    exp_values = [math.exp(max(-60.0, min(60.0, value - max_value))) for value in scaled]
+    total = sum(exp_values)
+    return [value / total for value in exp_values]
+
+
 def select_feature(groups: Sequence[Sequence[CandidateFeatures]], model: FeatureModel) -> list[CandidateFeatures]:
     selected: list[CandidateFeatures] = []
     for group in groups:
@@ -354,6 +371,72 @@ def train_model(
         "search_iterations": search_iterations,
     }
     return best, diagnostics
+
+
+def listwise_targets(group: Sequence[CandidateFeatures], temperature: float, target_mode: str) -> list[float]:
+    if not group:
+        return []
+    if target_mode == "best":
+        best_index = max(
+            range(len(group)),
+            key=lambda index: (
+                group[index].oracle_score,
+                -group[index].candidate.candidate_index,
+            ),
+        )
+        return [1.0 if index == best_index else 0.0 for index in range(len(group))]
+    return stable_softmax([row.oracle_score for row in group], temperature)
+
+
+def train_listwise_model(
+    train_groups: Sequence[Sequence[CandidateFeatures]],
+    feature_names: Sequence[str],
+    seed: int,
+    epochs: int,
+    learning_rate: float,
+    target_temperature: float,
+    l2: float,
+    target_mode: str,
+) -> tuple[FeatureModel, dict[str, Any]]:
+    feature_names = list(feature_names)
+    means, stds = normalization_stats(train_groups, feature_names)
+    weights = dict(initial_weights())
+    rng = random.Random(seed)
+    groups = [list(group) for group in train_groups if group]
+    initial = FeatureModel(feature_names, means, stds, weights)
+    initial_objective = mean_oracle_objective(groups, initial)
+    last_loss = 0.0
+
+    for _epoch in range(max(0, epochs)):
+        rng.shuffle(groups)
+        for group in groups:
+            targets = listwise_targets(group, target_temperature, target_mode)
+            model = FeatureModel(feature_names, means, stds, weights)
+            scores = [candidate_score(row, model) for row in group]
+            probabilities = stable_softmax(scores)
+            last_loss += -sum(target * math.log(max(1e-12, probability)) for target, probability in zip(targets, probabilities, strict=True))
+            gradients = {name: l2 * weights.get(name, 0.0) for name in feature_names}
+            for row, probability, target in zip(group, probabilities, targets, strict=True):
+                error = probability - target
+                for name in feature_names:
+                    gradients[name] += error * normalized_feature(row, model, name)
+            scale = 1.0 / max(1, len(group))
+            for name in feature_names:
+                weights[name] = weights.get(name, 0.0) - (learning_rate * gradients[name] * scale)
+
+    model = FeatureModel(feature_names, means, stds, weights)
+    diagnostics = {
+        "training_objective": "listwise",
+        "initial_objective": initial_objective,
+        "best_objective": mean_oracle_objective(groups, model),
+        "listwise_epochs": epochs,
+        "listwise_learning_rate": learning_rate,
+        "listwise_temperature": target_temperature,
+        "listwise_l2": l2,
+        "listwise_target": target_mode,
+        "last_accumulated_loss": last_loss,
+    }
+    return model, diagnostics
 
 
 def model_to_json(model: FeatureModel, diagnostics: dict[str, Any]) -> dict[str, Any]:
@@ -503,14 +586,26 @@ def main() -> None:
         if not args.train_jsonl:
             raise ValueError("--train-jsonl is required unless --weights-json is supplied")
         train_groups = featurize_groups(load_groups(args.train_jsonl), terminology_entries, args.terminology_top_k)
-        model, diagnostics = train_model(
-            train_groups,
-            feature_names=feature_names,
-            seed=args.seed,
-            search_iterations=args.search_iterations,
-            initial_noise=args.initial_noise,
-            min_noise=args.min_noise,
-        )
+        if args.training_objective == "listwise":
+            model, diagnostics = train_listwise_model(
+                train_groups,
+                feature_names=feature_names,
+                seed=args.seed,
+                epochs=args.listwise_epochs,
+                learning_rate=args.listwise_learning_rate,
+                target_temperature=args.listwise_temperature,
+                l2=args.listwise_l2,
+                target_mode=args.listwise_target,
+            )
+        else:
+            model, diagnostics = train_model(
+                train_groups,
+                feature_names=feature_names,
+                seed=args.seed,
+                search_iterations=args.search_iterations,
+                initial_noise=args.initial_noise,
+                min_noise=args.min_noise,
+            )
         diagnostics["train_groups"] = len(train_groups)
         diagnostics["train_candidates"] = sum(len(group) for group in train_groups)
     diagnostics["terminology_entries"] = len(terminology_entries)

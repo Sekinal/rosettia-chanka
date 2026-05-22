@@ -192,3 +192,22 @@ Decision:
 - Do not deploy mixed K32 with the current linear feature reranker. It underperforms the current K16 feature best (`28.5647` selection, chrF++ `42.9352`, BLEU `11.0872`).
 - The mixed pool is still extremely valuable: oracle reaches chrF++ `55.0908` and BLEU `22.6396`, much closer to the project target.
 - Next selector work should be listwise/QE-style, not another linear feature refit. Good labels are rows where exploratory sampling adds a better oracle candidate than conservative K16.
+
+## 2026-05-22 Listwise Feature Reranker Ablation
+
+Code added:
+
+- `scripts/train_feature_candidate_reranker.py --training-objective listwise`
+- `--listwise-target soft|best`, `--listwise-epochs`, `--listwise-learning-rate`, `--listwise-temperature`, `--listwise-l2`
+
+Mixed K32 train/eval results:
+
+| Objective | Output | Selection | chrF++ | BLEU | token F1 | TER |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| soft listwise | `outputs/feature_candidate_reranker_evals/20260522-listwise-soft-train-mixed-k32-eval-mixed-k32-term` | 27.3805 | 41.1811 | 9.0921 | 25.8811 | 82.9493 |
+| hard-best listwise | `outputs/feature_candidate_reranker_evals/20260522-listwise-best-train-mixed-k32-eval-mixed-k32-term` | 26.8655 | 40.5992 | 8.1170 | 25.6349 | 81.5668 |
+
+Decision:
+
+- The listwise linear objective is not a deployable improvement. It improves TER relative to MBR, but it gives up too much chrF++/BLEU/selection score.
+- The negative result points to feature expressiveness, not just optimization. A stronger selector likely needs candidate text modeling or richer learned QE/verifier features, not another objective over the same linear feature set.

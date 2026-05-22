@@ -85,6 +85,50 @@ class TrainFeatureCandidateRerankerTests(unittest.TestCase):
         self.assertIn("best_objective", diagnostics)
         self.assertGreaterEqual(feature_reranker.mean_oracle_objective(rows, model), 1.0)
 
+    def test_listwise_targets_can_use_hard_best_candidate(self):
+        group = [
+            feature_reranker.CandidateFeatures(
+                oracle_rerank.Candidate("src", "ref", "a", candidate_index=0),
+                raw={},
+                oracle_score=0.2,
+            ),
+            feature_reranker.CandidateFeatures(
+                oracle_rerank.Candidate("src", "ref", "b", candidate_index=1),
+                raw={},
+                oracle_score=0.8,
+            ),
+        ]
+
+        targets = feature_reranker.listwise_targets(group, temperature=0.04, target_mode="best")
+
+        self.assertEqual(targets, [0.0, 1.0])
+
+    def test_train_listwise_model_can_improve_toward_oracle_score(self):
+        group = [
+            oracle_rerank.Candidate("src", "ref", "short", candidate_index=0),
+            oracle_rerank.Candidate("src", "ref", "longer better", candidate_index=1),
+        ]
+        with mock.patch.object(
+            feature_reranker.oracle_rerank,
+            "candidate_oracle_score",
+            side_effect=lambda candidate: 1.0 if candidate.prediction == "longer better" else 0.0,
+        ):
+            rows = feature_reranker.featurize_groups([group])
+
+        model, diagnostics = feature_reranker.train_listwise_model(
+            rows,
+            feature_names=["target_token_count"],
+            seed=1,
+            epochs=20,
+            learning_rate=0.2,
+            target_temperature=0.05,
+            l2=0.0,
+            target_mode="best",
+        )
+
+        self.assertEqual(diagnostics["training_objective"], "listwise")
+        self.assertGreaterEqual(feature_reranker.mean_oracle_objective(rows, model), 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

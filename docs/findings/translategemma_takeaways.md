@@ -79,3 +79,41 @@ Evaluation requirements:
 - Verify EOS/chat-template behavior after every merge. Earlier saved-adapter reload failures were caused by EOS mismatch, so this is a real risk.
 - Evaluate greedy, K16 feature-reranked, and mixed-pool oracle/feature results. A merge that is worse greedily may still be useful as an additional candidate generator.
 - Do not commit merged model weights or generated outputs.
+
+## 2026-05-22 LoRA Soup Probe
+
+Utility added:
+
+- `scripts/merge_lora_adapters.py`: averages compatible PEFT LoRA adapter tensors and writes a new adapter directory. This is a lightweight precursor to full `mergekit` model merges.
+
+First soup:
+
+- Output: `outputs/lora_soups/20260522-termtrain-soup-8-16-24`
+- Adapters:
+  - `outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8`
+  - `outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-16`
+  - `outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-24`
+- Weights: `0.50/0.30/0.20`
+
+Greedy terminology top-1 eval:
+
+- chrF++ `41.0070`, BLEU `9.1150`, token F1 `26.4196`, TER `88.9401`
+- This is below the underlying checkpoint-8 eval, so the soup should not replace the current adapter.
+
+Candidate-generator eval:
+
+- Soup K8 sampled pool: `outputs/rerank_candidate_evals/20260522-termtrain-soup-8-k8-t065-p090-term/candidates_predictions.jsonl`
+- Current K16 + soup K8 merged pool: `outputs/rerank_candidate_evals/20260522-current-k16-plus-soup-k8-term/candidates_predictions.jsonl`
+- Merged pool stats after dedupe: `158` groups, `2,160` candidates, mean `13.6709` candidates/group.
+
+| Method | Selection | chrF++ | BLEU | token F1 | TER |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| current K16 feature best | 28.5647 | 42.9352 | 11.0872 | 27.7860 | 84.1014 |
+| current K16 oracle | 38.3462 | 52.6971 | 19.7691 | 41.8353 | 69.8157 |
+| current K16 + soup K8, current feature weights | 27.9722 | 42.4683 | 8.8622 | 27.8317 | 87.3272 |
+| current K16 + soup K8 oracle | 39.5617 | 54.0888 | 20.8652 | 43.1052 | 67.9724 |
+
+Takeaway:
+
+- The LoRA soup is worse greedily but adds useful diversity: oracle selection improves by `+1.2155`, chrF++ by `+1.3916`, BLEU by `+1.0961`, and TER by `-1.8433` over current K16 oracle.
+- The deployable feature selector cannot harvest that gain yet. This supports the frontier-style merge direction as candidate generation diversity, while reinforcing that the real bottleneck is selection/QE.
