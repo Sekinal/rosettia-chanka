@@ -35,6 +35,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Field to use as the assistant target. MBR files use 'prediction'.",
     )
     parser.add_argument("--reference-field", default="reference", help="Optional reference metadata field.")
+    parser.add_argument("--dataset-repo", default=gspo.DATASET_REPO)
+    parser.add_argument(
+        "--terminology-file",
+        default=None,
+        help="Optional dataset-repo parquet glossary for terminology-conditioned SFT prompts.",
+    )
+    parser.add_argument("--terminology-top-k", type=int, default=6)
+    parser.add_argument("--terminology-min-source-chars", type=int, default=3)
     parser.add_argument("--model-id", default=train_sft.DEFAULT_MODEL_ID)
     parser.add_argument(
         "--adapter-method",
@@ -201,9 +209,25 @@ def configure_step_schedule(args: argparse.Namespace, train_row_count: int) -> N
         args.save_steps = args.eval_steps
 
 
-def format_example(tokenizer, row: dict[str, str]) -> dict[str, str]:
+def terminology_for_row(
+    row: dict[str, str],
+    terminology_entries: Sequence[tuple[str, str]] | None,
+    terminology_top_k: int,
+) -> list[tuple[str, str]] | None:
+    if not terminology_entries or terminology_top_k <= 0:
+        return None
+    selected = gspo.select_terminology(row["source"], terminology_entries, terminology_top_k)
+    return selected or None
+
+
+def format_example(
+    tokenizer,
+    row: dict[str, str],
+    terminology_entries: Sequence[tuple[str, str]] | None = None,
+    terminology_top_k: int = 0,
+) -> dict[str, str]:
     messages = [
-        *gspo.prompt_messages(row["source"]),
+        *gspo.prompt_messages(row["source"], terminology_for_row(row, terminology_entries, terminology_top_k)),
         {"role": "assistant", "content": row["target"]},
     ]
     return {
@@ -214,8 +238,15 @@ def format_example(tokenizer, row: dict[str, str]) -> dict[str, str]:
     }
 
 
-def build_dataset(tokenizer, rows: Iterable[dict[str, str]]) -> Dataset:
-    return Dataset.from_list([format_example(tokenizer, row) for row in rows])
+def build_dataset(
+    tokenizer,
+    rows: Iterable[dict[str, str]],
+    terminology_entries: Sequence[tuple[str, str]] | None = None,
+    terminology_top_k: int = 0,
+) -> Dataset:
+    return Dataset.from_list(
+        [format_example(tokenizer, row, terminology_entries, terminology_top_k) for row in rows]
+    )
 
 
 def main() -> None:
@@ -237,6 +268,21 @@ def main() -> None:
         seed=args.seed,
         max_train_samples=args.max_train_samples,
         max_eval_samples=args.max_eval_samples,
+    )
+    terminology_entries = (
+        gspo.load_terminology_entries(args.dataset_repo, args.terminology_file, args.terminology_min_source_chars)
+        if args.terminology_file
+        else []
+    )
+    train_term_rows = (
+        sum(1 for row in train_rows if terminology_for_row(row, terminology_entries, args.terminology_top_k))
+        if terminology_entries
+        else 0
+    )
+    eval_term_rows = (
+        sum(1 for row in eval_rows if terminology_for_row(row, terminology_entries, args.terminology_top_k))
+        if terminology_entries
+        else 0
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -270,8 +316,8 @@ def main() -> None:
             **train_sft.adapter_flags(args.adapter_method),
         )
 
-    train_dataset = build_dataset(tokenizer, train_rows)
-    eval_dataset = build_dataset(tokenizer, eval_rows)
+    train_dataset = build_dataset(tokenizer, train_rows, terminology_entries, args.terminology_top_k)
+    eval_dataset = build_dataset(tokenizer, eval_rows, terminology_entries, args.terminology_top_k)
     configure_step_schedule(args, len(train_dataset))
 
     trainer = SFTTrainer(
@@ -324,6 +370,11 @@ def main() -> None:
     print(f"Train rows: {len(train_dataset):,}")
     print(f"Validation rows: {len(eval_dataset):,}")
     print(f"Target field: {args.target_field}")
+    if args.terminology_file:
+        print(f"Terminology file: {args.terminology_file}")
+        print(f"Terminology entries: {len(terminology_entries):,}")
+        print(f"Terminology-matched train rows: {train_term_rows:,}")
+        print(f"Terminology-matched validation rows: {eval_term_rows:,}")
     print(f"Model or adapter: {model_name_or_adapter}")
     print(f"LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")
     print(f"Validation: every {args.eval_steps} steps, best checkpoint by eval_loss")

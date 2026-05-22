@@ -356,3 +356,48 @@ Conclusion:
 - It improves over the previous deployable best on selection (`26.8011` vs `26.5515`), chrF++ (`41.3017` vs `40.8942`), BLEU (`9.5399` vs `9.4839`), token F1 (`26.6291` vs `26.3462`), and TER (`87.5576` vs `88.0184`).
 - Do not use `checkpoint-32` or `final_lora`; both lose the BLEU gain from checkpoint-24.
 - Future MBR self-training should stop treating MBR margin as confidence on these pools. The better rule so far is broad filter-only MBR plus low-LR continuation and early checkpoint selection.
+
+### Terminology-Aware JSONL SFT Follow-Up
+
+Purpose: train with the same glossary-conditioned prompt shape used at deployment. `scripts/train_jsonl_sft_unsloth.py` now accepts `--terminology-file`, `--terminology-top-k`, and `--terminology-min-source-chars`, reusing the same glossary loader and source-term matcher as GSPO/evaluation.
+
+SFT setup:
+
+- Starting adapter: `outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-lr3e-7-32steps/checkpoint-24`
+- Mixed data: `outputs/mbr_self_training_data/20260522-k16-full-newbest-noterm-t065-p090/mixed_clean512_confident_margin000_target.jsonl`
+- Terminology file: `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet`
+- Terminology top-k: `1`
+- Loaded rows after filtering: 1332
+  - 1133 train
+  - 199 validation
+- Terminology-matched rows:
+  - 143 train
+  - 25 validation
+- Output: `outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps`
+- LR: `2e-7`
+- Max steps: `24`
+- Batch: per-device `4`, gradient accumulation `2`
+- Validation/save: every `8` optimizer steps
+
+Held-out clean Chanka terminology-prompt eval:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-8` + terminology top-1 | 27.0396 | 41.4823 | 9.7158 | 27.0736 | 2.8270 | 0.4747 | 87.3272 |
+| `checkpoint-16` + terminology top-1 | 26.1284 | 40.9647 | 6.6537 | 26.2297 | 2.6688 | 0.4747 | 88.9401 |
+| `checkpoint-24` + terminology top-1 | 26.6986 | 41.2255 | 9.4832 | 26.4181 | 2.8270 | 0.4747 | 87.7880 |
+| `final_lora` + terminology top-1 | 26.6986 | 41.2255 | 9.4832 | 26.4181 | 2.8270 | 0.4747 | 87.7880 |
+
+Raw no-terminology eval for the best checkpoint:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-8` | 26.5490 | 41.1692 | 9.0400 | 26.3091 | 2.8270 | 0.4747 | 88.7097 |
+
+Conclusion:
+
+- This is the new deployable best as of 2026-05-22.
+- Use `outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8` with terminology top-1 inference.
+- It improves over the previous deployable best on selection (`27.0396` vs `26.8011`), chrF++ (`41.4823` vs `41.3017`), BLEU (`9.7158` vs `9.5399`), token F1 (`27.0736` vs `26.6291`), and TER (`87.3272` vs `87.5576`).
+- The gain is from the combination of terminology-aware SFT and terminology-aware inference. The same checkpoint without terminology prompting is not better than the previous deployable wrapper.
+- As before, early checkpoint selection matters: checkpoint-8 is best, while checkpoint-16 regresses and checkpoint-24/final are below checkpoint-8.

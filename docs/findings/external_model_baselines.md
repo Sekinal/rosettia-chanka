@@ -8,19 +8,19 @@ Purpose: test whether current external translation/general models can directly b
 
 Current deployable best is:
 
-`outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-lr3e-7-32steps/checkpoint-24`
+`outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8`
 
 Use it with terminology top-1 inference from `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet`.
 
 Canonical held-out eval:
 
-- Selection: `26.8011`
-- chrF++: `41.3017`
-- BLEU: `9.5399`
-- Token F1: `26.6291`
+- Selection: `27.0396`
+- chrF++: `41.4823`
+- BLEU: `9.7158`
+- Token F1: `27.0736`
 - Source-copy: `2.8270%`
 - Spanish leakage: `0.4747%`
-- TER: `87.5576`
+- TER: `87.3272`
 
 ## Zero-Shot Smokes
 

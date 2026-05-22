@@ -74,6 +74,46 @@ class TrainJsonlSftUnslothTests(unittest.TestCase):
         self.assertFalse(tokenizer.tokenize)
         self.assertFalse(tokenizer.add_generation_prompt)
 
+    def test_format_example_can_include_terminology_prompt(self):
+        tokenizer = DummyTokenizer()
+        row = {
+            "source": "¿Es usted casado?",
+            "target": "¿Warmiyuqchu kanki?",
+            "reference": "",
+            "source_name": "mbr",
+            "variant": "quy/chanka_pseudo",
+            "target_field": "target",
+        }
+
+        formatted = train_jsonl_sft.format_example(
+            tokenizer,
+            row,
+            terminology_entries=[("Casado", "Warmiyuq")],
+            terminology_top_k=1,
+        )
+
+        self.assertIn("Glosario sugerido", formatted["text"])
+        self.assertIn("- Casado = Warmiyuq", formatted["text"])
+        self.assertIn("¿Warmiyuqchu kanki?", formatted["text"])
+
+    def test_build_dataset_can_count_terminology_matches(self):
+        row = {
+            "source": "La madre abandonada llego.",
+            "target": "Saqisqa mama chayamurqan.",
+            "reference": "",
+            "source_name": "mbr",
+            "variant": "quy/chanka_pseudo",
+            "target_field": "target",
+        }
+
+        terminology = train_jsonl_sft.terminology_for_row(
+            row,
+            [("madre abandonada", "saqisqa mama"), ("madre", "mama")],
+            terminology_top_k=1,
+        )
+
+        self.assertEqual(terminology, [("madre abandonada", "saqisqa mama")])
+
     def test_step_schedule_uses_max_steps_when_present(self):
         args = argparse.Namespace(
             eval_steps=None,
