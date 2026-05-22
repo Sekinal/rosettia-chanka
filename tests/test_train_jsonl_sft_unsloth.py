@@ -24,6 +24,17 @@ def write_jsonl(path: Path, records: list[dict[str, str]]) -> None:
 
 
 class TrainJsonlSftUnslothTests(unittest.TestCase):
+    def test_cli_accepts_full_finetuning_mode(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "mbr_predictions.jsonl"
+            write_jsonl(path, [{"source": "Buenos dias.", "prediction": "Allin punchaw."}])
+
+            args = train_jsonl_sft.parse_args(
+                ["--jsonl", str(path), "--output-dir", str(Path(tmpdir) / "out"), "--training-mode", "full"]
+            )
+
+        self.assertEqual(args.training_mode, "full")
+
     def test_load_jsonl_rows_uses_prediction_as_target_and_dedupes(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "mbr_predictions.jsonl"

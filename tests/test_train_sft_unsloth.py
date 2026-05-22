@@ -32,6 +32,20 @@ class TrainSftUnslothTests(unittest.TestCase):
         args = train_sft.parse_args(["--stage", "chanka"])
 
         self.assertEqual(args.stage, "chanka")
+        self.assertEqual(args.training_mode, "lora")
+
+    def test_sft_cli_accepts_full_finetuning_mode(self):
+        args = train_sft.parse_args(["--stage", "chanka", "--training-mode", "full"])
+
+        self.assertEqual(args.training_mode, "full")
+
+    def test_full_finetuning_rejects_adapter_path(self):
+        args = train_sft.parse_args(
+            ["--stage", "chanka", "--training-mode", "full", "--adapter-path", "outputs/run/final_lora"]
+        )
+
+        with self.assertRaisesRegex(ValueError, "--adapter-path"):
+            train_sft.validate_training_mode_args(args)
 
     def test_sft_cli_accepts_hymt2_prompt_style(self):
         args = train_sft.parse_args(["--stage", "chanka", "--prompt-style", "hymt2"])
@@ -41,6 +55,7 @@ class TrainSftUnslothTests(unittest.TestCase):
     def test_chanka_stage_defaults_use_measured_context_and_batch(self):
         args = argparse.Namespace(
             stage="chanka",
+            training_mode="lora",
             max_seq_length=None,
             validation_fraction=None,
             num_train_epochs=None,
@@ -62,9 +77,34 @@ class TrainSftUnslothTests(unittest.TestCase):
         self.assertEqual(args.lora_r, 64)
         self.assertEqual(args.lora_alpha, 128)
 
+    def test_full_finetuning_defaults_are_conservative(self):
+        args = argparse.Namespace(
+            stage="chanka",
+            training_mode="full",
+            max_seq_length=None,
+            validation_fraction=None,
+            num_train_epochs=None,
+            learning_rate=None,
+            per_device_train_batch_size=None,
+            per_device_eval_batch_size=None,
+            gradient_accumulation_steps=None,
+            lora_r=None,
+            lora_alpha=None,
+            evals_per_epoch=None,
+        )
+
+        train_sft.stage_defaults(args)
+
+        self.assertEqual(args.max_seq_length, 128)
+        self.assertEqual(args.learning_rate, 1.0e-6)
+        self.assertEqual(args.per_device_train_batch_size, 1)
+        self.assertEqual(args.per_device_eval_batch_size, 2)
+        self.assertEqual(args.gradient_accumulation_steps, 8)
+
     def test_broad_stage_defaults_keep_longer_context_and_accumulation(self):
         args = argparse.Namespace(
             stage="broad",
+            training_mode="lora",
             max_seq_length=None,
             validation_fraction=None,
             num_train_epochs=None,

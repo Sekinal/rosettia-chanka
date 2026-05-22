@@ -51,10 +51,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Adapter variant to train when starting from the base model.",
     )
     parser.add_argument(
+        "--training-mode",
+        choices=["lora", "full"],
+        default="lora",
+        help="Train a PEFT adapter, or full-finetune all model weights with Unsloth FFT.",
+    )
+    parser.add_argument(
         "--adapter-path",
         type=Path,
         default=None,
-        help="Optional local/HF LoRA adapter to continue training from, for example the broad SFT final_lora.",
+        help="Optional local/HF LoRA adapter to continue training from. Only valid with --training-mode lora.",
     )
     parser.add_argument("--dataset-repo", default=DATASET_REPO)
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"))
@@ -92,11 +98,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Mask user/prompt tokens. Disable if chat-template markers change and masking fails.",
     )
     parser.add_argument("--wandb-project", default=None)
-    parser.add_argument("--push-to-hub", default=None, help="Optional HF repo id for the final LoRA adapter.")
+    parser.add_argument("--push-to-hub", default=None, help="Optional HF repo id for the final trained artifact.")
     return parser.parse_args(argv)
 
 
 def stage_defaults(args: argparse.Namespace) -> None:
+    training_mode = getattr(args, "training_mode", "lora")
     if args.max_seq_length is None:
         args.max_seq_length = 512 if args.stage == "broad" else 128
     if args.validation_fraction is None:
@@ -104,13 +111,19 @@ def stage_defaults(args: argparse.Namespace) -> None:
     if args.num_train_epochs is None:
         args.num_train_epochs = 1.0 if args.stage == "broad" else 8.0
     if args.learning_rate is None:
-        args.learning_rate = 1.0e-4 if args.stage == "broad" else 2.0e-5
+        if training_mode == "full":
+            args.learning_rate = 2.0e-6 if args.stage == "broad" else 1.0e-6
+        else:
+            args.learning_rate = 1.0e-4 if args.stage == "broad" else 2.0e-5
     if args.per_device_train_batch_size is None:
-        args.per_device_train_batch_size = 8
+        args.per_device_train_batch_size = 1 if training_mode == "full" else 8
     if args.per_device_eval_batch_size is None:
-        args.per_device_eval_batch_size = args.per_device_train_batch_size
+        args.per_device_eval_batch_size = 2 if training_mode == "full" else args.per_device_train_batch_size
     if args.gradient_accumulation_steps is None:
-        args.gradient_accumulation_steps = 2 if args.stage == "broad" else 1
+        if training_mode == "full":
+            args.gradient_accumulation_steps = 8
+        else:
+            args.gradient_accumulation_steps = 2 if args.stage == "broad" else 1
     if args.lora_r is None:
         args.lora_r = 64
     if args.lora_alpha is None:
@@ -124,6 +137,17 @@ def adapter_flags(adapter_method: str) -> dict[str, bool]:
         "use_dora": adapter_method == "dora",
         "use_rslora": adapter_method == "rslora",
     }
+
+
+def validate_training_mode_args(args: argparse.Namespace) -> None:
+    if args.training_mode == "full" and args.adapter_path is not None:
+        raise ValueError("--adapter-path is only valid with --training-mode lora")
+
+
+def final_artifact_dir(args: argparse.Namespace, run_dir: Path) -> Path:
+    if args.training_mode == "full":
+        return run_dir / "final_full_model"
+    return run_dir / f"final_{args.adapter_method}"
 
 
 def download_parquet(repo_id: str, filename: str) -> Path:
@@ -296,6 +320,7 @@ def build_dataset(tokenizer, args: argparse.Namespace, rows: Iterable[dict[str, 
 
 def main() -> None:
     args = parse_args()
+    validate_training_mode_args(args)
     stage_defaults(args)
 
     from unsloth import FastLanguageModel
@@ -324,10 +349,10 @@ def main() -> None:
         model_name=model_name_or_adapter,
         max_seq_length=args.max_seq_length,
         load_in_4bit=False,
-        load_in_16bit=True,
-        full_finetuning=False,
+        load_in_16bit=args.training_mode == "lora",
+        full_finetuning=args.training_mode == "full",
     )
-    if args.adapter_path is None:
+    if args.training_mode == "lora" and args.adapter_path is None:
         peft_kwargs = {
             "r": args.lora_r,
             "target_modules": [
@@ -407,9 +432,12 @@ def main() -> None:
     print(f"Validation rows: {len(eval_dataset):,}")
     print(f"Stage: {args.stage}")
     print(f"Prompt style: {args.prompt_style}")
-    print(f"Adapter method: {args.adapter_method}")
+    print(f"Training mode: {args.training_mode}")
+    if args.training_mode == "lora":
+        print(f"Adapter method: {args.adapter_method}")
     print(f"Model or adapter: {model_name_or_adapter}")
-    print(f"LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")
+    if args.training_mode == "lora":
+        print(f"LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")
     print(f"Validation: every {args.eval_steps} steps, best checkpoint by eval_loss")
     print(f"Saving: every {args.save_steps} steps, keeping the 3 most recent checkpoints")
 
@@ -417,7 +445,7 @@ def main() -> None:
     metrics = trainer.evaluate()
     print(metrics)
 
-    final_dir = run_dir / f"final_{args.adapter_method}"
+    final_dir = final_artifact_dir(args, run_dir)
     model.save_pretrained(str(final_dir))
     tokenizer.save_pretrained(str(final_dir))
 

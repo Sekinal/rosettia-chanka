@@ -51,10 +51,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Adapter variant to train when starting from the base model.",
     )
     parser.add_argument(
+        "--training-mode",
+        choices=["lora", "full"],
+        default="lora",
+        help="Train a PEFT adapter, or full-finetune all model weights with Unsloth FFT.",
+    )
+    parser.add_argument(
         "--adapter-path",
         type=Path,
         default=None,
-        help="Optional local/HF LoRA adapter to continue training from.",
+        help="Optional local/HF LoRA adapter to continue training from. Only valid with --training-mode lora.",
     )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--max-seq-length", type=int, default=128)
@@ -116,7 +122,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Drop rows above this chat-artifact penalty. Set above 1 to disable.",
     )
     parser.add_argument("--wandb-project", default=None)
-    parser.add_argument("--push-to-hub", default=None, help="Optional HF repo id for the final LoRA adapter.")
+    parser.add_argument("--push-to-hub", default=None, help="Optional HF repo id for the final trained artifact.")
     return parser.parse_args(argv)
 
 
@@ -258,6 +264,7 @@ def build_dataset(
 
 def main() -> None:
     args = parse_args()
+    train_sft.validate_training_mode_args(args)
 
     from unsloth import FastLanguageModel
     import torch
@@ -298,10 +305,10 @@ def main() -> None:
         model_name=model_name_or_adapter,
         max_seq_length=args.max_seq_length,
         load_in_4bit=False,
-        load_in_16bit=True,
-        full_finetuning=False,
+        load_in_16bit=args.training_mode == "lora",
+        full_finetuning=args.training_mode == "full",
     )
-    if args.adapter_path is None:
+    if args.training_mode == "lora" and args.adapter_path is None:
         model = FastLanguageModel.get_peft_model(
             model,
             r=args.lora_r,
@@ -382,8 +389,10 @@ def main() -> None:
         print(f"Terminology entries: {len(terminology_entries):,}")
         print(f"Terminology-matched train rows: {train_term_rows:,}")
         print(f"Terminology-matched validation rows: {eval_term_rows:,}")
+    print(f"Training mode: {args.training_mode}")
     print(f"Model or adapter: {model_name_or_adapter}")
-    print(f"LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")
+    if args.training_mode == "lora":
+        print(f"LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")
     print(f"Validation: every {args.eval_steps} steps, best checkpoint by eval_loss")
     print(f"Saving: every {args.save_steps} steps, keeping the 3 most recent checkpoints")
 
@@ -391,7 +400,7 @@ def main() -> None:
     metrics = trainer.evaluate()
     print(metrics)
 
-    final_dir = args.output_dir / f"final_{args.adapter_method}"
+    final_dir = train_sft.final_artifact_dir(args, args.output_dir)
     model.save_pretrained(str(final_dir))
     tokenizer.save_pretrained(str(final_dir))
 
