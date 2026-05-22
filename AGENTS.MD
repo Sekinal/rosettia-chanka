@@ -183,7 +183,7 @@ These are candidate directions, not commitments:
   - `scripts/evaluate_translation_baseline.py` can evaluate NLLB, generic seq2seq, and TranslateGemma-style models on the same clean Chanka split.
   - NLLB distilled 600M (`facebook/nllb-200-distilled-600M`, `spa_Latn -> quy_Latn`) completed full held-out eval: chrF++ `24.1377`, BLEU `0.9596`, token F1 `10.1348`, source-copy `6.2395%`, exact-copy `2.5316%`, leakage `1.2342%`, TER `166.1290`. Our current best is far ahead on this Chanka eval.
   - TranslateGemma 4B IT became accessible after HF auth but is not usable for Quechua/Chanka here. A 5-row smoke with `es -> qu` produced Devanagari/Nepali-like outputs and token F1 `0.0`.
-  - T5Gemma remained gated even after HF auth; it needs separate access acceptance before evaluation.
+  - T5Gemma became accessible after the newer HF token was installed on the remote, but the 5-row smoke remained poor: chrF++ `8.5113`, BLEU `0.3152`, token F1 `0.0`, Spanish leakage `5.3140%`, TER `714.2857`.
 - Current external model smoke note: `docs/findings/external_model_baselines.md`. On 2026-05-22, 5-row clean-Chanka smokes were run for `tencent/Hy-MT2-1.8B`, `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`, `google/translategemma-4b-it`, and `google/t5gemma-2-270m-270m`. None were close to the standing internal adapter zero-shot; Gemma 4 E4B produced the cleanest Chanka-like text but was still semantically poor.
 - `scripts/evaluate_translation_baseline.py` now supports `causal-chat`, including a Gemma 4 processor path with `enable_thinking=False`. The tokenizer-only Gemma 4 path leaked thinking artifacts.
 - `scripts/train_sft_unsloth.py` now allows `--stage chanka` for model-family SFT canaries in addition to the broad data tier.

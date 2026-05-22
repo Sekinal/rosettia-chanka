@@ -6,19 +6,21 @@ Purpose: test whether current external translation/general models can directly b
 
 ## Standing Internal Baseline
 
-Current best adapter remains:
+Current deployable best is:
 
-`outputs/gspo_paper_profiles/2511_learned_verifier_vibe_on_vibe896_4gen_canary_20260521-133146/chanka_gspo/final_gspo_lora`
+`outputs/mbr_self_training_sft/20260522-k16-fullterm-margin000-clean512-lr4e-7-32steps/checkpoint-32`
+
+Use it with terminology top-1 inference from `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet`.
 
 Canonical held-out eval:
 
-- Selection: `26.3808`
-- chrF++: `40.9703`
-- BLEU: `8.1555`
-- Token F1: `26.6169`
+- Selection: `26.5515`
+- chrF++: `40.8942`
+- BLEU: `9.4839`
+- Token F1: `26.3462`
 - Source-copy: `2.8270%`
-- Spanish leakage: `0.6329%`
-- TER: `88.7097`
+- Spanish leakage: `0.3165%`
+- TER: `88.0184`
 
 ## Zero-Shot Smokes
 
@@ -30,7 +32,7 @@ All smokes used 5 rows from the clean Chanka validation split. These are not ful
 | `google/gemma-4-E2B-it` | `causal-chat` with Gemma 4 processor | `8.2584` | `3.8436` | `0.0` | Malformed/repetitive Chanka-like output. |
 | `google/gemma-4-E4B-it` | `causal-chat` with Gemma 4 processor | `13.5899` | `4.4485` | `0.0` | Cleaner Chanka-like text than E2B, but semantically poor. |
 | `google/translategemma-4b-it` | `translategemma`, `es -> qu` | `2.4792` | `3.6688` | `0.0` | Invalid for our target; generated Devanagari-like text. |
-| `google/t5gemma-2-270m-270m` | `seq2seq-chat` | `6.3123` | `0.1828` | `0.0` | Not instruction/translation ready for this target. |
+| `google/t5gemma-2-270m-270m` | `seq2seq-chat` | `8.5113` | `0.3152` | `0.0` | Became accessible after HF auth; still not instruction/translation ready for this target. |
 
 Earlier full baseline:
 
@@ -42,6 +44,7 @@ Earlier full baseline:
 - Gemma 4 models require the processor/chat-template path with `enable_thinking=False`; the tokenizer-only path leaked thinking artifacts.
 - `tencent/Hy-MT2-1.8B` loaded with Transformers 5.5 but its model card supports Spanish and many major languages, not Quechua/Chanka. Treat it as a possible SFT base only, not a zero-shot Chanka translator.
 - TranslateGemma supports 55 languages and raises on unsupported chat-template language codes in principle, but `qu` produced non-Quechua output here. Do not full-evaluate it unless a verified Quechua/Chanka code or alternate prompt is found.
+- T5Gemma became accessible after the newer HF token was installed on the remote. The 5-row smoke wrote `outputs/external_baselines/t5gemma_2_270m_5row_after_auth_metrics.json` and remained very weak: chrF++ `8.5113`, BLEU `0.3152`, token F1 `0.0`, Spanish leakage `5.3140%`, TER `714.2857`.
 
 ## Unsloth Compatibility
 
