@@ -106,12 +106,14 @@ The glossary is kept separate from sentence-pair training data. It is useful for
 
 ## Feature-Reranked Inference
 
-The current best deployment path samples multiple candidates from the trained adapter and selects one with a reranker. The strongest overall deployable selector is now the text-aware K32 reranker. The numeric feature K32 selector still has the highest chrF++ setting.
+The current best deployment path samples multiple candidates from the trained adapter and selects one with a reranker. The strongest overall deployable selector is now the K32 score ensemble over text-aware, numeric feature, and MBR signals.
 
 ```bash
-python scripts/generate_text_reranked_translations.py \
+python scripts/generate_ensemble_reranked_translations.py \
   --adapter-path outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8 \
-  --model-json outputs/text_candidate_reranker_evals/20260522-text-ranker-train-k32-eval-k32-term/text_ranker_k32_model.json \
+  --feature-weights-json outputs/feature_candidate_reranker_evals/20260522-feature-reranker-train-current-deployable-term-eval-current-deployable-k16/feature_k16_current_term_weights.json \
+  --text-model-json outputs/text_candidate_reranker_evals/20260522-text-ranker-train-k32-eval-k32-term/text_ranker_k32_model.json \
+  --ensemble-json outputs/score_ensemble_reranker_evals/20260522-ensemble-feature-k16-text-k32-eval-k32-term/ensemble_k32_ensemble.json \
   --input-path sources.txt \
   --output-jsonl predictions.jsonl \
   --candidates-jsonl candidates.jsonl \
@@ -123,7 +125,7 @@ python scripts/generate_text_reranked_translations.py \
   --terminology-top-k 1
 ```
 
-The numeric feature-reranked command remains useful when optimizing for chrF++ specifically:
+The text-only and numeric feature-reranked commands remain useful ablations when diagnosing selector behavior:
 
 ```bash
 python scripts/generate_feature_reranked_translations.py \

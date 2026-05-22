@@ -302,3 +302,40 @@ Decision:
 - K32 text-aware reranking is the new best deployable overall profile because it improves selection, BLEU, token F1, and TER over the previous K16 feature best.
 - K32 numeric feature reranking remains the chrF++ best (`43.3398` vs text `43.0524`).
 - The remaining oracle gap is still large: K32 oracle reaches selection `40.1555`, chrF++ `54.4572`, BLEU `22.0831`. Text-aware selection is progress, not the finish line.
+
+## 2026-05-22 Score Ensemble Reranker
+
+Purpose: combine the strengths of the numeric feature selector and the text-aware selector instead of choosing between chrF++ and BLEU profiles.
+
+Code added:
+
+- `scripts/train_score_ensemble_reranker.py`: hill-climbs a reference-free score blend over normalized feature-score, text-score, MBR score/rank, length consensus, duplicate rate, and candidate index.
+- `scripts/generate_ensemble_reranked_translations.py`: K-sampling deployment wrapper for the score ensemble.
+- `tests/test_train_score_ensemble_reranker.py`
+- `tests/test_generate_ensemble_reranked_translations.py`
+
+Held-out K32 result:
+
+- Feature model: `outputs/feature_candidate_reranker_evals/20260522-feature-reranker-train-current-deployable-term-eval-current-deployable-k16/feature_k16_current_term_weights.json`
+- Text model: `outputs/text_candidate_reranker_evals/20260522-text-ranker-train-k32-eval-k32-term/text_ranker_k32_model.json`
+- Ensemble: `outputs/score_ensemble_reranker_evals/20260522-ensemble-feature-k16-text-k32-eval-k32-term/ensemble_k32_ensemble.json`
+
+| Method | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| previous K16 feature best | 28.5647 | 42.9352 | 11.0872 | 27.7860 | 2.0359 | 0.0000 | 84.1014 |
+| K32 numeric feature best | 28.6939 | 43.3398 | 9.2082 | 28.4464 | 2.0992 | 0.0000 | 82.9493 |
+| K32 text-aware reranker | 28.7980 | 43.0524 | 11.9903 | 28.8624 | 3.1646 | 0.0000 | 82.9493 |
+| K32 score ensemble | 29.7584 | 43.8064 | 13.2505 | 30.4677 | 3.1118 | 0.0000 | 81.3364 |
+| K32 oracle | 40.1555 | 54.4572 | 22.0831 | 43.9097 | 2.5814 | 0.0000 | 66.8203 |
+
+Deployment smoke:
+
+- Output: `outputs/manual_inference_smokes/20260522-ensemble-reranked-smoke`
+- K4 smoke selected:
+  - `Yo vivo en Quinua` -> `Quinua llaqtapim kawsani`
+  - `Tengo 45 años` -> `Tawa chunka pichqayoq watam kani`
+
+Decision:
+
+- K32 score ensemble is the new best deployable profile by selection, chrF++, BLEU, token F1, and TER.
+- It is still below K32 oracle by a wide margin, so the next selector work should keep moving toward richer QE/verifier signals or better candidate pools rather than more shallow numerical blends.
