@@ -398,6 +398,7 @@ Matching-distribution selectors:
 - Feature weights: `outputs/feature_candidate_reranker_evals/20260522-feature-listwise-current-k32-plus-qwen35-4b-full-k16-term/feature_listwise_current_k32_plus_4bfull_k16_weights.json`
 - Text model: `outputs/text_candidate_reranker_evals/20260522-text-train-current-k32-plus-qwen35-4b-full-k16-term/text_current_k32_plus_4bfull_k16_model.json`
 - Score ensemble: `outputs/score_ensemble_reranker_evals/20260522-ensemble-train-current-k32-plus-qwen35-4b-full-k16-term/ensemble_current_k32_plus_4bfull_k16_ensemble.json`
+- Deployment wrapper: `scripts/generate_multi_adapter_ensemble_reranked_translations.py`
 
 | Method | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -413,3 +414,20 @@ Decision:
 - Full-SFT did not become the best greedy model, but it did create high-value candidate diversity.
 - The current best deployable direction is multi-model candidate generation plus a matching-distribution text/score reranker.
 - The remaining oracle gap is still huge, so more candidate diversity from 9B/35B-A3B SFT or a stronger QE/listwise selector is more promising than another plain continuation from the 2B policy.
+
+Example inference shape:
+
+```bash
+.venv/bin/python scripts/generate_multi_adapter_ensemble_reranked_translations.py \
+  --adapter-path outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8 \
+  --adapter-path outputs/full_sft_canaries/20260522-qwen35-4b-merged-broad512-chanka224-full-chanka-lr1e-6-64steps/chanka/checkpoint-48 \
+  --num-return-sequences 32 \
+  --num-return-sequences 16 \
+  --feature-weights-json outputs/feature_candidate_reranker_evals/20260522-feature-listwise-current-k32-plus-qwen35-4b-full-k16-term/feature_listwise_current_k32_plus_4bfull_k16_weights.json \
+  --text-model-json outputs/text_candidate_reranker_evals/20260522-text-train-current-k32-plus-qwen35-4b-full-k16-term/text_current_k32_plus_4bfull_k16_model.json \
+  --ensemble-json outputs/score_ensemble_reranker_evals/20260522-ensemble-train-current-k32-plus-qwen35-4b-full-k16-term/ensemble_current_k32_plus_4bfull_k16_ensemble.json \
+  --terminology-file clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet \
+  --strip-chat-artifacts \
+  --input-path sources.txt \
+  --output-jsonl predictions.jsonl
+```
