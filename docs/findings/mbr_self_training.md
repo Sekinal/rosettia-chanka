@@ -442,3 +442,49 @@ Conclusion:
 - The best term-pair checkpoint scored `26.6310`, below the current deployable best `27.0396`.
 - Trainer eval loss improved because the validation set included easy short term pairs, but original held-out sentence translation regressed.
 - Future terminology augmentation should use glossary-triggered sentence or phrase-context examples, not standalone raw term-pair SFT.
+
+### Terminology-Matched Sentence Oversampling Follow-Up
+
+Purpose: avoid the raw term-pair failure by oversampling real sentence/pseudo-label rows whose Spanish source already matches glossary entries. `scripts/build_terminology_oversampled_jsonl.py` builds this regenerable JSONL, and `scripts/train_jsonl_sft_unsloth.py` now supports `--no-dedupe-rows` so intentional repeats actually affect SFT sampling.
+
+Data setup:
+
+- Input mixed data: `outputs/mbr_self_training_data/20260522-k16-full-newbest-noterm-t065-p090/mixed_clean512_confident_margin000_target.jsonl`
+- Generated oversampled JSONL: `outputs/terminology_augmented_data/20260522-oversample-matched/mixed_clean512_confident_margin000_term_oversample_r3.jsonl`
+- Terminology file: `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet`
+- Repeat matched rows: `3`
+- Builder rows:
+  - 1332 input rows
+  - 168 matched base rows
+  - 336 extra rows
+  - 1668 output rows
+- Trainer rows after filtering with `--no-dedupe-rows`:
+  - 1418 train
+  - 250 validation
+- Terminology-matched rows:
+  - 422 train
+  - 82 validation
+
+SFT setup:
+
+- Starting adapter: `outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8`
+- Output: `outputs/mbr_self_training_sft/20260522-k16-termtrain-best-oversample-r3-lr1e-7-16steps`
+- LR: `1e-7`
+- Max steps: `16`
+- Batch: per-device `4`, gradient accumulation `2`
+- Validation/save: every `8` optimizer steps
+
+Held-out clean Chanka terminology-prompt eval:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-8` + terminology top-1 | 26.3244 | 41.2740 | 6.7682 | 26.2407 | 2.6688 | 0.4747 | 88.2488 |
+| `checkpoint-16` + terminology top-1 | 25.9048 | 40.7224 | 6.5047 | 25.9770 | 2.6688 | 0.4747 | 88.9401 |
+| `final_lora` + terminology top-1 | 26.3244 | 41.2740 | 6.7682 | 26.2407 | 2.6688 | 0.4747 | 88.2488 |
+
+Conclusion:
+
+- Negative result. Do not use `20260522-k16-termtrain-best-oversample-r3-lr1e-7-16steps`.
+- Oversampling real matched sentence rows was safer than raw term pairs but still crushed BLEU compared with the current deployable best (`6.7682` vs `9.7158`).
+- More terminology exposure is not automatically better. The current best appears to sit at a narrow early-update point; additional terminology-weighted updates over-steer the model.
+- If this direction is revisited, try a lighter repeat ratio or construct new full-sentence contextual examples instead of duplicating the same matched rows.

@@ -92,6 +92,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Drop pseudo-targets that exactly copy the Spanish source.",
     )
     parser.add_argument(
+        "--dedupe-rows",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Dedupe rows by normalized source and target. Disable for deliberate oversampling experiments.",
+    )
+    parser.add_argument(
         "--max-source-copy-ratio",
         type=float,
         default=0.80,
@@ -149,10 +155,11 @@ def load_jsonl_rows(args: argparse.Namespace) -> list[dict[str, str]]:
                 continue
             if not pseudo_target_passes_quality_filters(source, target, args):
                 continue
-            key = (source.lower(), target.lower())
-            if key in seen:
-                continue
-            seen.add(key)
+            if args.dedupe_rows:
+                key = (source.lower(), target.lower())
+                if key in seen:
+                    continue
+                seen.add(key)
             rows.append(
                 {
                     "source": source,

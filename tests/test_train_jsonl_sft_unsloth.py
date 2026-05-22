@@ -45,6 +45,30 @@ class TrainJsonlSftUnslothTests(unittest.TestCase):
         self.assertEqual(rows[0]["reference"], "Allin punchaw")
         self.assertEqual(rows[0]["target_field"], "prediction")
 
+    def test_load_jsonl_rows_can_keep_duplicates_for_oversampling(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "mbr_predictions.jsonl"
+            write_jsonl(
+                path,
+                [
+                    {"source": "Buenos dias.", "prediction": "Allin punchaw.", "reference": "A"},
+                    {"source": "Buenos dias.", "prediction": "Allin punchaw.", "reference": "B"},
+                ],
+            )
+            args = train_jsonl_sft.parse_args(
+                [
+                    "--jsonl",
+                    str(path),
+                    "--output-dir",
+                    str(Path(tmpdir) / "out"),
+                    "--no-dedupe-rows",
+                ]
+            )
+
+            rows = train_jsonl_sft.load_jsonl_rows(args)
+
+        self.assertEqual(len(rows), 2)
+
     def test_load_jsonl_rows_filters_exact_source_copies(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "mbr_predictions.jsonl"
