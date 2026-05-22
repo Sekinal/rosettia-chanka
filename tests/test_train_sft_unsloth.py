@@ -52,6 +52,26 @@ class TrainSftUnslothTests(unittest.TestCase):
 
         self.assertEqual(args.prompt_style, "hymt2")
 
+    def test_chat_template_helper_disables_thinking_when_supported(self):
+        class ThinkingAwareTokenizer:
+            def apply_chat_template(self, messages, enable_thinking=True, **kwargs):
+                self.enable_thinking = enable_thinking
+                self.kwargs = kwargs
+                return "prompt"
+
+        tokenizer = ThinkingAwareTokenizer()
+
+        rendered = train_sft.apply_chat_template_no_thinking(
+            tokenizer,
+            [{"role": "user", "content": "Hola"}],
+            tokenize=False,
+            add_generation_prompt=False,
+        )
+
+        self.assertEqual(rendered, "prompt")
+        self.assertFalse(tokenizer.enable_thinking)
+        self.assertEqual(tokenizer.kwargs["tokenize"], False)
+
     def test_chanka_stage_defaults_use_measured_context_and_batch(self):
         args = argparse.Namespace(
             stage="chanka",

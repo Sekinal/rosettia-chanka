@@ -289,6 +289,14 @@ def prompt_messages(source: str, terminology: Sequence[tuple[str, str]] | None =
     ]
 
 
+def apply_chat_template_no_thinking(tokenizer, messages: list[dict[str, str]], **kwargs):
+    """Apply chat templates with reasoning disabled when the tokenizer supports it."""
+    try:
+        return tokenizer.apply_chat_template(messages, enable_thinking=False, **kwargs)
+    except TypeError:
+        return tokenizer.apply_chat_template(messages, **kwargs)
+
+
 def source_contains_term(source: str, source_term: str) -> bool:
     source_norm = normalize_text(source).lower()
     term_norm = normalize_text(source_term).lower()
@@ -458,6 +466,7 @@ def chat_artifact_penalty(hypothesis: str) -> float:
     artifacts = (
         "<think",
         "</think",
+        "thinking process",
         "<|im_start|>",
         "<|im_end|>",
         " assistant ",
@@ -471,8 +480,11 @@ def chat_artifact_penalty(hypothesis: str) -> float:
 
 def strip_chat_artifacts(text: str) -> str:
     normalized = normalize_text(text)
+    final_answer = re.search(r"(?i)(?:final answer|respuesta final)\s*:\s*(.+)$", normalized)
+    if final_answer:
+        return normalize_text(final_answer.group(1))
     match = re.search(
-        r"(?i)(?:<think|</think|<\|im_start\|>|<\|im_end\|>|\b(?:assistant|user|system)\b)",
+        r"(?i)(?:thinking process|<think|</think|<\|im_start\|>|<\|im_end\|>|\b(?:assistant|user|system)\b)",
         normalized,
     )
     if not match:
@@ -1019,7 +1031,8 @@ def generate_predictions(
             if terminology_entries and terminology_top_k > 0
             else None
         )
-        prompt = tokenizer.apply_chat_template(
+        prompt = apply_chat_template_no_thinking(
+            tokenizer,
             prompt_messages(row["source"], terminology),
             tokenize=False,
             add_generation_prompt=True,

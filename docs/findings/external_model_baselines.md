@@ -354,3 +354,47 @@ Decision: this is a useful negative result. Hy-MT2 7B can be adapted technically
 ## Decision
 
 Gemma 4 E4B and Hy-MT2 can both be used with Unsloth after chat-marker fixes, but Gemma 4 E4B clean-only SFT, Gemma 4 E4B broad-to-Chanka SFT, and the tiny Hy-MT2 7B broad-to-Chanka run are not competitive with the current Qwen3.5 adapter. Neither family justifies replacing the Qwen base from current results. If these families are revisited, they need much larger broad Quechua SFT before clean Chanka SFT/GSPO, with generation evals at checkpoints rather than relying on trainer loss.
+
+## Qwen3.5 4B JSONL-Only Canary
+
+Purpose: test whether simply scaling the current JSONL terminology/MBR SFT recipe from Qwen3.5 2B to Qwen3.5 4B gives an immediate base-model gain.
+
+Important prompt fix:
+
+- Qwen-family chat templates can emit reasoning traces unless `enable_thinking=False` is passed.
+- `scripts/train_gspo_chanka_unsloth.py`, `scripts/train_sft_unsloth.py`, `scripts/train_jsonl_sft_unsloth.py`, and `scripts/evaluate_gspo_checkpoint.py` now use helper wrappers that disable thinking when supported and fall back for tokenizers without that argument.
+- The first 4B run looked catastrophically bad because inference emitted `Thinking Process:` text. Re-evaluating the same checkpoint with no-thinking prompts recovered it from chrF++ `6.9684` / BLEU `0.0468` to chrF++ `24.1074` / BLEU `4.2321`, confirming the issue.
+
+Patched 4B LoRA run:
+
+- Model: `unsloth/Qwen3.5-4B`
+- Output: `outputs/model_family_canaries/20260522-qwen35-4b-jsonl-term-lora-r64-lr2e-5-64step-nothink`
+- Data: `outputs/mbr_self_training_data/20260522-k16-full-newbest-noterm-t065-p090/mixed_clean512_confident_margin000_target.jsonl`
+- Target field: `target`
+- Terminology prompt: `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet`, top-k `1`
+- Rows after filtering: 1,332 total, 1,133 train, 199 validation
+- LoRA: rank `64`, alpha `128`, LR `2e-5`, 64 steps, effective batch `8`
+
+Trainer eval loss:
+
+| Checkpoint | eval loss |
+| --- | ---: |
+| `checkpoint-16` | `1.965` |
+| `checkpoint-32` | `1.844` |
+| `checkpoint-48` | `1.786` |
+| `checkpoint-64` | `1.755` |
+| `final_lora` | `1.7859` |
+
+Held-out clean Chanka terminology-prompt eval:
+
+| Checkpoint | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-32` | `9.9882` | `21.3611` | `4.4160` | `7.1105` | `5.5591` | `0.6329` | `112.4424` |
+| `checkpoint-48` | `11.4808` | `23.5161` | `4.6359` | `7.9283` | `5.7233` | `0.1582` | `106.4516` |
+| `checkpoint-64` / `final_lora` | `10.9681` | `23.8631` | `4.1200` | `9.4646` | `7.2785` | `0.4747` | `109.9078` |
+
+Decision:
+
+- This JSONL-only 4B canary is a negative result. It is much better after disabling thinking, but still far below the standing 2B current-best adapter and far below the K32 ensemble.
+- Do not interpret this as evidence that 4B is worse than 2B. It is evidence that a larger raw Qwen model should not be dropped directly onto the small JSONL self-training mix.
+- The next serious 4B/9B attempt should use the full curriculum: broad Quechua SFT first, clean Chanka SFT second, then GSPO/selector work. Full fine-tuning should be tried only after that curriculum produces a competitive LoRA checkpoint.

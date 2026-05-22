@@ -244,7 +244,12 @@ def format_example(
         {"role": "assistant", "content": row["target"]},
     ]
     return {
-        "text": tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False),
+        "text": gspo.apply_chat_template_no_thinking(
+            tokenizer,
+            messages,
+            tokenize=False,
+            add_generation_prompt=False,
+        ),
         "source_name": row["source_name"],
         "variant": row["variant"],
         "target_field": row["target_field"],

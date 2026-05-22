@@ -105,3 +105,20 @@ Decision:
 - This is a negative result for deployment. It does not beat the current LoRA checkpoint (`checkpoint-8` from `20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps`) and is far below the conservative K32 score ensemble.
 - It also is not useful as a candidate diversity generator: its K8 oracle is below the previous conservative and mixed candidate pools.
 - Full SFT is viable mechanically, but current evidence says it should be reserved for larger/model-scale experiments or a better data mix. Do not scale this exact JSONL full-SFT recipe.
+
+## Current Full-SFT Recommendation
+
+Full fine-tuning with Unsloth is worth keeping in the toolkit, but not as the next blind experiment.
+
+Current evidence:
+
+- Raw-base full SFT is too slow and weak at our data scale.
+- Merged-current-best full SFT is stable but neutral on clean Chanka.
+- Merged-current-best JSONL full SFT is negative.
+- A Qwen3.5 4B JSONL-only LoRA canary is also negative after fixing no-thinking prompt formatting, so full-tuning 4B on that same data mix would likely spend more GPU without solving the data/curriculum issue.
+
+Next best SFT path:
+
+1. Train larger Qwen variants through the full broad Quechua -> clean Chanka curriculum with no-thinking chat templates.
+2. Evaluate generation quality at checkpoints, not just trainer eval loss.
+3. Only if a larger LoRA checkpoint approaches or beats the current 2B adapter, merge it and run a short full-SFT continuation from that strong state.

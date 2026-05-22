@@ -49,6 +49,26 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
         self.assertIn("no fuerces", messages[1]["content"])
         self.assertIn("La señora vive en Quinua.", messages[1]["content"])
 
+    def test_chat_template_helper_disables_thinking_when_supported(self):
+        class ThinkingAwareTokenizer:
+            def apply_chat_template(self, messages, enable_thinking=True, **kwargs):
+                self.enable_thinking = enable_thinking
+                self.kwargs = kwargs
+                return "prompt"
+
+        tokenizer = ThinkingAwareTokenizer()
+
+        rendered = train_gspo.apply_chat_template_no_thinking(
+            tokenizer,
+            train_gspo.prompt_messages("Buenos dias."),
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+
+        self.assertEqual(rendered, "prompt")
+        self.assertFalse(tokenizer.enable_thinking)
+        self.assertEqual(tokenizer.kwargs["add_generation_prompt"], True)
+
     def test_select_terminology_prefers_longest_matches_and_dedupes_targets(self):
         selected = train_gspo.select_terminology(
             "La madre abandonada hablo con la señora.",
@@ -189,6 +209,10 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
     def test_strip_chat_artifacts_keeps_translation_prefix(self):
         self.assertEqual(
             train_gspo.strip_chat_artifacts("Allin punchaw user Allin punchaw assistant <think></think>"),
+            "Allin punchaw",
+        )
+        self.assertEqual(
+            train_gspo.strip_chat_artifacts("Thinking Process: analyze. Final Answer: Allin punchaw"),
             "Allin punchaw",
         )
         self.assertEqual(train_gspo.strip_chat_artifacts("Allin punchaw taytay"), "Allin punchaw taytay")

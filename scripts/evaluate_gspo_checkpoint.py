@@ -160,7 +160,8 @@ def generate_predictions_with_progress(
         prompts = []
         for row, terms in zip(batch_rows, batch_terms, strict=True):
             prompts.append(
-                tokenizer.apply_chat_template(
+                gspo.apply_chat_template_no_thinking(
+                    tokenizer,
                     gspo.prompt_messages(row["source"], terms),
                     tokenize=False,
                     add_generation_prompt=True,

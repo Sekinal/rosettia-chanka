@@ -281,9 +281,18 @@ def messages_for_example(args: argparse.Namespace, row: dict[str, str]) -> list[
     ]
 
 
+def apply_chat_template_no_thinking(tokenizer, messages: list[dict[str, str]], **kwargs):
+    """Disable reasoning traces for chat templates that expose enable_thinking."""
+    try:
+        return tokenizer.apply_chat_template(messages, enable_thinking=False, **kwargs)
+    except TypeError:
+        return tokenizer.apply_chat_template(messages, **kwargs)
+
+
 def format_example(tokenizer, args: argparse.Namespace, row: dict[str, str]) -> dict[str, str]:
     return {
-        "text": tokenizer.apply_chat_template(
+        "text": apply_chat_template_no_thinking(
+            tokenizer,
             messages_for_example(args, row),
             tokenize=False,
             add_generation_prompt=False,
@@ -294,7 +303,8 @@ def format_example(tokenizer, args: argparse.Namespace, row: dict[str, str]) -> 
 
 
 def response_marker_parts(tokenizer) -> tuple[str, str]:
-    probe = tokenizer.apply_chat_template(
+    probe = apply_chat_template_no_thinking(
+        tokenizer,
         [
             {"role": "system", "content": "system"},
             {"role": "user", "content": "user"},
