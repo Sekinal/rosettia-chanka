@@ -32,9 +32,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--stage",
-        choices=["broad"],
+        choices=["broad", "chanka"],
         required=True,
-        help="SFT is restricted to broad SomosNLP/AmericasNLP data. Use a separate GSPO workflow for Chanka.",
+        help="SFT data tier: broad SomosNLP/AmericasNLP data, or the clean reviewed Chanka corpus.",
     )
     parser.add_argument("--model-id", default=DEFAULT_MODEL_ID)
     parser.add_argument(

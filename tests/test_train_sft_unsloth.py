@@ -28,9 +28,10 @@ class TrainSftUnslothTests(unittest.TestCase):
         self.assertEqual(train_sft.adapter_flags("dora"), {"use_dora": True, "use_rslora": False})
         self.assertEqual(train_sft.adapter_flags("rslora"), {"use_dora": False, "use_rslora": True})
 
-    def test_sft_cli_rejects_chanka_stage(self):
-        with self.assertRaises(SystemExit):
-            train_sft.parse_args(["--stage", "chanka"])
+    def test_sft_cli_accepts_chanka_stage_for_model_family_canaries(self):
+        args = train_sft.parse_args(["--stage", "chanka"])
+
+        self.assertEqual(args.stage, "chanka")
 
     def test_chanka_stage_defaults_use_measured_context_and_batch(self):
         args = argparse.Namespace(
