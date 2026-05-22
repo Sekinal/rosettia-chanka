@@ -201,6 +201,93 @@ Training loss and eval loss improved, but generated translation quality remained
 
 Qualitative pattern: the model stops emitting explanations and starts producing Chanka-like text, but it is often generic or semantically wrong. Examples from `checkpoint-392`: `¿En qué calle vive? -> ¿Imayna riqsi?`, `Yo vivo en Quinua -> Ñuqa Quinuawan kachkani`, `No es un buen esposo -> Mana allin waynaqmi`, and `Tengo 45 años -> 45 uraymi kani`.
 
+## Hy-MT2 7B Broad-to-Chanka SFT
+
+Purpose: test the strongest plausible Hy-MT2 path after zero-shot source-copying: first teach broad Spanish-to-Quechua behavior, then specialize to the clean Chanka split.
+
+Broad canary:
+
+```bash
+.venv/bin/python scripts/train_sft_unsloth.py \
+  --stage broad \
+  --model-id tencent/Hy-MT2-7B \
+  --prompt-style hymt2 \
+  --target-language-name Quechua \
+  --max-train-samples 2048 \
+  --max-eval-samples 128 \
+  --max-steps 96 \
+  --eval-steps 24 \
+  --save-steps 24 \
+  --per-device-train-batch-size 1 \
+  --per-device-eval-batch-size 1 \
+  --gradient-accumulation-steps 4 \
+  --max-seq-length 256 \
+  --learning-rate 1e-4 \
+  --lora-r 64 \
+  --lora-alpha 128 \
+  --output-dir outputs/hymt2_7b_broad_hymt2prompt_lora_r64_a128_s256_96steps
+```
+
+Result: validation loss improved monotonically over the 96-step run.
+
+| Checkpoint | Eval loss |
+| --- | ---: |
+| `checkpoint-24` | `3.446` |
+| `checkpoint-48` | `3.041` |
+| `checkpoint-72` | `2.863` |
+| `checkpoint-96` / `final_lora` | `2.7638` |
+
+Chanka continuation from the broad adapter:
+
+```bash
+.venv/bin/python scripts/train_sft_unsloth.py \
+  --stage chanka \
+  --model-id tencent/Hy-MT2-7B \
+  --adapter-path outputs/hymt2_7b_broad_hymt2prompt_lora_r64_a128_s256_96steps/broad/final_lora \
+  --prompt-style hymt2 \
+  --target-language-name "Quechua Chanka" \
+  --max-train-samples 512 \
+  --max-eval-samples 128 \
+  --max-steps 96 \
+  --eval-steps 24 \
+  --save-steps 24 \
+  --per-device-train-batch-size 1 \
+  --per-device-eval-batch-size 1 \
+  --gradient-accumulation-steps 4 \
+  --max-seq-length 128 \
+  --learning-rate 2e-5 \
+  --lora-r 64 \
+  --lora-alpha 128 \
+  --output-dir outputs/hymt2_7b_broad96_chanka_hymt2prompt_lora_s128_96steps
+```
+
+Result: validation loss again improved monotonically.
+
+| Checkpoint | Eval loss |
+| --- | ---: |
+| `checkpoint-24` | `3.025` |
+| `checkpoint-48` | `2.808` |
+| `checkpoint-72` | `2.716` |
+| `checkpoint-96` / `final_lora` | `2.6787` |
+
+Full held-out clean Chanka generation eval:
+
+| Decoding | chrF++ | BLEU | Token F1 | Source copy % | Leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| deterministic | `19.4632` | `3.1464` | `4.9005` | `3.5759` | `0.3165` | `101.6129` |
+| `temperature=0.1`, `top_p=0.7`, `top_k=20`, `repetition_penalty=1.05` | `18.9966` | `2.7194` | `4.7212` | `3.2595` | `0.4747` | `102.9954` |
+
+Qualitative pattern: broad+Chanka SFT fixes the zero-shot source-copy failure and produces Chanka-like text, but semantic fidelity is still poor. Examples from deterministic decoding:
+
+| Spanish | Prediction | Reference |
+| --- | --- | --- |
+| `¿En qué calle vive?` | `¿Ima kallpanpiytaqmi wawaykikusqanki?` | `¿May k’ikllupin tiyanki?` |
+| `Yo vivo en Quinua` | `Quinuapi kachkani` | `Quinuapim tiyani` |
+| `No es un buen esposo` | `Mana allin kachkani` | `Manam allin qusachu` |
+| `Tengo 45 años` | `Manam 45 wawaytaqmi` | `Tawa chunka pichqanpim kachkani` |
+
+Decision: this is a useful negative result. Hy-MT2 7B can be adapted technically and no longer source-copies after broad+Chanka SFT, but this 96+96 step recipe is far below the standing Qwen3.5 adapter (`chrF++ 41.4823`, BLEU `9.7158`, token F1 `27.0736`). Do not replace Qwen with Hy-MT2 from these results. Scaling Hy-MT2 would require much more broad data/steps and close early evaluation, not clean-Chanka-only or tiny broad SFT.
+
 ## Decision
 
-Gemma 4 E4B and Hy-MT2 can both be used with Unsloth after chat-marker fixes, but Gemma 4 E4B clean-Chanka SFT is not competitive with the current Qwen3.5 adapter and Hy-MT2 7B zero-shot source-copies Spanish. Neither justifies replacing the Qwen base from clean-Chanka-only results. If these families are revisited, they need broad Quechua SFT first, then clean Chanka SFT/GSPO, not clean Chanka alone.
+Gemma 4 E4B and Hy-MT2 can both be used with Unsloth after chat-marker fixes, but Gemma 4 E4B clean-Chanka SFT and the tiny Hy-MT2 7B broad-to-Chanka run are not competitive with the current Qwen3.5 adapter. Neither justifies replacing the Qwen base from current results. If these families are revisited, they need much larger broad Quechua SFT before clean Chanka SFT/GSPO, with generation evals at checkpoints rather than relying on trainer loss.
