@@ -185,3 +185,39 @@ Conclusion:
 - It improves selection slightly over the previous terminology-prompt best (`26.4760` vs `26.4615`) and improves BLEU more clearly (`8.9872` vs `8.6118`), while chrF++ is also higher (`41.0961` vs `41.0248`).
 - The final checkpoint regresses; use `checkpoint-40`, not `final_lora`.
 - Next step should expand the high-confidence K16 pool beyond 512 train rows or try margin `0.000`/`0.020` as separate mixtures. Margin `0.020` is high-BLEU but only 111 pseudo-labels after dedupe; margin `0.000` has better hidden-reference selection/F1 and far more rows.
+
+### Margin 0.000 Follow-Up
+
+Purpose: test whether the denser K16 confident set works better than the high-margin `0.020` subset. The margin `0.000` subset had the best hidden-reference selection/F1 in the confidence sweep and many more rows, but lower BLEU than margin `0.020`.
+
+SFT setup:
+
+- Pseudo-labels used: margin `0.000`
+- Mixed data: `outputs/mbr_self_training_data/20260522-k16-train512-t065-p090/mixed_clean512_confident_margin000_target.jsonl`
+- Builder rows: 971 total
+  - 510 clean anchors
+  - 461 confident MBR pseudo-labels after dedupe
+- Trainer rows after filters: 968 total
+  - 823 train
+  - 145 validation
+- Output: `outputs/mbr_self_training_sft/20260522-k16-confident-margin000-clean512-lr8e-7-56steps`
+- LR: `8e-7`
+- Max steps: `56`
+- Batch: per-device `4`, gradient accumulation `2`
+- Validation/save: every `8` optimizer steps
+
+Held-out clean Chanka eval:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-40` | 25.5853 | 40.4324 | 6.2136 | 25.8660 | 2.6688 | 0.7911 | 89.6313 |
+| `checkpoint-48` | 25.4862 | 40.1338 | 6.0282 | 25.8358 | 2.6688 | 0.7911 | 89.4009 |
+| `checkpoint-56` | 25.6758 | 40.2917 | 8.5100 | 25.1140 | 2.8270 | 0.7911 | 89.1705 |
+| `final_lora` | 25.6758 | 40.2917 | 8.5100 | 25.1140 | 2.8270 | 0.7911 | 89.1705 |
+
+Conclusion:
+
+- Margin `0.000` is worse than margin `0.020` despite much stronger hidden-reference training-set selection/F1.
+- The denser pseudo-label mix appears to increase Spanish leakage and hurts held-out selection, chrF++, and token F1.
+- Do not use this run as the deployable checkpoint. Keep `20260522-k16-confident-margin002-clean512-lr8e-7-48steps/checkpoint-40` with terminology top-1 as the current best.
+- The next high-upside self-training run should expand the K16 high-margin pool over more train rows, not lower the confidence threshold on the same 512-row pool.
