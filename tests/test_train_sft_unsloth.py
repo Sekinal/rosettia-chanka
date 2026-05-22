@@ -7,10 +7,15 @@ from scripts import train_sft_unsloth as train_sft
 
 
 class DummyTokenizer:
+    def __init__(self, template: str | None = None):
+        self.template = template
+
     def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=False):
         self.messages = messages
         self.tokenize = tokenize
         self.add_generation_prompt = add_generation_prompt
+        if self.template is not None:
+            return self.template
         return "\n".join(f"{message['role']}: {message['content']}" for message in messages)
 
 
@@ -122,6 +127,22 @@ class TrainSftUnslothTests(unittest.TestCase):
         self.assertEqual(formatted["variant"], "quy/chanka")
         self.assertFalse(tokenizer.tokenize)
         self.assertFalse(tokenizer.add_generation_prompt)
+
+    def test_response_marker_parts_supports_qwen_template(self):
+        tokenizer = DummyTokenizer("<|im_start|>user\nusr<|im_start|>assistant\nast")
+
+        self.assertEqual(
+            train_sft.response_marker_parts(tokenizer),
+            ("<|im_start|>user\n", "<|im_start|>assistant\n"),
+        )
+
+    def test_response_marker_parts_supports_gemma4_template(self):
+        tokenizer = DummyTokenizer("<|turn>user\nusr<turn|>\n<|turn>model\nast<turn|>")
+
+        self.assertEqual(
+            train_sft.response_marker_parts(tokenizer),
+            ("<|turn>user\n", "<|turn>model\n"),
+        )
 
 
 if __name__ == "__main__":

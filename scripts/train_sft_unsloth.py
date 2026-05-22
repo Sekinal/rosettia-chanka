@@ -240,6 +240,23 @@ def format_example(tokenizer, stage: str, row: dict[str, str]) -> dict[str, str]
     }
 
 
+def response_marker_parts(tokenizer) -> tuple[str, str]:
+    probe = tokenizer.apply_chat_template(
+        [
+            {"role": "system", "content": "system"},
+            {"role": "user", "content": "user"},
+            {"role": "assistant", "content": "assistant"},
+        ],
+        tokenize=False,
+        add_generation_prompt=False,
+    )
+    if "<|turn>user\n" in probe and "<|turn>model\n" in probe:
+        return "<|turn>user\n", "<|turn>model\n"
+    if "<|im_start|>user\n" in probe and "<|im_start|>assistant\n" in probe:
+        return "<|im_start|>user\n", "<|im_start|>assistant\n"
+    raise ValueError("Unsupported chat template for response-only SFT masking")
+
+
 def build_dataset(tokenizer, stage: str, rows: Iterable[dict[str, str]]) -> Dataset:
     return Dataset.from_list([format_example(tokenizer, stage, row) for row in rows])
 
@@ -345,10 +362,11 @@ def main() -> None:
     if args.train_on_responses_only:
         from unsloth.chat_templates import train_on_responses_only
 
+        instruction_part, response_part = response_marker_parts(tokenizer)
         trainer = train_on_responses_only(
             trainer,
-            instruction_part="<|im_start|>user\n",
-            response_part="<|im_start|>assistant\n",
+            instruction_part=instruction_part,
+            response_part=response_part,
         )
 
     print(f"Loaded rows: {len(rows):,}")
