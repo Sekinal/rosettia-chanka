@@ -145,6 +145,14 @@ class TrainSftUnslothTests(unittest.TestCase):
             ("<|turn>user\n", "<|turn>model\n"),
         )
 
+    def test_response_marker_parts_supports_hymt2_template(self):
+        tokenizer = DummyTokenizer("<｜hy_User｜>usr<｜hy_Assistant｜>ast<｜hy_place▁holder▁no▁2｜>")
+
+        self.assertEqual(
+            train_sft.response_marker_parts(tokenizer),
+            ("<｜hy_User｜>", "<｜hy_Assistant｜>"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

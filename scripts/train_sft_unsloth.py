@@ -250,6 +250,8 @@ def response_marker_parts(tokenizer) -> tuple[str, str]:
         tokenize=False,
         add_generation_prompt=False,
     )
+    if "<｜hy_User｜>" in probe and "<｜hy_Assistant｜>" in probe:
+        return "<｜hy_User｜>", "<｜hy_Assistant｜>"
     if "<|turn>user\n" in probe and "<|turn>model\n" in probe:
         return "<|turn>user\n", "<|turn>model\n"
     if "<|im_start|>user\n" in probe and "<|im_start|>assistant\n" in probe:
