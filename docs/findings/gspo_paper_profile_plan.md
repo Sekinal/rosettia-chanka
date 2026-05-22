@@ -265,6 +265,13 @@ Update as of 2026-05-22 09:35 UTC:
 - Row audit: terminology exactly fixed `¿Es usted casado?` and `¿Es usted casada?` from `Casarasqa...` forms to reference-matching `¿Warmiyuqchu kanki?` / `¿Qusayuqchu kanki?`. It also regressed a few already-good rows by over-steering, e.g. `Yo soy culpable` changed from near-reference `Ñuqam huchayoq kani` to shorter `Huchayuqmi kani`.
 - Interpretation: glossary prompting is worth keeping as a deployable option and confirms the terminology papers are relevant, but the current manual glossary covers too few held-out rows to move toward chrF 60 by itself. The next terminology step should be training-time augmentation: add glossary-triggered source prompts and synthetic short phrase pairs, then SFT/GSPO with validation, rather than continuing prompt-only sweeps.
 
+Update as of 2026-05-22 10:25 UTC:
+
+- Added terminology-conditioned GSPO training support to `scripts/train_gspo_chanka_unsloth.py` plus launcher `experiments/gspo/run_terminology_prompt_canary.sh`. The trainer now accepts `--terminology-file`, `--terminology-top-k`, and `--terminology-min-source-chars`; train and eval prompts use the same glossary-matching logic as checkpoint evaluation, and final metrics record matched terminology row counts.
+- Remote canary: `outputs/gspo_paper_profiles/2511_terminology_prompt_current_best_20260522-terminology-gspo-canary`, evaluated in `outputs/gspo_checkpoint_evals/20260522-terminology-gspo-canary-terminology-prompt-canary`. It started from the standing best adapter, used `learned_verifier_vibe_2511`, verifier `outputs/chanka_translation_verifier_hard_r128/checkpoint-1368`, LR `3e-7`, `MAX_STEPS=16`, `MAX_TRAIN_SAMPLES=384`, `MAX_EVAL_SAMPLES=64`, and terminology top-k `1`. Validation was enabled every 8 steps. The sampled slice had 48 terminology-matched train rows and 8 terminology-matched validation rows.
+- Result: terminology-conditioned GSPO did not beat prompt-only terminology inference or the standing adapter. Best reload checkpoint was `checkpoint-16` / final with selection `25.7517`, chrF++ `40.5832`, BLEU `6.3632`, token F1 `25.6711`, source-copy `2.6688%`, exact-copy `0.6329%`, leakage `0.6329%`, artifact `0.0%`, TER `88.7097`. Checkpoint `8` scored selection `25.7467`, chrF++ `40.5199`, BLEU `6.4529`, token F1 `25.5882`.
+- Interpretation: on the current small glossary coverage, actual GSPO updates hurt BLEU/token-F1 more than they help terminology. Keep terminology prompting as an inference option, but do not full-run terminology-conditioned GSPO until we have broader glossary-triggered training data or synthetic phrase pairs.
+
 ## Smoke Results
 
 Remote: `root@216.81.248.197 -p 20299`, path `/root/rosettia-chanka`, GPU `NVIDIA L40S`.

@@ -90,6 +90,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--validation-fraction", type=float, default=0.15)
     parser.add_argument("--max-train-samples", type=int, default=None)
     parser.add_argument("--max-eval-samples", type=int, default=None)
+    parser.add_argument(
+        "--terminology-file",
+        default=None,
+        help="Optional dataset-repo parquet glossary for terminology-conditioned GSPO prompts.",
+    )
+    parser.add_argument("--terminology-top-k", type=int, default=6)
+    parser.add_argument("--terminology-min-source-chars", type=int, default=3)
     parser.add_argument("--num-train-epochs", type=float, default=1.0)
     parser.add_argument("--max-steps", type=int, default=-1)
     parser.add_argument("--learning-rate", type=float, default=5.0e-6)
@@ -161,6 +168,38 @@ def load_chanka_rows(repo_id: str, filename: str) -> list[dict[str, str]]:
     if not rows:
         raise RuntimeError(f"No Chanka rows loaded from {filename}")
     return rows
+
+
+def load_terminology_entries(
+    repo_id: str,
+    filename: str,
+    min_source_chars: int,
+) -> list[tuple[str, str]]:
+    path = download_parquet(repo_id, filename)
+    frame = pl.read_parquet(path)
+    required = {"direction", "source_term", "target_text"}
+    missing = required.difference(frame.columns)
+    if missing:
+        raise ValueError(f"Terminology file {filename} is missing columns: {sorted(missing)}")
+
+    if "glossary_status" in frame.columns:
+        frame = frame.filter(pl.col("glossary_status") == "simple_term_pair")
+    frame = frame.filter(pl.col("direction") == "spa_Latn-quy_Latn")
+
+    entries: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for row in frame.select(["source_term", "target_text"]).iter_rows(named=True):
+        source_term = normalize_text(str(row["source_term"]))
+        target_text = normalize_text(str(row["target_text"]))
+        if len(source_term) < min_source_chars or not target_text:
+            continue
+        key = (source_term.lower(), target_text.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        entries.append((source_term, target_text))
+    entries.sort(key=lambda item: (-len(item[0]), item[0].lower(), item[1].lower()))
+    return entries
 
 
 def split_rows(
@@ -250,11 +289,48 @@ def prompt_messages(source: str, terminology: Sequence[tuple[str, str]] | None =
     ]
 
 
-def build_dataset(rows: Iterable[dict[str, str]]) -> Dataset:
+def source_contains_term(source: str, source_term: str) -> bool:
+    source_norm = normalize_text(source).lower()
+    term_norm = normalize_text(source_term).lower()
+    if not term_norm or term_norm in SPANISH_STOPWORDS:
+        return False
+    return re.search(rf"(?<!\w){re.escape(term_norm)}(?!\w)", source_norm) is not None
+
+
+def select_terminology(
+    source: str,
+    entries: Sequence[tuple[str, str]],
+    top_k: int,
+) -> list[tuple[str, str]]:
+    selected: list[tuple[str, str]] = []
+    used_targets: set[str] = set()
+    for source_term, target_term in entries:
+        if not source_contains_term(source, source_term):
+            continue
+        target_key = target_term.lower()
+        if target_key in used_targets:
+            continue
+        selected.append((source_term, target_term))
+        used_targets.add(target_key)
+        if len(selected) >= top_k:
+            break
+    return selected
+
+
+def build_dataset(
+    rows: Iterable[dict[str, str]],
+    terminology_entries: Sequence[tuple[str, str]] | None = None,
+    terminology_top_k: int = 0,
+) -> Dataset:
     return Dataset.from_list(
         [
             {
-                "prompt": prompt_messages(row["source"]),
+                "prompt": prompt_messages(
+                    row["source"],
+                    select_terminology(row["source"], terminology_entries or [], terminology_top_k)
+                    if terminology_entries and terminology_top_k > 0
+                    else None,
+                ),
                 "target": row["target"],
                 "source": row["source"],
                 "source_name": row["source_name"],
@@ -925,14 +1001,26 @@ def corpus_metrics(predictions: list[str], references: list[str], sources: list[
     return metrics
 
 
-def generate_predictions(model, tokenizer, rows: list[dict[str, str]], max_completion_length: int) -> list[str]:
+def generate_predictions(
+    model,
+    tokenizer,
+    rows: list[dict[str, str]],
+    max_completion_length: int,
+    terminology_entries: Sequence[tuple[str, str]] | None = None,
+    terminology_top_k: int = 0,
+) -> list[str]:
     import torch
 
     predictions: list[str] = []
     model.eval()
     for row in rows:
+        terminology = (
+            select_terminology(row["source"], terminology_entries or [], terminology_top_k)
+            if terminology_entries and terminology_top_k > 0
+            else None
+        )
         prompt = tokenizer.apply_chat_template(
-            prompt_messages(row["source"]),
+            prompt_messages(row["source"], terminology),
             tokenize=False,
             add_generation_prompt=True,
         )
@@ -1010,6 +1098,29 @@ def main() -> None:
         max_train_samples=args.max_train_samples,
         max_eval_samples=args.max_eval_samples,
     )
+    terminology_entries = (
+        load_terminology_entries(args.dataset_repo, args.terminology_file, args.terminology_min_source_chars)
+        if args.terminology_file
+        else []
+    )
+    train_term_rows = (
+        sum(
+            1
+            for row in train_rows
+            if select_terminology(row["source"], terminology_entries, args.terminology_top_k)
+        )
+        if terminology_entries
+        else 0
+    )
+    eval_term_rows = (
+        sum(
+            1
+            for row in eval_rows
+            if select_terminology(row["source"], terminology_entries, args.terminology_top_k)
+        )
+        if terminology_entries
+        else 0
+    )
     configure_step_schedule(args, len(train_rows))
 
     run_dir = args.output_dir / "chanka_gspo"
@@ -1028,12 +1139,17 @@ def main() -> None:
     model.generation_config.eos_token_id = tokenizer.eos_token_id
     model.generation_config.pad_token_id = tokenizer.eos_token_id
 
-    train_dataset = build_dataset(train_rows)
-    eval_dataset = build_dataset(eval_rows)
+    train_dataset = build_dataset(train_rows, terminology_entries, args.terminology_top_k)
+    eval_dataset = build_dataset(eval_rows, terminology_entries, args.terminology_top_k)
 
     print(f"Loaded Chanka rows: {len(rows):,}")
     print(f"Train rows: {len(train_dataset):,}")
     print(f"Validation rows: {len(eval_dataset):,}")
+    if args.terminology_file:
+        print(f"Terminology file: {args.terminology_file}")
+        print(f"Terminology entries: {len(terminology_entries):,}")
+        print(f"Terminology-matched train rows: {train_term_rows:,}")
+        print(f"Terminology-matched validation rows: {eval_term_rows:,}")
     print(f"Model or adapter: {model_name_or_adapter}")
     print('GSPO mode: GRPO with importance_sampling_level=\"sequence\"')
     print(f"Reward profile: {args.reward_profile}")
@@ -1104,7 +1220,14 @@ def main() -> None:
     model.save_pretrained(str(final_dir))
     tokenizer.save_pretrained(str(final_dir))
 
-    predictions = generate_predictions(model, tokenizer, eval_rows, args.max_completion_length)
+    predictions = generate_predictions(
+        model,
+        tokenizer,
+        eval_rows,
+        args.max_completion_length,
+        terminology_entries,
+        args.terminology_top_k,
+    )
     references = [row["target"] for row in eval_rows]
     sources = [row["source"] for row in eval_rows]
     metrics = corpus_metrics(predictions, references, sources)
@@ -1112,6 +1235,12 @@ def main() -> None:
     metrics["trainer_eval_reward"] = float(trainer_metrics.get("eval_reward", 0.0))
     metrics["final_adapter"] = str(final_dir)
     metrics["reward_profile"] = args.reward_profile
+    if args.terminology_file:
+        metrics["terminology_file"] = args.terminology_file
+        metrics["terminology_entries"] = len(terminology_entries)
+        metrics["terminology_top_k"] = args.terminology_top_k
+        metrics["terminology_train_matched_rows"] = train_term_rows
+        metrics["terminology_eval_matched_rows"] = eval_term_rows
     print(json.dumps(metrics, indent=2, sort_keys=True))
 
     metrics_path = args.metrics_json or (run_dir / "final_metrics.json")

@@ -49,6 +49,38 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
         self.assertIn("no fuerces", messages[1]["content"])
         self.assertIn("La señora vive en Quinua.", messages[1]["content"])
 
+    def test_select_terminology_prefers_longest_matches_and_dedupes_targets(self):
+        selected = train_gspo.select_terminology(
+            "La madre abandonada hablo con la señora.",
+            [
+                ("madre abandonada", "saqisqa mama"),
+                ("madre", "mama"),
+                ("señora", "mama"),
+                ("el", "dummy"),
+            ],
+            top_k=3,
+        )
+
+        self.assertEqual(selected, [("madre abandonada", "saqisqa mama"), ("madre", "mama")])
+
+    def test_build_dataset_can_use_terminology_prompts(self):
+        dataset = train_gspo.build_dataset(
+            [
+                {
+                    "source": "¿Es usted casado?",
+                    "target": "¿Warmiyuqchu kanki?",
+                    "source_name": "manual",
+                    "variant": "quy/chanka",
+                }
+            ],
+            terminology_entries=[("Casado", "Warmiyuq")],
+            terminology_top_k=1,
+        )
+
+        user_message = dataset[0]["prompt"][1]["content"]
+        self.assertIn("Glosario sugerido", user_message)
+        self.assertIn("- Casado = Warmiyuq", user_message)
+
     def test_reward_profile_cli_accepts_paper_profiles(self):
         for profile in train_gspo.REWARD_PROFILES:
             args = train_gspo.parse_args(["--reward-profile", profile])

@@ -55,5 +55,8 @@ gspo_args=(
 [[ -n "${EVAL_STEPS:-}" ]] && gspo_args+=(--eval-steps "$EVAL_STEPS")
 [[ -n "${SAVE_STEPS:-}" ]] && gspo_args+=(--save-steps "$SAVE_STEPS")
 [[ -n "${SECONDARY_VERIFIER_ADAPTER_PATH:-}" ]] && gspo_args+=(--secondary-verifier-adapter-path "$SECONDARY_VERIFIER_ADAPTER_PATH")
+[[ -n "${TERMINOLOGY_FILE:-}" ]] && gspo_args+=(--terminology-file "$TERMINOLOGY_FILE")
+[[ -n "${TERMINOLOGY_TOP_K:-}" ]] && gspo_args+=(--terminology-top-k "$TERMINOLOGY_TOP_K")
+[[ -n "${TERMINOLOGY_MIN_SOURCE_CHARS:-}" ]] && gspo_args+=(--terminology-min-source-chars "$TERMINOLOGY_MIN_SOURCE_CHARS")
 
 python "${gspo_args[@]}"
