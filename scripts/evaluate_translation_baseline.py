@@ -17,7 +17,7 @@ from scripts import train_gspo_chanka_unsloth as gspo
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--backend", choices=["nllb", "seq2seq-chat", "translategemma"], required=True)
+    parser.add_argument("--backend", choices=["nllb", "seq2seq-chat", "causal-chat", "translategemma"], required=True)
     parser.add_argument("--model-id", required=True)
     parser.add_argument("--dataset-repo", default=gspo.DATASET_REPO)
     parser.add_argument("--dataset-file", default=gspo.CHANKA_FILE)
@@ -112,6 +112,14 @@ def seq2seq_prompt(source: str) -> list[dict[str, str]]:
     ]
 
 
+def causal_translation_prompt(source: str) -> str:
+    return (
+        "Translate the following Spanish text into Quechua Chanka. "
+        "Only output the translated result without any explanation:\n\n"
+        f"{source}"
+    )
+
+
 def generate_seq2seq_chat(args: argparse.Namespace, rows: list[dict[str, str]]) -> list[str]:
     import torch
     from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -142,6 +150,47 @@ def generate_seq2seq_chat(args: argparse.Namespace, rows: list[dict[str, str]]) 
         prompt_len = inputs["input_ids"].shape[-1]
         generated = outputs[0][prompt_len:] if outputs.shape[-1] > prompt_len else outputs[0]
         predictions.append(gspo.strip_chat_artifacts(tokenizer.decode(generated, skip_special_tokens=True)))
+        print(f"generated {len(predictions)}/{len(rows)}", flush=True)
+    return predictions
+
+
+def generate_causal_chat(args: argparse.Namespace, rows: list[dict[str, str]]) -> list[str]:
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_id,
+        device_map="auto",
+        torch_dtype=torch_dtype(args.torch_dtype),
+        trust_remote_code=True,
+    )
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    predictions: list[str] = []
+    for row in rows:
+        prompt = causal_translation_prompt(row["source"])
+        messages = [{"role": "user", "content": prompt}]
+        if getattr(tokenizer, "chat_template", None):
+            inputs = tokenizer.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                return_tensors="pt",
+                return_dict=True,
+            ).to(model.device)
+        else:
+            fallback_prompt = f"{prompt}\n\nQuechua Chanka:"
+            inputs = tokenizer(fallback_prompt, return_tensors="pt", truncation=True).to(model.device)
+        with torch.inference_mode():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=args.max_new_tokens,
+                do_sample=False,
+                eos_token_id=tokenizer.eos_token_id,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+        prompt_len = inputs["input_ids"].shape[-1]
+        predictions.append(gspo.strip_chat_artifacts(tokenizer.decode(outputs[0][prompt_len:], skip_special_tokens=True)))
         print(f"generated {len(predictions)}/{len(rows)}", flush=True)
     return predictions
 
@@ -193,6 +242,8 @@ def main() -> None:
         predictions = generate_nllb(args, rows)
     elif args.backend == "seq2seq-chat":
         predictions = generate_seq2seq_chat(args, rows)
+    elif args.backend == "causal-chat":
+        predictions = generate_causal_chat(args, rows)
     else:
         predictions = generate_translategemma(args, rows)
 
