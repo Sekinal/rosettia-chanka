@@ -42,6 +42,7 @@ REWARD_PROFILES = (
     "learned_verifier_vibe_2511",
     "learned_verifier_ensemble_vibe_2511",
     "learned_verifier_bleu_margin_vibe_2511",
+    "reference_rerank_vibe_v1",
 )
 SPANISH_STOPWORDS = {
     "el",
@@ -477,6 +478,30 @@ def baseline_reward_score(
     )
 
 
+def reference_rerank_metric_score(
+    hypothesis: str,
+    reference: str,
+    source: str | None,
+    chrf: float,
+    bleu: float,
+    f1: float,
+    length_score: float,
+) -> float:
+    """Reference-aware score inspired by K-sample oracle reranking headroom."""
+    exact_copy = 1.0 if exact_source_copy(hypothesis, source) else 0.0
+    return (
+        (0.44 * chrf)
+        + (0.14 * bleu)
+        + (0.24 * f1)
+        + (0.08 * length_score)
+        - (0.25 * source_copy_ratio(hypothesis, source))
+        - (0.40 * exact_copy)
+        - (0.22 * spanish_leakage_penalty(hypothesis))
+        - (0.35 * chat_artifact_penalty(hypothesis))
+        - (0.12 * repetition_penalty(hypothesis))
+    )
+
+
 def reward_score(
     hypothesis: str,
     reference: str,
@@ -556,6 +581,8 @@ def reward_score(
         quality = (0.34 * chrf) + (0.24 * f1) + (0.08 * bleu)
         guards = (0.12 * length_score) + (0.08 * entity_score) + (0.10 * anti_copy) + (0.08 * anti_leakage)
         return quality + guards - (0.30 * severity) - (0.20 * repetition) - (0.25 * artifacts)
+    if profile == "reference_rerank_vibe_v1":
+        return reference_rerank_metric_score(hypothesis, reference, source, chrf, bleu, f1, length_score)
     return baseline_score
 
 
@@ -767,7 +794,7 @@ def chanka_reward(
         hypothesis = completion_text(completion)
         hypotheses.append(hypothesis)
         rewards.append(reward_score(hypothesis, reference, source_text, active_profile))
-    if active_profile in {"vibethinker_2511", "mix_verifier_vibe"}:
+    if active_profile in {"vibethinker_2511", "mix_verifier_vibe", "reference_rerank_vibe_v1"}:
         rewards = add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
     return rewards
 

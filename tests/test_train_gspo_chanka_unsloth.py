@@ -207,6 +207,7 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             "learned_verifier_2511",
             "learned_verifier_vibe_2511",
             "learned_verifier_bleu_margin_vibe_2511",
+            "reference_rerank_vibe_v1",
         }
 
         self.assertTrue(expected.issubset(set(train_gspo.REWARD_PROFILES)))
@@ -226,6 +227,25 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
                 "Allin punchaw kamachiq.",
                 "Buenos dias autoridad.",
                 "rosettia_guard_v2",
+            )
+
+        self.assertGreater(translated, copied)
+
+    def test_reference_rerank_metric_profile_penalizes_source_copy(self):
+        with mock.patch.object(train_gspo, "sentence_chrfpp", return_value=0.7), mock.patch.object(
+            train_gspo, "sentence_bleu", return_value=0.3
+        ):
+            translated = train_gspo.reward_score(
+                "Allin punchaw kamachiq.",
+                "Allin punchaw kamachiq.",
+                "Buenos dias autoridad.",
+                "reference_rerank_vibe_v1",
+            )
+            copied = train_gspo.reward_score(
+                "Buenos dias autoridad.",
+                "Allin punchaw kamachiq.",
+                "Buenos dias autoridad.",
+                "reference_rerank_vibe_v1",
             )
 
         self.assertGreater(translated, copied)
