@@ -247,3 +247,58 @@ Decision:
 - K16 remains the better BLEU setting (`11.0872` vs `9.2082`). Because the project wants much higher BLEU too, this is not a complete replacement; keep both profiles depending on metric priority.
 - Matched K32 refitting over-selected late/high-index candidates and hurt BLEU, so keep using the K16-trained feature weights for K32 inference.
 - The K32 oracle is higher than K16 oracle but lower than mixed K32 oracle, so same-distribution K32 is a safer deployable gain while mixed/exploratory pools remain a selector research target.
+
+## 2026-05-22 Text-Aware Hashed Reranker
+
+Purpose: add source/candidate text modeling to the selector without needing sklearn/xgboost. The model is deployable: references are used only to train pairwise oracle-winner preferences, while inference uses only source text, candidate text, and reference-free group features.
+
+Code added:
+
+- `scripts/train_text_candidate_reranker.py`: online pairwise logistic ranker over hashed sparse features.
+- `scripts/generate_text_reranked_translations.py`: K-sampling deployment wrapper for the text-aware reranker.
+- `tests/test_train_text_candidate_reranker.py`
+- `tests/test_generate_text_reranked_translations.py`
+
+Feature families:
+
+- Existing numeric feature-reranker signals.
+- Candidate word n-grams and character n-grams.
+- Source-token to candidate-token cross features, e.g. a learnable `fiesta -> raymipim` style association.
+
+Same-distribution K32 result:
+
+- Train pool: `outputs/verifier_candidate_mining/20260522-train-k32-current-deployable-term-t065-p090/train_k32_predictions.jsonl`
+- Eval pool: `outputs/rerank_candidate_evals/20260522-current-deployable-k32-t065-p090-term/candidates_predictions.jsonl`
+- Model: `outputs/text_candidate_reranker_evals/20260522-text-ranker-train-k32-eval-k32-term/text_ranker_k32_model.json`
+
+| Method | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| previous K16 feature best | 28.5647 | 42.9352 | 11.0872 | 27.7860 | 2.0359 | 0.0000 | 84.1014 |
+| K32 numeric feature best | 28.6939 | 43.3398 | 9.2082 | 28.4464 | 2.0992 | 0.0000 | 82.9493 |
+| K32 text-aware reranker | 28.7980 | 43.0524 | 11.9903 | 28.8624 | 3.1646 | 0.0000 | 82.9493 |
+| K32 oracle | 40.1555 | 54.4572 | 22.0831 | 43.9097 | 2.5814 | 0.0000 | 66.8203 |
+
+K16 text-ranker result:
+
+- Output: `outputs/text_candidate_reranker_evals/20260522-text-ranker-train-k16-eval-k16-term`
+- Selection `28.5400`, chrF++ `42.2006`, BLEU `11.2813`, token F1 `29.4821`, TER `83.1797`.
+- Useful as a high-token-F1/BLEU-ish profile, but it does not beat K32 text overall.
+
+Transfer checks:
+
+- K32-trained text model on mixed K32: selection `27.7533`, chrF++ `41.1096`, BLEU `11.8041`, TER `84.5622`.
+- K32-trained text model on current K16 + soup K8: selection `27.3980`, chrF++ `40.8253`, BLEU `12.2599`, TER `84.1014`.
+- These transfer runs improve BLEU but lose too much chrF++/selection. The text model should be used on same-distribution conservative K32 candidates for now.
+
+Deployment smoke:
+
+- Output: `outputs/manual_inference_smokes/20260522-text-reranked-smoke`
+- K4 smoke command used the K32-trained text model and current adapter.
+- `Yo vivo en Quinua` -> `Quinua llaqtapim kawsani`
+- `Tengo 45 años` -> `45 watayuqmi kani`
+
+Decision:
+
+- K32 text-aware reranking is the new best deployable overall profile because it improves selection, BLEU, token F1, and TER over the previous K16 feature best.
+- K32 numeric feature reranking remains the chrF++ best (`43.3398` vs text `43.0524`).
+- The remaining oracle gap is still large: K32 oracle reaches selection `40.1555`, chrF++ `54.4572`, BLEU `22.0831`. Text-aware selection is progress, not the finish line.

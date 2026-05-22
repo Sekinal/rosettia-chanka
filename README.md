@@ -106,8 +106,24 @@ The glossary is kept separate from sentence-pair training data. It is useful for
 
 ## Feature-Reranked Inference
 
-The current best deployment path samples multiple candidates from the trained adapter and selects one with the feature reranker.
-K32 is the current best chrF++/selection/TER setting; K16 remains the better BLEU setting.
+The current best deployment path samples multiple candidates from the trained adapter and selects one with a reranker. The strongest overall deployable selector is now the text-aware K32 reranker. The numeric feature K32 selector still has the highest chrF++ setting.
+
+```bash
+python scripts/generate_text_reranked_translations.py \
+  --adapter-path outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8 \
+  --model-json outputs/text_candidate_reranker_evals/20260522-text-ranker-train-k32-eval-k32-term/text_ranker_k32_model.json \
+  --input-path sources.txt \
+  --output-jsonl predictions.jsonl \
+  --candidates-jsonl candidates.jsonl \
+  --num-return-sequences 32 \
+  --temperature 0.65 \
+  --top-p 0.90 \
+  --top-k 50 \
+  --terminology-file clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet \
+  --terminology-top-k 1
+```
+
+The numeric feature-reranked command remains useful when optimizing for chrF++ specifically:
 
 ```bash
 python scripts/generate_feature_reranked_translations.py \
