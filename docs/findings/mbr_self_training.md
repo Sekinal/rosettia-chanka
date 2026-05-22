@@ -55,3 +55,52 @@ Conclusion:
   - lower LR or fewer steps,
   - or train a selector/verifier from MBR/oracle features instead of directly imitating MBR pseudo-labels.
 
+## 2026-05-22 Clean-Anchor + MBR K8 Canary
+
+Purpose: test the main flaw in the pseudo-only run by mixing clean Chanka reference anchors with MBR pseudo-labels.
+
+Code added:
+
+- `scripts/build_mixed_sft_jsonl.py`: builds one JSONL file with a common `target` field from clean Chanka train anchors plus pseudo-label JSONL files.
+- `tests/test_build_mixed_sft_jsonl.py`: covers pseudo target normalization, clean-anchor precedence over duplicate pseudo rows, and JSONL writing.
+
+Mixed data:
+
+- Pseudo source: `outputs/mbr_self_training_data/20260522-k8-train512/mbr_train_mbr_predictions.jsonl`
+- Mixed output: `outputs/mbr_self_training_data/20260522-k8-train512/mixed_clean_anchors_mbr_target.jsonl`
+- Builder rows: 1,003 total
+  - 510 clean anchors
+  - 493 MBR pseudo-labels
+- Trainer rows after copy/leakage/artifact filters: 998
+  - 849 train
+  - 149 validation
+
+SFT setup:
+
+- Start adapter: `outputs/gspo_paper_profiles/2511_learned_verifier_vibe_on_vibe896_4gen_canary_20260521-133146/chanka_gspo/final_gspo_lora`
+- Output: `outputs/mbr_self_training_sft/20260522-k8-train512-mixed-clean512-from-current-best-lr1e-6-64steps`
+- LR: `1e-6`
+- Max steps: `64`
+- Batch: per-device `4`, gradient accumulation `2`
+- Validation/save: every `8` optimizer steps
+
+Held-out clean Chanka eval:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-48` | 25.9369 | 40.5448 | 8.1424 | 25.7731 | 2.8270 | 0.6329 | 89.1705 |
+| `checkpoint-56` | 25.6320 | 40.4837 | 5.8668 | 25.8258 | 2.6688 | 0.6329 | 89.1705 |
+| `checkpoint-64` | 25.0994 | 39.8556 | 5.6166 | 25.4461 | 2.7215 | 0.6329 | 90.3226 |
+| `final_lora` | 25.6320 | 40.4837 | 5.8668 | 25.8258 | 2.6688 | 0.6329 | 89.1705 |
+
+Terminology-prompt eval on best mixed checkpoint:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-48` + terminology top-1 | 26.2287 | 40.6787 | 8.6205 | 26.1684 | 2.8270 | 0.4747 | 88.2488 |
+
+Conclusion:
+
+- Clean anchors fixed the severe BLEU collapse seen in pseudo-only self-training, but still did not beat the standing best overall.
+- The terminology-prompt wrapper on mixed `checkpoint-48` gives the highest BLEU seen in these triage runs (`8.6205`), but selection and chrF++ remain below the previous terminology-prompt best.
+- Do not scale this exact K8 mixed recipe. The next MBR/self-training variant should use higher-confidence pseudo-labels, likely from the K16 conservative pool or a consensus-thresholded builder, before any longer SFT continuation.
