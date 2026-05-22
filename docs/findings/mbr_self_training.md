@@ -282,8 +282,77 @@ Terminology-prompt eval on the close checkpoint:
 
 Conclusion:
 
-- This is the new deployable best as of 2026-05-22.
-- Use `outputs/mbr_self_training_sft/20260522-k16-fullterm-margin000-clean512-lr4e-7-32steps/checkpoint-32` with terminology top-1 inference.
+- This became the deployable best at the time, but is superseded by the non-terminology candidate-pool follow-up below.
+- Superseded adapter: `outputs/mbr_self_training_sft/20260522-k16-fullterm-margin000-clean512-lr4e-7-32steps/checkpoint-32` with terminology top-1 inference.
 - It beats the previous deployable best (`26.5515` vs `26.4760` selection) mainly through BLEU (`9.4839` vs `8.9872`) and lower TER (`88.0184` vs `88.4793`), while chrF++ is slightly lower than the previous checkpoint-40 terminology eval (`40.8942` vs `41.0961`).
 - Do not use `final_lora`; it reverted to the checkpoint-24 behavior.
 - The broader terminology-mined pseudo-label pool is useful only with a very low continuation LR and early checkpoint selection. More steps or stricter MBR-margin filtering are not justified by this result.
+
+### Full-Train New-Best Non-Terminology MBR Follow-Up
+
+Purpose: test whether the improved checkpoint from the full-train terminology-MBR run can generate a better non-terminology K16 pseudo-label pool. This isolates the policy distribution from terminology-prompt candidate generation, because high-margin filtering behaved badly on the terminology-mined pool.
+
+Candidate generation:
+
+- Adapter: `outputs/mbr_self_training_sft/20260522-k16-fullterm-margin000-clean512-lr4e-7-32steps/checkpoint-32`
+- Terminology prompting: none
+- Split: full train split, 897 rows
+- Sampling: K16, temperature `0.65`, top-p `0.90`, top-k `50`
+- Candidate pool: `outputs/verifier_candidate_mining/20260522-train-k16-full-newbest-noterm-t065-p090/train_k16_predictions.jsonl`
+
+Reference-aware pool diagnostics:
+
+| Selector/filter | Rows/groups | Selection | chrF++ | BLEU | token F1 | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| All candidates | 14,352 candidates | - | 39.8951 | 8.9216 | 23.7855 | 0.2375 | 90.5610 |
+| First candidate | 886 groups | 25.6169 | 39.8136 | 8.0786 | 24.2197 | 0.2822 | 89.4652 |
+| Unfiltered MBR | 886 groups | 27.0672 | 41.9230 | 8.2642 | 25.0538 | 0.1411 | 89.5057 |
+| Oracle | 886 groups | 36.1985 | 51.1360 | 17.1928 | 36.4736 | 0.0282 | 70.7861 |
+| Filter-only margin `0.000` | 867 kept | 27.3825 | 41.9044 | 8.1874 | 24.9884 | 0.0000 | 89.5436 |
+| Margin `0.005` | 408 kept | 23.0017 | 37.4351 | 3.6855 | 19.3891 | 0.0000 | 97.7835 |
+| Margin `0.010` | 323 kept | 23.3561 | 37.9059 | 4.3072 | 20.1528 | 0.0000 | 98.4530 |
+| Margin `0.020` | 212 kept | 23.0346 | 37.8563 | 4.8105 | 19.0160 | 0.0000 | 99.3443 |
+| Margin `0.030` | 123 kept | 23.2715 | 38.6491 | 4.8563 | 18.9378 | 0.0000 | 101.2012 |
+
+Observation: high MBR-score margin again selected bad rows. The only useful subset was filter-only margin `0.000`, which removed copy/leakage/artifact failures while keeping most groups.
+
+SFT setup:
+
+- Pseudo-labels used: full-train new-best non-terminology MBR, filter-only margin `0.000`
+- Mixed data: `outputs/mbr_self_training_data/20260522-k16-full-newbest-noterm-t065-p090/mixed_clean512_confident_margin000_target.jsonl`
+- Builder rows: 1332 total
+  - 510 clean anchors
+  - 822 pseudo-labels after dedupe
+- Trainer rows after filters: 1332 total
+  - 1133 train
+  - 199 validation
+- Output: `outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-lr3e-7-32steps`
+- Starting adapter: `outputs/mbr_self_training_sft/20260522-k16-fullterm-margin000-clean512-lr4e-7-32steps/checkpoint-32`
+- LR: `3e-7`
+- Max steps: `32`
+- Batch: per-device `4`, gradient accumulation `2`
+- Validation/save: every `8` optimizer steps
+
+Held-out clean Chanka eval:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-16` | 25.5624 | 40.4161 | 5.9737 | 25.5817 | 2.6688 | 0.4747 | 89.6313 |
+| `checkpoint-24` | 26.6394 | 41.1437 | 9.1801 | 26.5728 | 2.8270 | 0.4747 | 88.0184 |
+| `checkpoint-32` | 26.3009 | 41.1277 | 6.8091 | 26.4447 | 2.6688 | 0.4747 | 87.7880 |
+| `final_lora` | 26.3009 | 41.1277 | 6.8091 | 26.4447 | 2.6688 | 0.4747 | 87.7880 |
+
+Terminology-prompt eval:
+
+| Adapter | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-24` + terminology top-1 | 26.8011 | 41.3017 | 9.5399 | 26.6291 | 2.8270 | 0.4747 | 87.5576 |
+| `checkpoint-32` + terminology top-1 | 26.3438 | 41.1735 | 7.1561 | 26.2071 | 2.6688 | 0.4747 | 87.3272 |
+
+Conclusion:
+
+- This is the new deployable best as of 2026-05-22.
+- Use `outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-lr3e-7-32steps/checkpoint-24` with terminology top-1 inference.
+- It improves over the previous deployable best on selection (`26.8011` vs `26.5515`), chrF++ (`41.3017` vs `40.8942`), BLEU (`9.5399` vs `9.4839`), token F1 (`26.6291` vs `26.3462`), and TER (`87.5576` vs `88.0184`).
+- Do not use `checkpoint-32` or `final_lora`; both lose the BLEU gain from checkpoint-24.
+- Future MBR self-training should stop treating MBR margin as confidence on these pools. The better rule so far is broad filter-only MBR plus low-LR continuation and early checkpoint selection.
