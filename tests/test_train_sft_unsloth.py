@@ -33,6 +33,11 @@ class TrainSftUnslothTests(unittest.TestCase):
 
         self.assertEqual(args.stage, "chanka")
 
+    def test_sft_cli_accepts_hymt2_prompt_style(self):
+        args = train_sft.parse_args(["--stage", "chanka", "--prompt-style", "hymt2"])
+
+        self.assertEqual(args.prompt_style, "hymt2")
+
     def test_chanka_stage_defaults_use_measured_context_and_batch(self):
         args = argparse.Namespace(
             stage="chanka",
@@ -120,7 +125,9 @@ class TrainSftUnslothTests(unittest.TestCase):
             "variant": "quy/chanka",
         }
 
-        formatted = train_sft.format_example(tokenizer, "chanka", row)
+        args = train_sft.parse_args(["--stage", "chanka"])
+
+        formatted = train_sft.format_example(tokenizer, args, row)
 
         self.assertIn("quechua chanka", formatted["text"])
         self.assertIn("Buenos dias.", formatted["text"])
@@ -128,6 +135,23 @@ class TrainSftUnslothTests(unittest.TestCase):
         self.assertEqual(formatted["variant"], "quy/chanka")
         self.assertFalse(tokenizer.tokenize)
         self.assertFalse(tokenizer.add_generation_prompt)
+
+    def test_hymt2_format_uses_user_only_translation_prompt(self):
+        tokenizer = DummyTokenizer()
+        row = {
+            "source": "Buenos dias.",
+            "target": "Allin punchaw.",
+            "source_name": "manual",
+            "variant": "quy/chanka",
+        }
+        args = train_sft.parse_args(["--stage", "chanka", "--prompt-style", "hymt2"])
+
+        formatted = train_sft.format_example(tokenizer, args, row)
+
+        self.assertEqual([message["role"] for message in tokenizer.messages], ["user", "assistant"])
+        self.assertIn("Translate the following text into Quechua Chanka", tokenizer.messages[0]["content"])
+        self.assertIn("Buenos dias.", formatted["text"])
+        self.assertIn("Allin punchaw.", formatted["text"])
 
     def test_response_marker_parts_supports_qwen_template(self):
         tokenizer = DummyTokenizer("<|im_start|>user\nusr<|im_start|>assistant\nast")
@@ -151,6 +175,14 @@ class TrainSftUnslothTests(unittest.TestCase):
         self.assertEqual(
             train_sft.response_marker_parts(tokenizer),
             ("<｜hy_User｜>", "<｜hy_Assistant｜>"),
+        )
+
+    def test_response_marker_parts_supports_hymt2_7b_template(self):
+        tokenizer = DummyTokenizer("<|startoftext|>system<|extra_4|>user<|extra_0|>assistant<|eos|>")
+
+        self.assertEqual(
+            train_sft.response_marker_parts(tokenizer),
+            ("<|extra_4|>", "<|extra_0|>"),
         )
 
 

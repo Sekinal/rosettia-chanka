@@ -19,6 +19,19 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend", choices=["nllb", "seq2seq-chat", "causal-chat", "translategemma"], required=True)
     parser.add_argument("--model-id", required=True)
+    parser.add_argument(
+        "--adapter-path",
+        type=Path,
+        default=None,
+        help="Optional PEFT/LoRA adapter to attach before generation.",
+    )
+    parser.add_argument(
+        "--prompt-style",
+        choices=["generic", "hymt2"],
+        default="generic",
+        help="Prompt protocol for chat baselines. Hy-MT2 uses its model-card translation prompt and no system role.",
+    )
+    parser.add_argument("--target-language-name", default="Quechua Chanka")
     parser.add_argument("--dataset-repo", default=gspo.DATASET_REPO)
     parser.add_argument("--dataset-file", default=gspo.CHANKA_FILE)
     parser.add_argument("--split", choices=["eval", "train", "all"], default="eval")
@@ -31,6 +44,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--source-lang", default="spa_Latn")
     parser.add_argument("--target-lang", default="quy_Latn")
     parser.add_argument("--torch-dtype", choices=["auto", "float16", "bfloat16", "float32"], default="auto")
+    parser.add_argument("--do-sample", action="store_true")
+    parser.add_argument("--temperature", type=float, default=None)
+    parser.add_argument("--top-p", type=float, default=None)
+    parser.add_argument("--top-k", type=int, default=None)
+    parser.add_argument("--repetition-penalty", type=float, default=None)
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--predictions-jsonl", type=Path, default=None)
     return parser.parse_args(argv)
@@ -64,6 +82,14 @@ def torch_dtype(name: str):
     return "auto"
 
 
+def attach_adapter_if_requested(model, adapter_path: Path | None):
+    if adapter_path is None:
+        return model
+    from peft import PeftModel
+
+    return PeftModel.from_pretrained(model, adapter_path)
+
+
 def generate_nllb(args: argparse.Namespace, rows: list[dict[str, str]]) -> list[str]:
     import torch
     from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -74,6 +100,7 @@ def generate_nllb(args: argparse.Namespace, rows: list[dict[str, str]]) -> list[
         device_map="auto",
         torch_dtype=torch_dtype(args.torch_dtype),
     )
+    model = attach_adapter_if_requested(model, args.adapter_path)
     tokenizer.src_lang = args.source_lang
     forced_bos_token_id = tokenizer.convert_tokens_to_ids(args.target_lang)
     if forced_bos_token_id is None or forced_bos_token_id < 0:
@@ -112,12 +139,42 @@ def seq2seq_prompt(source: str) -> list[dict[str, str]]:
     ]
 
 
-def causal_translation_prompt(source: str) -> str:
+def causal_translation_prompt(source: str, target_language_name: str = "Quechua Chanka") -> str:
     return (
-        "Translate the following Spanish text into Quechua Chanka. "
+        f"Translate the following Spanish text into {target_language_name}. "
         "Only output the translated result without any explanation:\n\n"
         f"{source}"
     )
+
+
+def hymt2_translation_prompt(source: str, target_language_name: str) -> str:
+    return (
+        f"Translate the following text into {target_language_name}. "
+        "Note that you should only output the translated result without any additional explanation:\n\n"
+        f"{source}"
+    )
+
+
+def causal_messages(args: argparse.Namespace, source: str) -> list[dict[str, str]]:
+    if args.prompt_style == "hymt2":
+        return [{"role": "user", "content": hymt2_translation_prompt(source, args.target_language_name)}]
+    return [
+        {"role": "system", "content": "You are a translation engine. Return only the final translation."},
+        {"role": "user", "content": causal_translation_prompt(source, args.target_language_name)},
+    ]
+
+
+def generation_kwargs(args: argparse.Namespace) -> dict[str, object]:
+    kwargs: dict[str, object] = {"max_new_tokens": args.max_new_tokens, "do_sample": args.do_sample}
+    if args.temperature is not None:
+        kwargs["temperature"] = args.temperature
+    if args.top_p is not None:
+        kwargs["top_p"] = args.top_p
+    if args.top_k is not None:
+        kwargs["top_k"] = args.top_k
+    if args.repetition_penalty is not None:
+        kwargs["repetition_penalty"] = args.repetition_penalty
+    return kwargs
 
 
 def gemma4_model_id(model_id: str) -> bool:
@@ -143,6 +200,7 @@ def generate_seq2seq_chat(args: argparse.Namespace, rows: list[dict[str, str]]) 
         device_map="auto",
         torch_dtype=torch_dtype(args.torch_dtype),
     )
+    model = attach_adapter_if_requested(model, args.adapter_path)
     predictions: list[str] = []
     for row in rows:
         if getattr(tokenizer, "chat_template", None):
@@ -182,15 +240,12 @@ def generate_causal_chat(args: argparse.Namespace, rows: list[dict[str, str]]) -
         torch_dtype=torch_dtype(args.torch_dtype),
         trust_remote_code=True,
     )
+    model = attach_adapter_if_requested(model, args.adapter_path)
     if tokenizer is not None and tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     predictions: list[str] = []
     for row in rows:
-        prompt = causal_translation_prompt(row["source"])
-        messages = [
-            {"role": "system", "content": "You are a translation engine. Return only the final translation."},
-            {"role": "user", "content": prompt},
-        ]
+        messages = causal_messages(args, row["source"])
         if processor is not None:
             text = processor.apply_chat_template(
                 messages,
@@ -223,19 +278,18 @@ def generate_causal_chat(args: argparse.Namespace, rows: list[dict[str, str]]) -
             eos_token_id = tokenizer.eos_token_id
             pad_token_id = tokenizer.eos_token_id
         else:
-            fallback_prompt = f"{prompt}\n\nQuechua Chanka:"
+            fallback_prompt = messages[-1]["content"]
+            if args.prompt_style != "hymt2":
+                fallback_prompt = f"{fallback_prompt}\n\n{args.target_language_name}:"
             inputs = tokenizer(fallback_prompt, return_tensors="pt", truncation=True).to(model.device)
             decode = lambda generated: tokenizer.decode(generated, skip_special_tokens=True)
             eos_token_id = tokenizer.eos_token_id
             pad_token_id = tokenizer.eos_token_id
+        kwargs = generation_kwargs(args)
+        kwargs["eos_token_id"] = eos_token_id
+        kwargs["pad_token_id"] = pad_token_id
         with torch.inference_mode():
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=args.max_new_tokens,
-                do_sample=False,
-                eos_token_id=eos_token_id,
-                pad_token_id=pad_token_id,
-            )
+            outputs = model.generate(**inputs, **kwargs)
         prompt_len = inputs["input_ids"].shape[-1]
         predictions.append(gspo.strip_chat_artifacts(decode(outputs[0][prompt_len:])))
         print(f"generated {len(predictions)}/{len(rows)}", flush=True)
@@ -301,10 +355,18 @@ def main() -> None:
         {
             "backend": args.backend,
             "model_id": args.model_id,
+            "adapter_path": str(args.adapter_path) if args.adapter_path else None,
+            "prompt_style": args.prompt_style,
             "split": args.split,
             "eval_rows": len(rows),
             "source_lang": args.source_lang,
             "target_lang": args.target_lang,
+            "target_language_name": args.target_language_name,
+            "do_sample": args.do_sample,
+            "temperature": args.temperature,
+            "top_p": args.top_p,
+            "top_k": args.top_k,
+            "repetition_penalty": args.repetition_penalty,
         }
     )
     args.output_json.parent.mkdir(parents=True, exist_ok=True)

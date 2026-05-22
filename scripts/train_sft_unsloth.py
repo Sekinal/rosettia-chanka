@@ -38,6 +38,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--model-id", default=DEFAULT_MODEL_ID)
     parser.add_argument(
+        "--prompt-style",
+        choices=["generic", "hymt2"],
+        default="generic",
+        help="Chat prompt protocol for SFT examples. Hy-MT2 uses a user-only translation prompt.",
+    )
+    parser.add_argument("--target-language-name", default=None)
+    parser.add_argument(
         "--adapter-method",
         choices=["lora", "dora", "rslora"],
         default="lora",
@@ -214,6 +221,12 @@ def configure_step_schedule(args: argparse.Namespace, train_row_count: int) -> N
         args.save_steps = args.eval_steps
 
 
+def target_language_name_for(stage: str, override: str | None) -> str:
+    if override:
+        return override
+    return "Quechua Chanka" if stage == "chanka" else "Quechua"
+
+
 def instruction_for(stage: str) -> str:
     if stage == "chanka":
         return (
@@ -223,15 +236,31 @@ def instruction_for(stage: str) -> str:
     return "Traduce del español al quechua. Conserva el significado y no copies el español."
 
 
-def format_example(tokenizer, stage: str, row: dict[str, str]) -> dict[str, str]:
-    messages = [
+def hymt2_user_prompt(source: str, target_language_name: str) -> str:
+    return (
+        f"Translate the following text into {target_language_name}. "
+        "Note that you should only output the translated result without any additional explanation:\n\n"
+        f"{source}"
+    )
+
+
+def messages_for_example(args: argparse.Namespace, row: dict[str, str]) -> list[dict[str, str]]:
+    if args.prompt_style == "hymt2":
+        return [
+            {"role": "user", "content": hymt2_user_prompt(row["source"], target_language_name_for(args.stage, args.target_language_name))},
+            {"role": "assistant", "content": row["target"]},
+        ]
+    return [
         {"role": "system", "content": "Eres un traductor profesional español-quechua."},
-        {"role": "user", "content": f"{instruction_for(stage)}\n\nEspañol: {row['source']}"},
+        {"role": "user", "content": f"{instruction_for(args.stage)}\n\nEspañol: {row['source']}"},
         {"role": "assistant", "content": row["target"]},
     ]
+
+
+def format_example(tokenizer, args: argparse.Namespace, row: dict[str, str]) -> dict[str, str]:
     return {
         "text": tokenizer.apply_chat_template(
-            messages,
+            messages_for_example(args, row),
             tokenize=False,
             add_generation_prompt=False,
         ),
@@ -252,6 +281,8 @@ def response_marker_parts(tokenizer) -> tuple[str, str]:
     )
     if "<｜hy_User｜>" in probe and "<｜hy_Assistant｜>" in probe:
         return "<｜hy_User｜>", "<｜hy_Assistant｜>"
+    if "<|extra_4|>" in probe and "<|extra_0|>" in probe:
+        return "<|extra_4|>", "<|extra_0|>"
     if "<|turn>user\n" in probe and "<|turn>model\n" in probe:
         return "<|turn>user\n", "<|turn>model\n"
     if "<|im_start|>user\n" in probe and "<|im_start|>assistant\n" in probe:
@@ -259,8 +290,8 @@ def response_marker_parts(tokenizer) -> tuple[str, str]:
     raise ValueError("Unsupported chat template for response-only SFT masking")
 
 
-def build_dataset(tokenizer, stage: str, rows: Iterable[dict[str, str]]) -> Dataset:
-    return Dataset.from_list([format_example(tokenizer, stage, row) for row in rows])
+def build_dataset(tokenizer, args: argparse.Namespace, rows: Iterable[dict[str, str]]) -> Dataset:
+    return Dataset.from_list([format_example(tokenizer, args, row) for row in rows])
 
 
 def main() -> None:
@@ -321,8 +352,8 @@ def main() -> None:
             **peft_kwargs,
         )
 
-    train_dataset = build_dataset(tokenizer, args.stage, train_rows)
-    eval_dataset = build_dataset(tokenizer, args.stage, eval_rows)
+    train_dataset = build_dataset(tokenizer, args, train_rows)
+    eval_dataset = build_dataset(tokenizer, args, eval_rows)
     configure_step_schedule(args, len(train_dataset))
 
     trainer = SFTTrainer(
@@ -375,6 +406,7 @@ def main() -> None:
     print(f"Train rows: {len(train_dataset):,}")
     print(f"Validation rows: {len(eval_dataset):,}")
     print(f"Stage: {args.stage}")
+    print(f"Prompt style: {args.prompt_style}")
     print(f"Adapter method: {args.adapter_method}")
     print(f"Model or adapter: {model_name_or_adapter}")
     print(f"LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")

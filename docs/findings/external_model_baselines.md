@@ -29,6 +29,7 @@ All smokes used 5 rows from the clean Chanka validation split. These are not ful
 | Model | Backend | chrF++ | BLEU | Token F1 | Outcome |
 | --- | --- | ---: | ---: | ---: | --- |
 | `tencent/Hy-MT2-1.8B` | `causal-chat` | `12.6362` | `2.8117` | `0.0` | Not Chanka; mixed Spanish/other-language-looking output. |
+| `tencent/Hy-MT2-7B` | `causal-chat`, `hymt2` prompt | `8.5036` | `2.1364` | `0.0` | Not Chanka; source-copied Spanish under both `Quechua Chanka` and `Quechua` target names. |
 | `google/gemma-4-E2B-it` | `causal-chat` with Gemma 4 processor | `8.2584` | `3.8436` | `0.0` | Malformed/repetitive Chanka-like output. |
 | `google/gemma-4-E4B-it` | `causal-chat` with Gemma 4 processor | `13.5899` | `4.4485` | `0.0` | Cleaner Chanka-like text than E2B, but semantically poor. |
 | `google/translategemma-4b-it` | `translategemma`, `es -> qu` | `2.4792` | `3.6688` | `0.0` | Invalid for our target; generated Devanagari-like text. |
@@ -41,7 +42,10 @@ Earlier full baseline:
 ## Implementation Notes
 
 - `scripts/evaluate_translation_baseline.py` now supports `causal-chat` models.
+- `scripts/evaluate_translation_baseline.py` supports `--adapter-path`, `--prompt-style hymt2`, target-language names, and generation knobs. Use this for evaluating non-Qwen LoRA adapters with the same external metrics as base models.
 - Gemma 4 models require the processor/chat-template path with `enable_thinking=False`; the tokenizer-only path leaked thinking artifacts.
+- HF model search on 2026-05-22 showed current Google Gemma 4 entries including `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`, `google/gemma-4-26B-A4B-it`, and `google/gemma-4-31B-it`. Current Hy-MT2 entries include `tencent/Hy-MT2-1.8B`, `tencent/Hy-MT2-7B`, and `tencent/Hy-MT2-30B-A3B`.
+- The official Hy-MT2 documentation says the family supports 33 languages and lists Spanish, but not Quechua. It also recommends a user-only translation prompt, so zero-shot and SFT tests should use `--prompt-style hymt2` rather than the generic system prompt.
 - `tencent/Hy-MT2-1.8B` loaded with Transformers 5.5 but its model card supports Spanish and many major languages, not Quechua/Chanka. Treat it as a possible SFT base only, not a zero-shot Chanka translator.
 - TranslateGemma supports 55 languages and raises on unsupported chat-template language codes in principle, but `qu` produced non-Quechua output here. Do not full-evaluate it unless a verified Quechua/Chanka code or alternate prompt is found.
 - T5Gemma became accessible after the newer HF token was installed on the remote. The 5-row smoke wrote `outputs/external_baselines/t5gemma_2_270m_5row_after_auth_metrics.json` and remained very weak: chrF++ `8.5113`, BLEU `0.3152`, token F1 `0.0`, Spanish leakage `5.3140%`, TER `714.2857`.
@@ -93,6 +97,56 @@ Hy-MT2 1.8B SFT smoke:
 Result: passed with validation enabled and wrote `outputs/smoke_hymt2_1_8b_chanka_lora2/chanka/final_lora`. Unsloth recognizes this model as `Hunyuan_V1_Dense`. Final smoke eval loss was `6.7444`.
 
 Important fix: response-only SFT masking must also detect Hy-MT2 markers `"<｜hy_User｜>"` and `"<｜hy_Assistant｜>"`.
+
+Hy-MT2 7B SFT smoke:
+
+```bash
+.venv/bin/python scripts/train_sft_unsloth.py \
+  --stage chanka \
+  --model-id tencent/Hy-MT2-7B \
+  --prompt-style hymt2 \
+  --target-language-name "Quechua Chanka" \
+  --max-train-samples 16 \
+  --max-eval-samples 4 \
+  --max-steps 2 \
+  --eval-steps 1 \
+  --save-steps 1 \
+  --per-device-train-batch-size 1 \
+  --per-device-eval-batch-size 1 \
+  --gradient-accumulation-steps 1 \
+  --max-seq-length 128 \
+  --learning-rate 2e-5 \
+  --lora-r 32 \
+  --lora-alpha 64 \
+  --output-dir outputs/smoke_hymt2_7b_chanka_hymt2prompt_lora_r32_s128_2steps
+```
+
+Result: passed with validation enabled and wrote `outputs/smoke_hymt2_7b_chanka_hymt2prompt_lora_r32_s128_2steps/chanka/final_lora`. Final smoke eval loss was `6.9954`, down from step-1 eval loss `7.230`.
+
+5-row adapter eval with the same Hy-MT2 prompt still source-copied Spanish:
+
+```bash
+.venv/bin/python scripts/evaluate_translation_baseline.py \
+  --backend causal-chat \
+  --model-id tencent/Hy-MT2-7B \
+  --adapter-path outputs/smoke_hymt2_7b_chanka_hymt2prompt_lora_r32_s128_2steps/chanka/final_lora \
+  --prompt-style hymt2 \
+  --target-language-name "Quechua Chanka" \
+  --max-eval-samples 5 \
+  --batch-size 1 \
+  --max-new-tokens 80 \
+  --torch-dtype bfloat16 \
+  --do-sample \
+  --temperature 0.1 \
+  --top-p 0.7 \
+  --top-k 20 \
+  --repetition-penalty 1.05 \
+  --output-json outputs/external_baselines/hymt2_7b_hymt2prompt_lora2step_5row_metrics.json
+```
+
+Metrics matched the base smoke: chrF++ `8.5036`, BLEU `2.1364`, token F1 `0.0`, source-copy `100.0%`, TER `171.4286`. This is only a wiring smoke, not evidence against a real broad-then-Chanka Hy-MT2 7B run.
+
+Important fix: Hy-MT2 7B response-only SFT masking must detect `"<|extra_4|>"` and `"<|extra_0|>"`. The earlier 1.8B markers are different.
 
 ## Gemma 4 E4B Chanka SFT
 
@@ -149,4 +203,4 @@ Qualitative pattern: the model stops emitting explanations and starts producing 
 
 ## Decision
 
-Gemma 4 E4B and Hy-MT2 can both be used with Unsloth after chat-marker fixes, but Gemma 4 E4B clean-Chanka SFT is not competitive with the current Qwen3.5 adapter. It does not justify replacing the Qwen base. If these families are revisited, they need broad Quechua SFT first, then clean Chanka SFT/GSPO, not clean Chanka alone.
+Gemma 4 E4B and Hy-MT2 can both be used with Unsloth after chat-marker fixes, but Gemma 4 E4B clean-Chanka SFT is not competitive with the current Qwen3.5 adapter and Hy-MT2 7B zero-shot source-copies Spanish. Neither justifies replacing the Qwen base from clean-Chanka-only results. If these families are revisited, they need broad Quechua SFT first, then clean Chanka SFT/GSPO, not clean Chanka alone.
