@@ -19,8 +19,24 @@ class TrainFeatureCandidateRerankerTests(unittest.TestCase):
         self.assertEqual(len(rows), 2)
         self.assertIn("mbr_score", rows[0].raw)
         self.assertIn("duplicate_rate", rows[0].raw)
+        self.assertIn("source_root_copy_ratio", rows[0].raw)
+        self.assertIn("terminology_target_coverage", rows[0].raw)
         self.assertEqual(rows[1].raw["exact_source_copy"], 1.0)
         self.assertGreaterEqual(rows[0].oracle_score, 0.0)
+
+    def test_source_root_copy_ratio_detects_suffix_copying(self):
+        ratio = feature_reranker.source_root_copy_ratio("En la fiesta", "Fiestapim")
+
+        self.assertEqual(ratio, 1.0)
+
+    def test_terminology_features_detect_target_coverage_and_source_root_leakage(self):
+        terminology = [("fiesta", "Raymi")]
+
+        covered = feature_reranker.terminology_features("En la fiesta", "Raymipim", terminology, 1)
+        leaked = feature_reranker.terminology_features("En la fiesta", "Fiestapi", terminology, 1)
+
+        self.assertEqual(covered, (1.0, 0.0))
+        self.assertEqual(leaked, (0.0, 1.0))
 
     def test_select_feature_prefers_high_weighted_candidate(self):
         group = [
@@ -59,6 +75,7 @@ class TrainFeatureCandidateRerankerTests(unittest.TestCase):
 
         model, diagnostics = feature_reranker.train_model(
             rows,
+            feature_names=feature_reranker.BASE_FEATURE_NAMES,
             seed=1,
             search_iterations=50,
             initial_noise=0.2,

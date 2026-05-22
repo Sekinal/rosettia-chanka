@@ -78,3 +78,36 @@ Next checks:
 
 - Add glossary-root leakage features such as `fiesta -> raymi` versus `fiestapi`, because current Spanish-leakage metrics miss Spanish roots with Quechua suffixes.
 - Consider a listwise/discriminative reranker after the feature baseline is stable.
+
+## 2026-05-22 Source-Root And Glossary Feature Ablations
+
+Purpose: test whether the feature reranker can directly penalize Spanish roots with Quechua suffixes, e.g. `En la fiesta -> Fiestapi`, and reward coverage of matched Chanka glossary targets.
+
+Code update:
+
+- `source_root_copy_ratio` detects source content-token prefix copying such as `fiesta -> Fiestapim`.
+- `terminology_target_coverage` and `terminology_source_root_leakage` can use the simple glossary to score whether matched source terms are translated with the expected Chanka term.
+- These features are opt-in via `--include-source-root-copy` and `--include-terminology-features`. The default feature set still reproduces the current best result.
+
+Default reproduction after the opt-in refactor:
+
+- Output: `outputs/feature_candidate_reranker_evals/20260522-feature-reranker-default-repro-after-feature-ablation`
+- Feature result: selection `28.5647`, chrF++ `42.9352`, BLEU `11.0872`, token F1 `27.7860`, TER `84.1014`.
+
+Source-root copy feature only:
+
+- Output: `outputs/feature_candidate_reranker_evals/20260522-feature-reranker-source-root-copy-eval-current-deployable-k16`
+- Feature result: selection `28.1603`, chrF++ `42.8616`, BLEU `9.7972`, token F1 `27.3957`, TER `85.7143`.
+- This is still stronger than MBR but worse than the current default feature reranker.
+
+Glossary terminology features:
+
+- Output: `outputs/feature_candidate_reranker_evals/20260522-feature-reranker-train-current-deployable-term-features-eval-current-deployable-k16`
+- Feature result: selection `27.8330`, chrF++ `42.4529`, BLEU `8.9455`, token F1 `26.9195`, TER `84.5622`.
+- The fitted model learned a negative weight for `terminology_target_coverage`, which is a sign that the current glossary matches are too sparse or distribution-mismatched for this held-out pool.
+
+Decision:
+
+- Do not enable source-root or glossary features for the current deployable reranker.
+- Keep the features in code as opt-in diagnostics for future richer terminology pools.
+- The better fix for `Fiestapi` is likely data generation or candidate generation with a glossary that actually includes `fiesta -> raymi`; the K16 candidate pool for `En la fiesta` contained only `Fiestapi`/`Fiestapim` variants, so no selector could choose `Raymipim`.

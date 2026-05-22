@@ -27,7 +27,7 @@ from scripts import train_gspo_chanka_unsloth as gspo
 from scripts.summarize_gspo_canaries import selection_score
 
 
-FEATURE_NAMES = [
+BASE_FEATURE_NAMES = [
     "mbr_score",
     "mbr_rank",
     "mbr_gap_to_best",
@@ -42,6 +42,12 @@ FEATURE_NAMES = [
     "target_token_count",
     "target_source_token_ratio",
 ]
+EXPERIMENTAL_FEATURE_NAMES = [
+    "source_root_copy_ratio",
+    "terminology_target_coverage",
+    "terminology_source_root_leakage",
+]
+FEATURE_NAMES = BASE_FEATURE_NAMES + EXPERIMENTAL_FEATURE_NAMES
 
 
 @dataclass(frozen=True)
@@ -69,6 +75,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--search-iterations", type=int, default=3000)
     parser.add_argument("--initial-noise", type=float, default=0.35)
     parser.add_argument("--min-noise", type=float, default=0.01)
+    parser.add_argument(
+        "--terminology-file",
+        default=None,
+        help="Optional dataset-repo parquet glossary used to add terminology coverage/leakage features.",
+    )
+    parser.add_argument("--dataset-repo", default=gspo.DATASET_REPO)
+    parser.add_argument("--terminology-top-k", type=int, default=6)
+    parser.add_argument("--terminology-min-source-chars", type=int, default=3)
+    parser.add_argument(
+        "--include-source-root-copy",
+        action="store_true",
+        help="Opt in to an experimental feature that penalizes source-token prefix copying such as fiesta -> Fiestapi.",
+    )
+    parser.add_argument(
+        "--include-terminology-features",
+        action="store_true",
+        help="Opt in to experimental glossary target-coverage and source-root leakage features.",
+    )
     parser.add_argument("--seed", type=int, default=3407)
     return parser.parse_args(argv)
 
@@ -85,9 +109,86 @@ def normalized_prediction(text: str) -> str:
     return gspo.normalize_text(text).lower()
 
 
-def feature_rows_for_group(group: Sequence[oracle_rerank.Candidate]) -> list[CandidateFeatures]:
+def significant_term_tokens(text: str) -> list[str]:
+    return [
+        token
+        for token in gspo.word_tokens(text)
+        if len(token) >= 4 and token.lower() not in gspo.SPANISH_STOPWORDS
+    ]
+
+
+def token_is_morphological_match(candidate_token: str, term_token: str) -> bool:
+    candidate_token = candidate_token.lower()
+    term_token = term_token.lower()
+    return candidate_token == term_token or candidate_token.startswith(term_token)
+
+
+def term_tokens_are_covered(candidate_tokens: Sequence[str], term: str) -> bool:
+    term_tokens = significant_term_tokens(term)
+    if not term_tokens:
+        return False
+    return all(
+        any(token_is_morphological_match(candidate_token, term_token) for candidate_token in candidate_tokens)
+        for term_token in term_tokens
+    )
+
+
+def terminology_features(
+    source: str,
+    prediction: str,
+    terminology_entries: Sequence[tuple[str, str]],
+    terminology_top_k: int,
+) -> tuple[float, float]:
+    selected = gspo.select_terminology(source, terminology_entries, terminology_top_k)
+    if not selected:
+        return 0.0, 0.0
+
+    prediction_tokens = [token.lower() for token in gspo.word_tokens(prediction)]
+    covered_targets = [
+        target_term
+        for _source_term, target_term in selected
+        if term_tokens_are_covered(prediction_tokens, target_term)
+    ]
+    target_coverage = len(covered_targets) / len(selected)
+    covered_target_keys = {target_term.lower() for target_term in covered_targets}
+
+    leaked_roots = 0
+    checked_roots = 0
+    for source_term, target_term in selected:
+        source_tokens = significant_term_tokens(source_term)
+        if not source_tokens:
+            continue
+        checked_roots += len(source_tokens)
+        if target_term.lower() in covered_target_keys:
+            continue
+        for source_token in source_tokens:
+            if any(token_is_morphological_match(prediction_token, source_token) for prediction_token in prediction_tokens):
+                leaked_roots += 1
+
+    source_root_leakage = leaked_roots / max(1, checked_roots)
+    return target_coverage, source_root_leakage
+
+
+def source_root_copy_ratio(source: str, prediction: str) -> float:
+    source_tokens = significant_term_tokens(source)
+    prediction_tokens = [token.lower() for token in gspo.word_tokens(prediction)]
+    if not source_tokens or not prediction_tokens:
+        return 0.0
+    copied = 0
+    for source_token in source_tokens:
+        if any(token_is_morphological_match(prediction_token, source_token) for prediction_token in prediction_tokens):
+            copied += 1
+    return copied / len(source_tokens)
+
+
+def feature_rows_for_group(
+    group: Sequence[oracle_rerank.Candidate],
+    terminology_entries: Sequence[tuple[str, str]] | None = None,
+    terminology_top_k: int = 0,
+) -> list[CandidateFeatures]:
     if not group:
         return []
+    terminology_entries = terminology_entries or []
     group_size = len(group)
     mbr_scores = [mbr.mbr_score(candidate, group) for candidate in group]
     best_mbr = max(mbr_scores)
@@ -105,6 +206,12 @@ def feature_rows_for_group(group: Sequence[oracle_rerank.Candidate]) -> list[Can
         source_tokens = gspo.word_tokens(candidate.source)
         target_count = len(target_tokens)
         source_count = max(1, len(source_tokens))
+        terminology_target_coverage, terminology_source_root_leakage = terminology_features(
+            candidate.source,
+            candidate.prediction,
+            terminology_entries,
+            terminology_top_k,
+        )
         raw = {
             "mbr_score": mbr_score,
             "mbr_rank": 1.0 - (ranks[candidate.candidate_index] / max_index),
@@ -112,10 +219,13 @@ def feature_rows_for_group(group: Sequence[oracle_rerank.Candidate]) -> list[Can
             "duplicate_rate": prediction_counts[normalized_prediction(candidate.prediction)] / group_size,
             "length_consensus": mbr.candidate_length_score(candidate, group),
             "source_copy_ratio": gspo.source_copy_ratio(candidate.prediction, candidate.source),
+            "source_root_copy_ratio": source_root_copy_ratio(candidate.source, candidate.prediction),
             "spanish_leakage_penalty": gspo.spanish_leakage_penalty(candidate.prediction),
             "chat_artifact_penalty": gspo.chat_artifact_penalty(candidate.prediction),
             "repetition_penalty": gspo.repetition_penalty(candidate.prediction),
             "exact_source_copy": 1.0 if gspo.exact_source_copy(candidate.prediction, candidate.source) else 0.0,
+            "terminology_target_coverage": terminology_target_coverage,
+            "terminology_source_root_leakage": terminology_source_root_leakage,
             "candidate_index_fraction": candidate.candidate_index / max_index,
             "target_token_count": float(target_count),
             "target_source_token_ratio": target_count / source_count,
@@ -124,15 +234,26 @@ def feature_rows_for_group(group: Sequence[oracle_rerank.Candidate]) -> list[Can
     return rows
 
 
-def featurize_groups(groups: Sequence[Sequence[oracle_rerank.Candidate]]) -> list[list[CandidateFeatures]]:
-    return [feature_rows_for_group(group) for group in groups if group]
+def featurize_groups(
+    groups: Sequence[Sequence[oracle_rerank.Candidate]],
+    terminology_entries: Sequence[tuple[str, str]] | None = None,
+    terminology_top_k: int = 0,
+) -> list[list[CandidateFeatures]]:
+    return [
+        feature_rows_for_group(group, terminology_entries, terminology_top_k)
+        for group in groups
+        if group
+    ]
 
 
-def normalization_stats(groups: Sequence[Sequence[CandidateFeatures]]) -> tuple[dict[str, float], dict[str, float]]:
+def normalization_stats(
+    groups: Sequence[Sequence[CandidateFeatures]],
+    feature_names: Sequence[str] = BASE_FEATURE_NAMES,
+) -> tuple[dict[str, float], dict[str, float]]:
     flat = [row for group in groups for row in group]
     means: dict[str, float] = {}
     stds: dict[str, float] = {}
-    for name in FEATURE_NAMES:
+    for name in feature_names:
         values = [row.raw[name] for row in flat]
         means[name] = statistics.fmean(values) if values else 0.0
         std = statistics.pstdev(values) if len(values) > 1 else 1.0
@@ -178,10 +299,13 @@ def initial_weights() -> dict[str, float]:
         "duplicate_rate": 0.05,
         "length_consensus": 0.10,
         "source_copy_ratio": -0.10,
+        "source_root_copy_ratio": -0.15,
         "spanish_leakage_penalty": -0.15,
         "chat_artifact_penalty": -0.20,
         "repetition_penalty": -0.08,
         "exact_source_copy": -0.15,
+        "terminology_target_coverage": 0.15,
+        "terminology_source_root_leakage": -0.25,
         "candidate_index_fraction": -0.03,
         "target_token_count": 0.0,
         "target_source_token_ratio": 0.0,
@@ -190,13 +314,15 @@ def initial_weights() -> dict[str, float]:
 
 def train_model(
     train_groups: Sequence[Sequence[CandidateFeatures]],
+    feature_names: Sequence[str],
     seed: int,
     search_iterations: int,
     initial_noise: float,
     min_noise: float,
 ) -> tuple[FeatureModel, dict[str, Any]]:
-    means, stds = normalization_stats(train_groups)
-    best = FeatureModel(FEATURE_NAMES[:], means, stds, initial_weights())
+    feature_names = list(feature_names)
+    means, stds = normalization_stats(train_groups, feature_names)
+    best = FeatureModel(feature_names, means, stds, initial_weights())
     best_objective = mean_oracle_objective(train_groups, best)
     rng = random.Random(seed)
     accepted = 0
@@ -206,12 +332,12 @@ def train_model(
         noise = max(min_noise, initial_noise * (1.0 - progress))
         weights = dict(best.weights)
         if rng.random() < 0.80:
-            feature = rng.choice(FEATURE_NAMES)
+            feature = rng.choice(feature_names)
             weights[feature] = weights.get(feature, 0.0) + rng.gauss(0.0, noise)
         else:
-            for feature in rng.sample(FEATURE_NAMES, k=min(3, len(FEATURE_NAMES))):
+            for feature in rng.sample(feature_names, k=min(3, len(feature_names))):
                 weights[feature] = weights.get(feature, 0.0) + rng.gauss(0.0, noise * 0.5)
-        proposal = FeatureModel(FEATURE_NAMES[:], means, stds, weights)
+        proposal = FeatureModel(feature_names, means, stds, weights)
         objective = mean_oracle_objective(train_groups, proposal)
         if objective > best_objective:
             best = proposal
@@ -222,7 +348,7 @@ def train_model(
         "accepted_updates": accepted,
         "initial_objective": mean_oracle_objective(
             train_groups,
-            FeatureModel(FEATURE_NAMES[:], means, stds, initial_weights()),
+            FeatureModel(feature_names, means, stds, initial_weights()),
         ),
         "best_objective": best_objective,
         "search_iterations": search_iterations,
@@ -247,6 +373,25 @@ def model_from_json(payload: dict[str, Any]) -> FeatureModel:
         stds={key: float(value) for key, value in payload["stds"].items()},
         weights={key: float(value) for key, value in payload["weights"].items()},
     )
+
+
+def load_optional_terminology(args: argparse.Namespace) -> list[tuple[str, str]]:
+    if not args.terminology_file:
+        return []
+    return gspo.load_terminology_entries(
+        args.dataset_repo,
+        args.terminology_file,
+        args.terminology_min_source_chars,
+    )
+
+
+def selected_feature_names(args: argparse.Namespace) -> list[str]:
+    feature_names = BASE_FEATURE_NAMES[:]
+    if args.include_source_root_copy:
+        feature_names.append("source_root_copy_ratio")
+    if args.include_terminology_features:
+        feature_names.extend(["terminology_target_coverage", "terminology_source_root_leakage"])
+    return feature_names
 
 
 def metrics_for_selected(
@@ -345,8 +490,10 @@ def evaluate_groups(
 
 def main() -> None:
     args = parse_args()
+    terminology_entries = load_optional_terminology(args)
+    feature_names = selected_feature_names(args)
     eval_groups_raw = load_groups(args.eval_jsonl)
-    eval_groups = featurize_groups(eval_groups_raw)
+    eval_groups = featurize_groups(eval_groups_raw, terminology_entries, args.terminology_top_k)
     diagnostics: dict[str, Any] = {}
     if args.weights_json:
         payload = json.loads(args.weights_json.read_text())
@@ -355,9 +502,10 @@ def main() -> None:
     else:
         if not args.train_jsonl:
             raise ValueError("--train-jsonl is required unless --weights-json is supplied")
-        train_groups = featurize_groups(load_groups(args.train_jsonl))
+        train_groups = featurize_groups(load_groups(args.train_jsonl), terminology_entries, args.terminology_top_k)
         model, diagnostics = train_model(
             train_groups,
+            feature_names=feature_names,
             seed=args.seed,
             search_iterations=args.search_iterations,
             initial_noise=args.initial_noise,
@@ -365,6 +513,8 @@ def main() -> None:
         )
         diagnostics["train_groups"] = len(train_groups)
         diagnostics["train_candidates"] = sum(len(group) for group in train_groups)
+    diagnostics["terminology_entries"] = len(terminology_entries)
+    diagnostics["terminology_top_k"] = args.terminology_top_k if terminology_entries else 0
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     model_payload = model_to_json(model, diagnostics)
