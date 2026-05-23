@@ -4,6 +4,15 @@ Date: 2026-05-22
 
 Purpose: test whether current external translation/general models can directly beat or usefully seed the RosettIA Chanka translator before spending time on larger SFT/GSPO runs.
 
+## Live Model Availability Refresh
+
+Checked on 2026-05-23:
+
+- Hy-MT2 official code: https://github.com/Tencent-Hunyuan/Hy-MT2
+- Hy-MT2 Hugging Face org exposes `tencent/Hy-MT2-1.8B`, `tencent/Hy-MT2-7B`, and `tencent/Hy-MT2-30B-A3B`.
+- `tencent/Hy-MT2-30B-A3B` is the most relevant scale target if we revisit this family on the RTX PRO 6000, but the official model card does not list Quechua/Chanka support. Treat it as a multilingual transfer base to SFT, not as an off-the-shelf Quechua translator.
+- Gemma 4 SLM references remain a moving target on Hugging Face. Earlier local Gemma 4 E4B experiments are negative; do not spend more GPU on Gemma 4 unless a newer official checkpoint or model card clearly changes expected translation-language coverage.
+
 ## Standing Internal Baseline
 
 Current deployable best is:
