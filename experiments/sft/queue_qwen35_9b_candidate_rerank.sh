@@ -28,6 +28,8 @@ PROGRESS_EVERY="${PROGRESS_EVERY:-64}"
 TEXT_EPOCHS="${TEXT_EPOCHS:-5}"
 TEXT_LEARNING_RATE="${TEXT_LEARNING_RATE:-0.08}"
 TEXT_MAX_NEGATIVES="${TEXT_MAX_NEGATIVES:-16}"
+TEXT_TRAINING_OBJECTIVE="${TEXT_TRAINING_OBJECTIVE:-listwise}"
+TEXT_LISTWISE_TEMPERATURE="${TEXT_LISTWISE_TEMPERATURE:-0.06}"
 FEATURE_EPOCHS="${FEATURE_EPOCHS:-120}"
 ENSEMBLE_SEARCH_ITERATIONS="${ENSEMBLE_SEARCH_ITERATIONS:-8000}"
 
@@ -152,14 +154,20 @@ ENSEMBLE_DIR="${WORK_DIR}/score_ensemble"
   --listwise-learning-rate 0.03 \
   --listwise-temperature 0.04
 
-"$PYTHON" scripts/train_text_candidate_reranker.py \
-  --train-jsonl "$MERGED_TRAIN_POOL" \
-  --eval-jsonl "$MERGED_EVAL_POOL" \
-  --output-dir "$TEXT_DIR" \
-  --prefix text_current_4b_9b \
-  --epochs "$TEXT_EPOCHS" \
-  --learning-rate "$TEXT_LEARNING_RATE" \
+TEXT_ARGS=(
+  --train-jsonl "$MERGED_TRAIN_POOL"
+  --eval-jsonl "$MERGED_EVAL_POOL"
+  --output-dir "$TEXT_DIR"
+  --prefix text_current_4b_9b
+  --training-objective "$TEXT_TRAINING_OBJECTIVE"
+  --epochs "$TEXT_EPOCHS"
+  --learning-rate "$TEXT_LEARNING_RATE"
   --max-negatives-per-group "$TEXT_MAX_NEGATIVES"
+)
+if [[ "$TEXT_TRAINING_OBJECTIVE" == "listwise" ]]; then
+  TEXT_ARGS+=(--listwise-temperature "$TEXT_LISTWISE_TEMPERATURE")
+fi
+"$PYTHON" scripts/train_text_candidate_reranker.py "${TEXT_ARGS[@]}"
 
 "$PYTHON" scripts/train_score_ensemble_reranker.py \
   --train-jsonl "$MERGED_TRAIN_POOL" \
