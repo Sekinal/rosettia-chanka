@@ -39,12 +39,31 @@ class TrainSftUnslothTests(unittest.TestCase):
 
         self.assertEqual(args.training_mode, "full")
 
+    def test_sft_cli_accepts_4bit_loading_for_huge_canaries(self):
+        args = train_sft.parse_args(["--stage", "chanka", "--load-in-4bit"])
+
+        self.assertTrue(args.load_in_4bit)
+
     def test_full_finetuning_rejects_adapter_path(self):
         args = train_sft.parse_args(
             ["--stage", "chanka", "--training-mode", "full", "--adapter-path", "outputs/run/final_lora"]
         )
 
         with self.assertRaisesRegex(ValueError, "--adapter-path"):
+            train_sft.validate_training_mode_args(args)
+
+    def test_full_finetuning_rejects_4bit_loading(self):
+        args = train_sft.parse_args(["--stage", "chanka", "--training-mode", "full", "--load-in-4bit"])
+
+        with self.assertRaisesRegex(ValueError, "--load-in-4bit"):
+            train_sft.validate_training_mode_args(args)
+
+    def test_4bit_loading_rejects_adapter_continuation(self):
+        args = train_sft.parse_args(
+            ["--stage", "chanka", "--load-in-4bit", "--adapter-path", "outputs/run/final_lora"]
+        )
+
+        with self.assertRaisesRegex(ValueError, "--load-in-4bit"):
             train_sft.validate_training_mode_args(args)
 
     def test_sft_cli_accepts_hymt2_prompt_style(self):

@@ -56,6 +56,7 @@ Earlier full baseline:
 - HF model search on 2026-05-22 showed current Google Gemma 4 entries including `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`, `google/gemma-4-26B-A4B-it`, and `google/gemma-4-31B-it`. Current Hy-MT2 entries include `tencent/Hy-MT2-1.8B`, `tencent/Hy-MT2-7B`, and `tencent/Hy-MT2-30B-A3B`.
 - The official Hy-MT2 documentation says the family supports 33 languages and lists Spanish, but not Quechua. It also recommends a user-only translation prompt, so zero-shot and SFT tests should use `--prompt-style hymt2` rather than the generic system prompt.
 - `tencent/Hy-MT2-1.8B` loaded with Transformers 5.5 but its model card supports Spanish and many major languages, not Quechua/Chanka. Treat it as a possible SFT base only, not a zero-shot Chanka translator.
+- `scripts/train_sft_unsloth.py --load-in-4bit` is available for huge non-Qwen model-family smokes. Keep Qwen3.5 runs on the established 16-bit path; use 4-bit only for memory feasibility checks such as Hy-MT2 30B-A3B.
 - TranslateGemma supports 55 languages and raises on unsupported chat-template language codes in principle, but `qu` produced non-Quechua output here. Do not full-evaluate it unless a verified Quechua/Chanka code or alternate prompt is found.
 - T5Gemma became accessible after the newer HF token was installed on the remote. The 5-row smoke wrote `outputs/external_baselines/t5gemma_2_270m_5row_after_auth_metrics.json` and remained very weak: chrF++ `8.5113`, BLEU `0.3152`, token F1 `0.0`, Spanish leakage `5.3140%`, TER `714.2857`.
 
@@ -359,6 +360,14 @@ Qualitative pattern: broad+Chanka SFT fixes the zero-shot source-copy failure an
 | `Tengo 45 años` | `Manam 45 wawaytaqmi` | `Tawa chunka pichqanpim kachkani` |
 
 Decision: this is a useful negative result. Hy-MT2 7B can be adapted technically and no longer source-copies after broad+Chanka SFT, but this 96+96 step recipe is far below the standing Qwen3.5 adapter (`chrF++ 41.4823`, BLEU `9.7158`, token F1 `27.0736`). Do not replace Qwen with Hy-MT2 from these results. Scaling Hy-MT2 would require much more broad data/steps and close early evaluation, not clean-Chanka-only or tiny broad SFT.
+
+## Hy-MT2 30B-A3B Smoke Queue
+
+Added `experiments/sft/queue_hymt2_30b_a3b_smoke.sh`.
+
+Purpose: test whether the largest currently available Hy-MT2 checkpoint can at least load and train a tiny Chanka LoRA through Unsloth. It uses `--load-in-4bit`, `--prompt-style hymt2`, LoRA rank `16`, 16 train rows, 4 eval rows, and 2 optimizer steps.
+
+The queue waits behind the current contextual terminology canary by default so it does not compete with the 9B Qwen evaluation/rerank chain. If the L40S cannot load the MoE checkpoint or Unsloth does not support this variant, it writes `smoke_failed.txt` and exits cleanly. Keep this recipe for the RTX PRO 6000 even if it fails on the current server.
 
 ## Decision
 

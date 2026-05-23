@@ -62,6 +62,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Optional local/HF LoRA adapter to continue training from. Only valid with --training-mode lora.",
     )
+    parser.add_argument(
+        "--load-in-4bit",
+        action="store_true",
+        help="Use Unsloth 4-bit loading for huge non-Qwen model-family canaries. Keep off for Qwen3.5 runs.",
+    )
     parser.add_argument("--dataset-repo", default=DATASET_REPO)
     parser.add_argument(
         "--terminology-file",
@@ -149,6 +154,10 @@ def adapter_flags(adapter_method: str) -> dict[str, bool]:
 def validate_training_mode_args(args: argparse.Namespace) -> None:
     if args.training_mode == "full" and args.adapter_path is not None:
         raise ValueError("--adapter-path is only valid with --training-mode lora")
+    if args.training_mode == "full" and args.load_in_4bit:
+        raise ValueError("--load-in-4bit is only valid with --training-mode lora")
+    if args.load_in_4bit and args.adapter_path is not None:
+        raise ValueError("--load-in-4bit is only supported when creating a new LoRA adapter")
 
 
 def final_artifact_dir(args: argparse.Namespace, run_dir: Path) -> Path:
@@ -504,8 +513,8 @@ def main() -> None:
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_name_or_adapter,
         max_seq_length=args.max_seq_length,
-        load_in_4bit=False,
-        load_in_16bit=args.training_mode == "lora",
+        load_in_4bit=args.load_in_4bit,
+        load_in_16bit=args.training_mode == "lora" and not args.load_in_4bit,
         full_finetuning=args.training_mode == "full",
     )
     if args.training_mode == "lora" and args.adapter_path is None:
@@ -594,6 +603,7 @@ def main() -> None:
         print(f"Terminology-matched train rows: {train_term_rows:,}")
         print(f"Terminology-matched validation rows: {eval_term_rows:,}")
     print(f"Training mode: {args.training_mode}")
+    print(f"Load in 4-bit: {args.load_in_4bit}")
     if args.training_mode == "lora":
         print(f"Adapter method: {args.adapter_method}")
     print(f"Model or adapter: {model_name_or_adapter}")
