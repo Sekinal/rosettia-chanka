@@ -48,6 +48,24 @@ class GenerateMultiAdapterEnsembleRerankedTranslationsTests(unittest.TestCase):
         self.assertEqual(args.temperature, [0.65, 0.75])
         self.assertEqual(args.few_shot_top_k, 2)
 
+    def test_parse_args_accepts_text_only_selection(self):
+        args = generate_multi.parse_args(
+            [
+                "--adapter-path",
+                "outputs/a",
+                "--text-model-json",
+                "text.json",
+                "--selection-mode",
+                "text",
+                "--output-jsonl",
+                "predictions.jsonl",
+            ]
+        )
+
+        self.assertEqual(args.selection_mode, "text")
+        self.assertIsNone(args.feature_weights_json)
+        self.assertIsNone(args.ensemble_json)
+
     def test_merge_candidate_groups_dedupes_and_reindexes(self):
         groups = generate_multi.merge_candidate_groups(
             [

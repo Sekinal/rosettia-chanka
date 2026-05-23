@@ -416,6 +416,52 @@ Decision:
 - The remaining oracle gap is still huge, so more candidate diversity from 9B/35B-A3B SFT or a stronger QE/listwise selector is more promising than another plain continuation from the 2B policy.
 - Retrieval-augmented prompts are now available in `scripts/evaluate_gspo_checkpoint.py` via `--few-shot-top-k`, and in the multi-adapter deployment wrapper via the same flag. The retriever uses clean train rows only and excludes exact source matches, so eval references are not placed in the prompt. This is intended for a controlled follow-up after the 9B no-few-shot candidate pass.
 
+## 2026-05-23 Listwise Text Reranker
+
+Purpose: adapt the text-aware selector to the actual listwise candidate-choice problem, closer to QE/listwise reranking papers. Pairwise training was already useful, but it learned independent winner-vs-loser preferences instead of a distribution over all candidates in a group.
+
+Code:
+
+- `scripts/train_text_candidate_reranker.py --training-objective listwise`
+- `scripts/generate_multi_adapter_ensemble_reranked_translations.py --selection-mode text`
+- Unit tests: `tests/test_train_text_candidate_reranker.py`, `tests/test_generate_multi_adapter_ensemble_reranked_translations.py`
+
+Run:
+
+- Train pool: `outputs/verifier_candidate_mining/20260522-train-current-k32-plus-qwen35-4b-full-k16-term/train_current_k32_plus_4bfull_k16_predictions.jsonl`
+- Eval pool: `outputs/rerank_candidate_evals/20260522-current-k32-plus-qwen35-4b-full-k16-term/candidates_predictions.jsonl`
+- Output: `outputs/text_candidate_reranker_evals/20260523-text-listwise-current-k32-plus-qwen35-4b-full-k16-term`
+- Settings: `--training-objective listwise --epochs 8 --learning-rate 0.05 --listwise-temperature 0.06`
+
+| Method | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| previous merged-pool score ensemble | 35.5481 | 48.1624 | 24.0635 | 35.9579 | 2.4156 | 0.0000 | 70.5069 |
+| listwise text reranker | 38.9423 | 51.8586 | 26.0207 | 40.3340 | 1.9409 | 0.0000 | 67.7419 |
+| listwise-text score ensemble | 38.4376 | 51.5307 | 25.3485 | 39.6017 | 2.0464 | 0.0000 | 69.1244 |
+| oracle | 50.0788 | 63.5158 | 35.7333 | 54.9308 | 2.0992 | 0.0000 | 51.3825 |
+
+Decision:
+
+- This is the new best deployable held-out profile by selection, chrF++, BLEU, token F1, source-copy, and TER.
+- The old score ensemble hurts this stronger text selector, so deploy this pool with `--selection-mode text` rather than the ensemble blend.
+- The remaining gap to oracle is still large, but chrF++ `51.8586` and BLEU `26.0207` are the strongest verified metrics so far and move materially toward the chrF++ 60 target.
+
+Deployment shape:
+
+```bash
+.venv/bin/python scripts/generate_multi_adapter_ensemble_reranked_translations.py \
+  --selection-mode text \
+  --adapter-path outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8 \
+  --adapter-path outputs/full_sft_canaries/20260522-qwen35-4b-merged-broad512-chanka224-full-chanka-lr1e-6-64steps/chanka/checkpoint-48 \
+  --num-return-sequences 32 \
+  --num-return-sequences 16 \
+  --text-model-json outputs/text_candidate_reranker_evals/20260523-text-listwise-current-k32-plus-qwen35-4b-full-k16-term/text_listwise_current_4bfull_model.json \
+  --terminology-file clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet \
+  --strip-chat-artifacts \
+  --input-path sources.txt \
+  --output-jsonl predictions.jsonl
+```
+
 ## 2026-05-23 Tuned MBR Consensus Selector
 
 Purpose: adapt the Kaggle Deep Past MBR idea more directly for our candidate pools: select the candidate with highest consensus against other candidates, then tune the reference-free signal weights on a train candidate pool.

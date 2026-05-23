@@ -1,8 +1,8 @@
-"""Generate Chanka translations from multiple adapters, then ensemble-rerank.
+"""Generate Chanka translations from multiple adapters, then rerank.
 
 This is the deployable version of the current best held-out profile: generate
 candidate pools from more than one model/checkpoint, dedupe them per source,
-and select with the trained score ensemble.
+and select with a trained reference-free reranker.
 """
 
 from __future__ import annotations
@@ -31,9 +31,15 @@ from scripts import train_text_candidate_reranker as text_reranker
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--adapter-path", type=Path, action="append", required=True)
-    parser.add_argument("--feature-weights-json", type=Path, required=True)
     parser.add_argument("--text-model-json", type=Path, required=True)
-    parser.add_argument("--ensemble-json", type=Path, required=True)
+    parser.add_argument("--feature-weights-json", type=Path, default=None)
+    parser.add_argument("--ensemble-json", type=Path, default=None)
+    parser.add_argument(
+        "--selection-mode",
+        choices=["text", "ensemble"],
+        default="ensemble",
+        help="Use the text reranker directly, or blend feature/text/MBR signals with a score ensemble.",
+    )
     parser.add_argument("--output-jsonl", type=Path, required=True)
     parser.add_argument("--candidates-jsonl", type=Path, default=None)
     parser.add_argument("--source", action="append", default=[], help="Spanish source text. Repeatable.")
@@ -179,6 +185,8 @@ def generate_groups_for_adapter(
 
 def main() -> None:
     args = parse_args()
+    if args.selection_mode == "ensemble" and (args.feature_weights_json is None or args.ensemble_json is None):
+        raise ValueError("--selection-mode ensemble requires --feature-weights-json and --ensemble-json")
     adapter_count = len(args.adapter_path)
     num_return_sequences = [int(value) for value in broadcast(args.num_return_sequences, adapter_count, 16)]
     temperatures = [float(value) for value in broadcast(args.temperature, adapter_count, 0.65)]
@@ -203,9 +211,13 @@ def main() -> None:
         )
     else:
         few_shot_rows = []
-    feature_model = feature_reranker.model_from_json(json.loads(args.feature_weights_json.read_text()))
     text_model = text_reranker.model_from_json(json.loads(args.text_model_json.read_text()))
-    ensemble_model = ensemble_reranker.model_from_json(json.loads(args.ensemble_json.read_text()))
+    if args.selection_mode == "ensemble":
+        feature_model = feature_reranker.model_from_json(json.loads(args.feature_weights_json.read_text()))
+        ensemble_model = ensemble_reranker.model_from_json(json.loads(args.ensemble_json.read_text()))
+    else:
+        feature_model = None
+        ensemble_model = None
 
     all_groups = []
     for index, adapter_path in enumerate(args.adapter_path):
@@ -238,7 +250,20 @@ def main() -> None:
         )
 
     merged_groups = merge_candidate_groups(all_groups)
-    selected = ensemble_generate.select_translations(merged_groups, feature_model, text_model, ensemble_model)
+    if args.selection_mode == "text":
+        selected = [
+            sparse_row.row.candidate
+            for sparse_row in text_reranker.select_sparse(
+                text_reranker.sparse_groups_for_model(
+                    feature_reranker.featurize_groups(merged_groups),
+                    text_model,
+                ),
+                text_model,
+            )
+        ]
+    else:
+        assert feature_model is not None and ensemble_model is not None
+        selected = ensemble_generate.select_translations(merged_groups, feature_model, text_model, ensemble_model)
     feature_generate.write_selected(args.output_jsonl, selected)
     if args.candidates_jsonl:
         feature_generate.write_candidates(args.candidates_jsonl, merged_groups)
