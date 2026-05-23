@@ -42,6 +42,7 @@ REWARD_PROFILES = (
     "learned_verifier_vibe_2511",
     "learned_verifier_ensemble_vibe_2511",
     "learned_verifier_bleu_margin_vibe_2511",
+    "self_verifiable_translation_2511",
     "reference_rerank_vibe_v1",
 )
 SPANISH_STOPWORDS = {
@@ -295,6 +296,7 @@ def prompt_messages(
     source: str,
     terminology: Sequence[tuple[str, str]] | None = None,
     few_shot_examples: Sequence[tuple[str, str]] | None = None,
+    self_verification: bool = False,
 ) -> list[dict[str, str]]:
     user_content = (
         "Traduce del español al quechua chanka. Usa una traducción directa, "
@@ -323,6 +325,15 @@ def prompt_messages(
             "\n\nGlosario sugerido: usa estos terminos solo si aplican al texto; "
             "no fuerces terminos irrelevantes.\n"
             + "\n".join(glossary_lines)
+        )
+    if self_verification:
+        user_content += (
+            "\n\nFormato obligatorio inspirado en verificacion formal:\n"
+            "Traduccion final: <solo la traduccion al quechua chanka>\n"
+            "Autoevaluacion: <menciona brevemente errores o di que no ves errores>\n"
+            "Puntaje: \\boxed{<0.0 a 1.0>}\n"
+            "El puntaje debe reflejar fidelidad, gramatica chanka, terminologia, "
+            "ausencia de copia del espanol y naturalidad."
         )
     user_content += f"\n\nEspañol: {source}"
     return [
@@ -374,6 +385,7 @@ def build_dataset(
     rows: Iterable[dict[str, str]],
     terminology_entries: Sequence[tuple[str, str]] | None = None,
     terminology_top_k: int = 0,
+    self_verification: bool = False,
 ) -> Dataset:
     return Dataset.from_list(
         [
@@ -383,6 +395,7 @@ def build_dataset(
                     select_terminology(row["source"], terminology_entries or [], terminology_top_k)
                     if terminology_entries and terminology_top_k > 0
                     else None,
+                    self_verification=self_verification,
                 ),
                 "target": row["target"],
                 "source": row["source"],
@@ -410,6 +423,37 @@ def completion_text(completion: object) -> str:
         if isinstance(last, dict):
             return normalize_text(str(last.get("content", "")))
     return normalize_text(str(completion))
+
+
+def extract_translation_from_structured_output(text: str) -> str:
+    normalized = normalize_text(text)
+    match = re.search(
+        r"(?is)(?:traducci[oó]n\s+final|final\s+translation)\s*:\s*(.*?)(?:\s+autoevaluaci[oó]n\s*:|\s+self[- ]?evaluation\s*:|\s+puntaje\s*:|\s+score\s*:|$)",
+        normalized,
+    )
+    if match:
+        return normalize_text(match.group(1))
+    return normalized
+
+
+def parse_self_verification_output(text: str) -> dict[str, object]:
+    normalized = normalize_text(text)
+    translation = extract_translation_from_structured_output(normalized)
+    analysis_match = re.search(
+        r"(?is)(?:autoevaluaci[oó]n|self[- ]?evaluation)\s*:\s*(.*?)(?:\s+puntaje\s*:|\s+score\s*:|$)",
+        normalized,
+    )
+    score_match = re.search(r"(?is)(?:puntaje|score)\s*:\s*\\?boxed\{?\s*([01](?:\.\d+)?)\s*\}?", normalized)
+    if not score_match:
+        score_match = re.search(r"(?is)(?:puntaje|score)\s*:\s*([01](?:\.\d+)?)", normalized)
+    score = max(0.0, min(1.0, float(score_match.group(1)))) if score_match else None
+    has_format = bool(translation and analysis_match and score is not None)
+    return {
+        "translation": translation,
+        "analysis": normalize_text(analysis_match.group(1)) if analysis_match else "",
+        "self_score": score,
+        "has_format": has_format,
+    }
 
 
 def load_sacrebleu():
@@ -673,6 +717,98 @@ def reference_rerank_metric_score(
         - (0.35 * chat_artifact_penalty(hypothesis))
         - (0.12 * repetition_penalty(hypothesis))
     )
+
+
+def bounded_translation_quality_score(
+    hypothesis: str,
+    reference: str,
+    source: str | None,
+) -> float:
+    chrf = sentence_chrfpp(hypothesis, reference)
+    bleu = sentence_bleu(hypothesis, reference)
+    f1 = token_f1(hypothesis, reference)
+    length_score = length_ratio_score(hypothesis, reference)
+    score = reference_rerank_metric_score(hypothesis, reference, source, chrf, bleu, f1, length_score)
+    return max(0.0, min(1.0, score))
+
+
+def self_analysis_meta_score(analysis: str, self_score: float | None, true_score: float) -> float:
+    if self_score is None:
+        return 0.0
+    normalized = normalize_text(analysis).lower()
+    if len(normalized.split()) < 3:
+        return 0.35
+    issue_terms = (
+        "error",
+        "falta",
+        "copia",
+        "español",
+        "espanol",
+        "termino",
+        "término",
+        "numero",
+        "número",
+        "entidad",
+        "incomplet",
+        "repet",
+        "no conserva",
+        "duda",
+        "problema",
+    )
+    claims_issue = any(term in normalized for term in issue_terms)
+    claims_clean = any(
+        phrase in normalized
+        for phrase in (
+            "no veo errores",
+            "sin errores",
+            "correcta",
+            "fiel",
+            "adecuada",
+            "conserva el significado",
+        )
+    )
+    if true_score < 0.45 and self_score >= 0.80:
+        return 0.0
+    if true_score < 0.65 and not claims_issue:
+        return 0.35
+    if true_score >= 0.82 and self_score <= 0.50:
+        return 0.45
+    if true_score >= 0.82 and claims_issue and not claims_clean:
+        return 0.65
+    return 1.0
+
+
+def self_verifiable_translation_reward(
+    completion: object,
+    reference: str,
+    source: str | None,
+    overlong_max_words: int | None = None,
+    overlong_ratio_threshold: float = 0.0,
+    overlong_penalty_weight: float = 1.0,
+) -> float:
+    parsed = parse_self_verification_output(completion_text(completion))
+    translation = str(parsed["translation"])
+    self_score = parsed["self_score"]
+    true_score = bounded_translation_quality_score(translation, reference, source)
+    format_reward = 1.0 if parsed["has_format"] else 0.15
+    score_reward = 0.0 if self_score is None else 1.0 - abs(float(self_score) - true_score)
+    meta_reward = self_analysis_meta_score(str(parsed["analysis"]), self_score if isinstance(self_score, float) else None, true_score)
+    self_eval_reward = score_reward * meta_reward
+    overlong = overlong_penalty_weight * overlong_completion_penalty(
+        translation,
+        reference,
+        max_words=overlong_max_words,
+        ratio_threshold=overlong_ratio_threshold,
+    )
+    guard_penalty = (
+        0.30 * source_copy_ratio(translation, source)
+        + 0.45 * spanish_leakage_penalty(translation)
+        + 0.18 * repetition_penalty(translation)
+        + 0.60 * chat_artifact_penalty(translation)
+    )
+    if exact_source_copy(translation, source):
+        guard_penalty += 0.50
+    return format_reward * ((0.76 * true_score) + (0.24 * self_eval_reward)) - guard_penalty - overlong
 
 
 def reward_score(
@@ -1007,6 +1143,20 @@ def chanka_reward(
     hypotheses: list[str] = []
     sources = list(source) if source is not None else [None] * len(target)
     for completion, reference, source_text in zip(completions, target, sources, strict=True):
+        if active_profile == "self_verifiable_translation_2511":
+            reward = self_verifiable_translation_reward(
+                completion,
+                reference,
+                source_text,
+                overlong_max_words=overlong_max_words,
+                overlong_ratio_threshold=overlong_ratio_threshold,
+                overlong_penalty_weight=overlong_penalty_weight,
+            )
+            rewards.append(reward)
+            hypotheses.append(
+                str(parse_self_verification_output(completion_text(completion))["translation"])
+            )
+            continue
         hypothesis = completion_text(completion)
         hypotheses.append(hypothesis)
         rewards.append(
@@ -1182,6 +1332,7 @@ def generate_predictions(
     max_completion_length: int,
     terminology_entries: Sequence[tuple[str, str]] | None = None,
     terminology_top_k: int = 0,
+    self_verification: bool = False,
 ) -> list[str]:
     import torch
 
@@ -1195,7 +1346,7 @@ def generate_predictions(
         )
         prompt = apply_chat_template_no_thinking(
             tokenizer,
-            prompt_messages(row["source"], terminology),
+            prompt_messages(row["source"], terminology, self_verification=self_verification),
             tokenize=False,
             add_generation_prompt=True,
         )
@@ -1212,6 +1363,8 @@ def generate_predictions(
             )
         completion_ids = output_ids[0, inputs["input_ids"].shape[1] :]
         predictions.append(normalize_text(tokenizer.decode(completion_ids, skip_special_tokens=True)))
+        if self_verification:
+            predictions[-1] = extract_translation_from_structured_output(predictions[-1])
     return predictions
 
 
@@ -1336,8 +1489,19 @@ def main() -> None:
     model.generation_config.eos_token_id = tokenizer.eos_token_id
     model.generation_config.pad_token_id = tokenizer.eos_token_id
 
-    train_dataset = build_dataset(train_rows, terminology_entries, args.terminology_top_k)
-    eval_dataset = build_dataset(eval_rows, terminology_entries, args.terminology_top_k)
+    use_self_verification_prompt = args.reward_profile == "self_verifiable_translation_2511"
+    train_dataset = build_dataset(
+        train_rows,
+        terminology_entries,
+        args.terminology_top_k,
+        self_verification=use_self_verification_prompt,
+    )
+    eval_dataset = build_dataset(
+        eval_rows,
+        terminology_entries,
+        args.terminology_top_k,
+        self_verification=use_self_verification_prompt,
+    )
 
     print(f"Loaded Chanka rows: {len(rows):,}")
     print(f"Train rows: {len(train_dataset):,}")
@@ -1352,6 +1516,8 @@ def main() -> None:
         print(f"Attached fresh LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")
     print('GSPO mode: GRPO with importance_sampling_level=\"sequence\"')
     print(f"Reward profile: {args.reward_profile}")
+    if use_self_verification_prompt:
+        print("Self-verification prompt: enabled")
     print(f"Validation: every {args.eval_steps} steps")
     print(f"Saving: every {args.save_steps} steps")
 
@@ -1433,6 +1599,7 @@ def main() -> None:
         args.max_completion_length,
         terminology_entries,
         args.terminology_top_k,
+        self_verification=use_self_verification_prompt,
     )
     references = [row["target"] for row in eval_rows]
     sources = [row["source"] for row in eval_rows]

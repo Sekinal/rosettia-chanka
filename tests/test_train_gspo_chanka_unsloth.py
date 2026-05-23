@@ -60,6 +60,14 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
         self.assertIn("Quechua chanka: Ayacuchopim tiyani.", messages[1]["content"])
         self.assertIn("Español: Yo vivo en Quinua.", messages[1]["content"])
 
+    def test_prompt_can_request_self_verification_format(self):
+        messages = train_gspo.prompt_messages("No es un buen esposo.", self_verification=True)
+
+        self.assertIn("Formato obligatorio", messages[1]["content"])
+        self.assertIn("Traduccion final:", messages[1]["content"])
+        self.assertIn("Autoevaluacion:", messages[1]["content"])
+        self.assertIn("Puntaje:", messages[1]["content"])
+
     def test_chat_template_helper_disables_thinking_when_supported(self):
         class ThinkingAwareTokenizer:
             def apply_chat_template(self, messages, enable_thinking=True, **kwargs):
@@ -111,6 +119,21 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
         user_message = dataset[0]["prompt"][1]["content"]
         self.assertIn("Glosario sugerido", user_message)
         self.assertIn("- Casado = Warmiyuq", user_message)
+
+    def test_build_dataset_can_use_self_verification_prompts(self):
+        dataset = train_gspo.build_dataset(
+            [
+                {
+                    "source": "¿Es usted casado?",
+                    "target": "¿Warmiyuqchu kanki?",
+                    "source_name": "manual",
+                    "variant": "quy/chanka",
+                }
+            ],
+            self_verification=True,
+        )
+
+        self.assertIn("Traduccion final:", dataset[0]["prompt"][1]["content"])
 
     def test_reward_profile_cli_accepts_paper_profiles(self):
         for profile in train_gspo.REWARD_PROFILES:
@@ -183,6 +206,21 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
         completion = [{"role": "assistant", "content": "  Allin   punchaw.  "}]
 
         self.assertEqual(train_gspo.completion_text(completion), "Allin punchaw.")
+
+    def test_parse_self_verification_output_extracts_translation_and_score(self):
+        parsed = train_gspo.parse_self_verification_output(
+            "Traduccion final: Mana allin qusachu. Autoevaluacion: no veo errores. Puntaje: \\boxed{0.93}"
+        )
+
+        self.assertEqual(parsed["translation"], "Mana allin qusachu.")
+        self.assertEqual(parsed["self_score"], 0.93)
+        self.assertTrue(parsed["has_format"])
+
+    def test_structured_translation_extractor_falls_back_to_plain_text(self):
+        self.assertEqual(
+            train_gspo.extract_translation_from_structured_output("Allin punchaw."),
+            "Allin punchaw.",
+        )
 
     def test_token_f1_rewards_overlap(self):
         self.assertGreater(
@@ -286,6 +324,7 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             "learned_verifier_vibe_2511",
             "learned_verifier_bleu_margin_vibe_2511",
             "reference_rerank_vibe_v1",
+            "self_verifiable_translation_2511",
         }
 
         self.assertTrue(expected.issubset(set(train_gspo.REWARD_PROFILES)))
@@ -308,6 +347,33 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             )
 
         self.assertGreater(translated, copied)
+
+    def test_self_verifiable_translation_reward_penalizes_false_self_score(self):
+        good = (
+            "Traduccion final: Allin punchaw kamachiq. "
+            "Autoevaluacion: no veo errores importantes. "
+            "Puntaje: \\boxed{0.95}"
+        )
+        copied = (
+            "Traduccion final: Buenos dias autoridad. "
+            "Autoevaluacion: no veo errores importantes. "
+            "Puntaje: \\boxed{0.95}"
+        )
+        with mock.patch.object(train_gspo, "sentence_chrfpp", side_effect=[0.8, 0.1]), mock.patch.object(
+            train_gspo, "sentence_bleu", side_effect=[0.4, 0.0]
+        ):
+            good_reward = train_gspo.self_verifiable_translation_reward(
+                good,
+                "Allin punchaw kamachiq.",
+                "Buenos dias autoridad.",
+            )
+            copied_reward = train_gspo.self_verifiable_translation_reward(
+                copied,
+                "Allin punchaw kamachiq.",
+                "Buenos dias autoridad.",
+            )
+
+        self.assertGreater(good_reward, copied_reward)
 
     def test_reference_rerank_metric_profile_penalizes_source_copy(self):
         with mock.patch.object(train_gspo, "sentence_chrfpp", return_value=0.7), mock.patch.object(
