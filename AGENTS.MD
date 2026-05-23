@@ -262,3 +262,11 @@ These are candidate directions, not commitments:
 - Choose an initial baseline model and evaluation strategy.
 - Decide whether the hackathon deliverable is a model, dataset, demo, paper-style report, or a combination.
 - Add reproducible scripts for data preparation, training/post-training, evaluation, and demo inference as the project grows.
+
+## 2026-05-23 Latest Base-Model Notes
+
+- Best standalone 4B full-SFT base so far: `outputs/full_sft_sweeps/20260523-qwen35-4b-full-sft-lr-followups/lr_2em6_48steps/chanka/checkpoint-36`, selection `31.1999`, chrF++ `44.4295`, BLEU `18.0014`, token F1 `29.9850`, TER `81.5668`.
+- Current best deployable held-out profile is still current K32 plus old Qwen3.5 4B full-SFT K16 with the matching listwise text selector: selection `38.9423`, chrF++ `51.8586`, BLEU `26.0207`, token F1 `40.3340`, TER `67.7419`.
+- Adding the newer 4B full-SFT checkpoint as another K16 candidate generator did not improve deployment yet: matched listwise text scored selection `38.3355`, chrF++ `51.6498`, BLEU `23.9115`, token F1 `39.6077`, TER `69.1244`, despite oracle `51.1497` / chrF++ `64.5949` / BLEU `37.1959`.
+- GSPO from a full-SFT checkpoint should use a fresh LoRA adapter, not full-parameter RL on the L40S. `experiments/gspo/queue_qwen35_4b_full_sft_gspo_canary.sh` now defaults train/eval batch size to `4` for `NUM_GENERATIONS=4`; earlier failures were only Unsloth GRPO batch-divisibility guard failures.
+- Remote active retry log: `outputs/logs/qwen35_4b_fft2e6ckpt36_lora_gspo_retry2_20260523.log`, starting from the best 4B full-SFT checkpoint with LoRA r32/a64 and terminology top-1 prompts.

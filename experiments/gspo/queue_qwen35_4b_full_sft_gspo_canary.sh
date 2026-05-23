@@ -38,8 +38,8 @@ fi
   --max-steps "${MAX_STEPS:-16}" \
   --max-train-samples "${MAX_TRAIN_SAMPLES:-256}" \
   --max-eval-samples "${MAX_EVAL_SAMPLES:-64}" \
-  --per-device-train-batch-size "${TRAIN_BATCH_SIZE:-2}" \
-  --per-device-eval-batch-size "${EVAL_BATCH_SIZE:-2}" \
+  --per-device-train-batch-size "${TRAIN_BATCH_SIZE:-4}" \
+  --per-device-eval-batch-size "${EVAL_BATCH_SIZE:-4}" \
   --gradient-accumulation-steps "${GRADIENT_ACCUMULATION_STEPS:-4}" \
   --num-generations "${NUM_GENERATIONS:-4}" \
   --temperature "${TEMPERATURE:-0.70}" \

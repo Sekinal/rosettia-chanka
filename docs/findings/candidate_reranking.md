@@ -564,3 +564,37 @@ Example inference shape:
   --input-path sources.txt \
   --output-jsonl predictions.jsonl
 ```
+
+## 2026-05-23 New 4B Full-SFT Candidate Complement
+
+Purpose: test whether the improved standalone 4B full-SFT checkpoint from the `2e-6` LR follow-up adds deployable candidate quality beyond the current K32+old-4B pool.
+
+Inputs:
+
+- Current deployable eval pool: `outputs/rerank_candidate_evals/20260522-current-k32-plus-qwen35-4b-full-k16-term/candidates_predictions.jsonl`
+- New 4B full-SFT checkpoint: `outputs/full_sft_sweeps/20260523-qwen35-4b-full-sft-lr-followups/lr_2em6_48steps/chanka/checkpoint-36`
+- New 4B K16 eval pool: `outputs/qwen35_4b_full_sft_candidate_rerank/20260523-qwen35-4b-fft2e6ckpt36-candidate-rerank/eval_qwen35_4b_full_sft_k16_predictions.jsonl`
+- Merged eval pool: `outputs/qwen35_4b_full_sft_candidate_rerank/20260523-qwen35-4b-fft2e6ckpt36-candidate-rerank/eval_current_4b_old_4b_new_k16.jsonl`
+- Text selector: `outputs/qwen35_4b_full_sft_candidate_rerank/20260523-qwen35-4b-fft2e6ckpt36-candidate-rerank/text_ranker_listwise/text_current_4b_old_4b_new_summary.json`
+
+Standalone new-4B K16 eval:
+
+| Method | Selection | chrF++ | BLEU | token F1 | TER |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| first candidate | 29.1882 | 42.5822 | 16.4238 | 28.3610 | 81.7972 |
+| oracle | 41.3831 | 54.6467 | 25.0224 | 42.1051 | 63.5945 |
+
+Merged-pool eval:
+
+| Method | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| first | 25.9309 | 40.7905 | 8.9543 | 25.1761 | 2.7637 | 0.3165 | 92.1659 |
+| MBR | 30.9242 | 45.4973 | 11.0815 | 29.9680 | 1.7119 | 0.0000 | 83.6406 |
+| matched listwise text | 38.3355 | 51.6498 | 23.9115 | 39.6077 | 1.9409 | 0.0000 | 69.1244 |
+| oracle | 51.1497 | 64.5949 | 37.1959 | 56.1489 | 2.0992 | 0.0000 | 50.0000 |
+
+Decision:
+
+- The new 4B full-SFT checkpoint is the best standalone 4B base so far and has a useful K16 oracle.
+- Adding it to the current deployable pool raises the oracle slightly over the old K32+4B pool, but the matched listwise text selector does not beat the current deployable result (`38.9423` selection, chrF++ `51.8586`, BLEU `26.0207`).
+- This is a selector problem more than a generation problem. Keep the checkpoint for future reranker/verifier work, but do not change the default deployment recipe yet.

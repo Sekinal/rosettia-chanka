@@ -269,4 +269,12 @@ GSPO follow-up:
 
 - `scripts/train_gspo_chanka_unsloth.py` now supports `--attach-lora`, `--lora-r`, `--lora-alpha`, and `--lora-dropout`. This is intended for RL from a merged/full checkpoint without full-parameter RL.
 - `experiments/gspo/queue_qwen35_4b_full_sft_gspo_canary.sh` queues a small LoRA-on-full-checkpoint GSPO canary from `2e-6/checkpoint-36`, using the current learned-verifier-vibe reward profile and terminology top-1 prompts.
-- Remote queued log: `outputs/logs/qwen35_4b_fft2e6ckpt36_lora_gspo_20260523.log`. It waits for the active K16 candidate-rerank job before using the GPU.
+- First two launches failed before training because Unsloth GRPO requires both train and eval per-device batch sizes to be divisible by `num_generations`. The queue script now defaults train/eval batch size to `4` when `NUM_GENERATIONS=4`.
+- Remote retry log: `outputs/logs/qwen35_4b_fft2e6ckpt36_lora_gspo_retry2_20260523.log`. It has passed the batching guard and is training from `2e-6/checkpoint-36`.
+
+Candidate-rerank follow-up:
+
+- K16 candidates generated from `2e-6/checkpoint-36` have strong oracle headroom but did not improve the deployable selector when added to the current K32+old-4B pool.
+- Merged pool listwise text result: selection `38.3355`, chrF++ `51.6498`, BLEU `23.9115`, token F1 `39.6077`, TER `69.1244`.
+- Merged pool oracle: selection `51.1497`, chrF++ `64.5949`, BLEU `37.1959`, token F1 `56.1489`, TER `50.0000`.
+- Decision: keep `2e-6/checkpoint-36` as the best standalone 4B full-SFT base and as a useful diversity source, but do not replace the current deployable K32+old-4B listwise profile until selector training can harvest the extra oracle headroom.
