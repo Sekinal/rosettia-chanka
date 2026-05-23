@@ -488,3 +488,17 @@ Conclusion:
 - Oversampling real matched sentence rows was safer than raw term pairs but still crushed BLEU compared with the current deployable best (`6.7682` vs `9.7158`).
 - More terminology exposure is not automatically better. The current best appears to sit at a narrow early-update point; additional terminology-weighted updates over-steer the model.
 - If this direction is revisited, try a lighter repeat ratio or construct new full-sentence contextual examples instead of duplicating the same matched rows.
+
+### Contextual Terminology Drills Follow-Up
+
+Added `scripts/build_contextual_terminology_jsonl.py` after the raw term-pair and oversampling negatives.
+
+Purpose: preserve the useful glossary signal while avoiding bare dictionary-answer training. The builder wraps filtered simple glossary entries in short stable contexts such as `Explique {source_term}.` -> `{target_term}ta sut'ichay.` and `Explique el caso de {source_term}.` -> `{target_term} kasutam sut'ichay.`.
+
+Guardrails:
+
+- Rejects Spanish stopwords, numeric/legal-code fragments, parenthetical labels, long terms, and terms with too many words.
+- Labels rows as `quy/chanka_terminology_context` so artifacts remain auditable.
+- Generated JSONL is an artifact under `outputs/`, not a git-tracked dataset.
+
+Queued canary: `experiments/sft/queue_contextual_terminology_sft_canary.sh` waits until the current 9B terminology-SFT chain has a summary, builds a small contextual terminology JSONL, mixes it with the current clean+MBR JSONL, continues from the current deployable 2B adapter at LR `1e-7` for 16 steps, and evaluates checkpoints with terminology top-1 prompting.

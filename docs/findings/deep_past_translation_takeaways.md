@@ -6,7 +6,7 @@ Source: user-provided Kaggle Deep Past Challenge solution writeups, reviewed on 
 
 The biggest transferable point is that the winning systems were data systems first and model systems second. For RosettIA-Chanka, the most useful ideas are:
 
-- Build targeted synthetic drills from our Chanka glossary instead of generic sentence generation. Useful drill families: vocabulary-in-context, ambiguity contrasts, short formulaic legal/interview templates, and negative examples where a Spanish-looking Quechua output must be rejected.
+- Build targeted synthetic drills from our Chanka glossary instead of generic sentence generation. Useful drill families: vocabulary-in-context, ambiguity contrasts, short formulaic legal/interview templates, and negative examples where a Spanish-looking Quechua output must be rejected. First implementation: `scripts/build_contextual_terminology_jsonl.py` creates filtered glossary-in-context rows for a low-LR canary.
 - Use slot-fill templates for stable domains already visible in our data: identity questions, family/marital status, court procedure, location, age, dates, and simple legal formulas. These can scale cleanly if slots are curated from real Chanka references.
 - Keep MBR-style candidate selection in the inference stack. The Kaggle winners used MBR or reward-model selection; our own K16 experiments show the candidate pool contains much better translations than greedy selection.
 - Prefer iterative data repair over blind scaling. The most relevant loop is: generate/evaluate candidate translations, identify rows with high candidate disagreement or severe reference mismatch, then manually/LLM-review those rows and add corrected examples.
