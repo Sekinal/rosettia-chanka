@@ -176,6 +176,24 @@ The v3 mining run from that failed adapter produced the desired hard negatives:
 
 This confirms that the main failure is not lack of self-evaluation syntax anymore; it is calibration. The meta-verifier should be trained heavily on these real false-confidence traces, then the next GSPO run should reward agreement with that meta-verifier rather than trusting the model's boxed score.
 
+The first GSPO run using the v3 meta-verifier still failed as a translator:
+
+- run directory: `outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_meta_v3_20260523-meta-v3-thinking`
+- chrF++: 32.5425
+- BLEU: 8.5679
+- TER: 119.6532
+- token F1: 17.9425
+- trainer eval reward: 0.0970
+- format/thinking-format rate: 50.0%
+- missing self-score rate: 50.0%
+- average self-score / true-score: 0.9250 / 0.2457
+- false-confidence rate: 93.75%
+- average thinking score: 0.2036
+
+The reward rose, but corpus translation metrics collapsed. That makes this a useful negative: the model learned enough structure to satisfy part of the verifier loop, but the loop is not yet grounded strongly enough in translation quality. The next variant should give the generator a supervised head-start on the primitive-tag thinking format before GSPO.
+
+Speed note: `scripts/train_gspo_chanka_unsloth.py` now supports `--no-trainer-eval`, `--final-metrics-max-samples`, and `--final-generation-batch-size`. For exploratory structured-output canaries, disable trainer eval and score only 16-32 final rows; reserve full trainer eval/full final metrics for runs that already show format adherence and non-collapsed translation quality.
+
 ## Why This Fits Chanka Better Than Plain BLEU RL
 
 BLEU/chrF rewards are useful but too shallow for the user's goal of learning grammar structures. A translation can gain n-gram overlap while still copying Spanish structure, omitting agglutinative morphology, or choosing a misleading Chanka term. The DeepSeekMath-V2 adaptation makes the model expose its own quality judgement, then rewards calibration. This creates pressure toward internal checks like:

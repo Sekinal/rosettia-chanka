@@ -26,6 +26,21 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
             str(args.resume_from_checkpoint), "outputs/run/chanka_gspo/checkpoint-56"
         )
 
+    def test_fast_canary_cli_can_skip_trainer_eval_and_cap_final_metrics(self):
+        args = train_gspo.parse_args(
+            [
+                "--no-trainer-eval",
+                "--final-metrics-max-samples",
+                "16",
+                "--final-generation-batch-size",
+                "8",
+            ]
+        )
+
+        self.assertFalse(args.trainer_eval)
+        self.assertEqual(args.final_metrics_max_samples, 16)
+        self.assertEqual(args.final_generation_batch_size, 8)
+
     def test_prompt_is_general_chanka_translation(self):
         messages = train_gspo.prompt_messages("Buenos dias.")
 

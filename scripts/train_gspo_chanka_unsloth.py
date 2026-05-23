@@ -139,6 +139,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--save-steps", type=int, default=None)
     parser.add_argument("--save-total-limit", type=int, default=3)
     parser.add_argument("--evals-per-epoch", type=int, default=8)
+    parser.add_argument(
+        "--trainer-eval",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run TRL trainer evaluation during GSPO. Disable for fast canaries and rely on final metrics.",
+    )
+    parser.add_argument(
+        "--final-metrics-max-samples",
+        type=int,
+        default=None,
+        help="Optional positive cap for final generated corpus metrics. Useful for slow structured-output canaries.",
+    )
+    parser.add_argument(
+        "--final-generation-batch-size",
+        type=int,
+        default=None,
+        help="Optional batch size for final generated metrics. Defaults to per-device eval batch size.",
+    )
     parser.add_argument("--logging-steps", type=int, default=5)
     parser.add_argument("--log-completions", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument(
@@ -1881,6 +1899,7 @@ def main() -> None:
     if patched_no_thinking_template:
         print("Tokenizer chat template: forced closed thinking block for TRL prompt rendering")
     print(f"Validation: every {args.eval_steps} steps")
+    print(f"Trainer eval: {args.trainer_eval}")
     print(f"Saving: every {args.save_steps} steps")
 
     trainer = GRPOTrainer(
@@ -1916,7 +1935,7 @@ def main() -> None:
             learning_rate=args.learning_rate,
             warmup_ratio=args.warmup_ratio,
             logging_steps=args.logging_steps,
-            eval_strategy="steps",
+            eval_strategy="steps" if args.trainer_eval else "no",
             eval_steps=args.eval_steps,
             save_strategy="steps",
             save_steps=args.save_steps,
@@ -1958,25 +1977,29 @@ def main() -> None:
     model.save_pretrained(str(final_dir))
     tokenizer.save_pretrained(str(final_dir))
 
+    final_eval_rows = eval_rows
+    if args.final_metrics_max_samples is not None:
+        final_eval_rows = final_eval_rows[: max(1, args.final_metrics_max_samples)]
+    final_generation_batch_size = args.final_generation_batch_size or args.per_device_eval_batch_size
     generated = generate_predictions(
         model,
         tokenizer,
-        eval_rows,
+        final_eval_rows,
         args.max_completion_length,
         terminology_entries,
         args.terminology_top_k,
         self_verification=use_self_verification_prompt,
         self_verification_thinking=use_self_verification_thinking,
         return_raw=use_self_verification_prompt,
-        batch_size=args.per_device_eval_batch_size,
+        batch_size=final_generation_batch_size,
     )
     if use_self_verification_prompt:
         predictions, raw_predictions = generated
     else:
         predictions = generated
         raw_predictions = []
-    references = [row["target"] for row in eval_rows]
-    sources = [row["source"] for row in eval_rows]
+    references = [row["target"] for row in final_eval_rows]
+    sources = [row["source"] for row in final_eval_rows]
     metrics = corpus_metrics(predictions, references, sources)
     if use_self_verification_prompt:
         metrics.update(
@@ -1988,6 +2011,8 @@ def main() -> None:
             )
         )
     metrics["eval_rows"] = len(eval_rows)
+    metrics["final_metric_rows"] = len(final_eval_rows)
+    metrics["final_generation_batch_size"] = final_generation_batch_size
     metrics["trainer_eval_reward"] = float(trainer_metrics.get("eval_reward", 0.0))
     metrics["final_adapter"] = str(final_dir)
     metrics["reward_profile"] = args.reward_profile

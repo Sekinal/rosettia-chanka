@@ -19,6 +19,7 @@ NUM_GENERATIONS="${NUM_GENERATIONS:-4}"
 TRAIN_BATCH_SIZE="${TRAIN_BATCH_SIZE:-4}"
 EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-4}"
 LEARNING_RATE="${LEARNING_RATE:-2e-7}"
+TRAINER_EVAL="${TRAINER_EVAL:-true}"
 
 cd "$ROOT_DIR"
 mkdir -p "$OUTPUT_DIR"
@@ -33,6 +34,16 @@ if [[ -n "${MAX_TRAIN_SAMPLES:-}" ]]; then
 fi
 if [[ -n "${MAX_EVAL_SAMPLES:-}" ]]; then
   SAMPLE_ARGS+=(--max-eval-samples "$MAX_EVAL_SAMPLES")
+fi
+SPEED_ARGS=()
+if [[ "$TRAINER_EVAL" == "false" || "$TRAINER_EVAL" == "0" || "$TRAINER_EVAL" == "no" ]]; then
+  SPEED_ARGS+=(--no-trainer-eval)
+fi
+if [[ -n "${FINAL_METRICS_MAX_SAMPLES:-}" ]]; then
+  SPEED_ARGS+=(--final-metrics-max-samples "$FINAL_METRICS_MAX_SAMPLES")
+fi
+if [[ -n "${FINAL_GENERATION_BATCH_SIZE:-}" ]]; then
+  SPEED_ARGS+=(--final-generation-batch-size "$FINAL_GENERATION_BATCH_SIZE")
 fi
 
 "$PYTHON" scripts/train_gspo_chanka_unsloth.py \
@@ -64,6 +75,7 @@ fi
   --terminology-file "$TERMINOLOGY_FILE" \
   --terminology-top-k "${TERMINOLOGY_TOP_K:-1}" \
   "${SAMPLE_ARGS[@]}" \
+  "${SPEED_ARGS[@]}" \
   --overlong-ratio-threshold "${OVERLONG_RATIO_THRESHOLD:-3.0}" \
   --overlong-penalty-weight "${OVERLONG_PENALTY_WEIGHT:-0.7}" \
   "${META_ARGS[@]}" \
