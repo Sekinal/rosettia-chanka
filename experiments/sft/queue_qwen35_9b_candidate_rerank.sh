@@ -52,10 +52,19 @@ import json
 import sys
 from pathlib import Path
 
+from scripts.summarize_gspo_canaries import selection_score
+
 eval_dir = Path(sys.argv[1])
 chanka_dir = Path(sys.argv[2])
 summary = json.loads((eval_dir / "summary.json").read_text())
-records = [row for row in summary.get("records", []) if row.get("selection_score") is not None]
+records = []
+for row in summary.get("records", []):
+    score = row.get("selection_score")
+    if score is None and row.get("metrics_json"):
+        score = selection_score(json.loads(Path(row["metrics_json"]).read_text()))
+        row = {**row, "selection_score": score}
+    if score is not None:
+        records.append(row)
 if not records:
     raise SystemExit("No scored checkpoint records found")
 best = max(records, key=lambda row: row["selection_score"])

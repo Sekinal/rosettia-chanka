@@ -148,6 +148,14 @@ Caveat: 9B FFT may be memory-bound on the current L40S despite Unsloth support. 
 
 Update: the queued 9B full-SFT smoke and real canary now train with `--terminology-file clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet --terminology-top-k 1`, not just evaluate that way. This removes the prompt mismatch from the original queued plan.
 
+9B checkpoint status:
+
+- The broad -> Chanka 9B LoRA curriculum completed at `outputs/qwen35_9b_curriculum/20260522-broad256-chanka192-r64`.
+- Best standalone checkpoint is `checkpoint-192` / `final_lora`: selection `28.3241`, chrF++ `41.6747`, BLEU `12.3257`, token F1 `29.2655`, TER `84.7926`.
+- This is weaker than the 4B full-SFT checkpoint as a standalone model, so the immediate value of 9B is candidate diversity and possible merge -> full-SFT refinement, not direct deployment yet.
+- `scripts/write_nested_metrics_summary.py` was added because the 9B eval summary initially lacked computed `selection_score` fields. Downstream queues now compute fallback selection scores from `metrics.json`.
+- The no-few-shot 9B candidate-rerank queue was restarted on 2026-05-23 and selected `checkpoint-192`. The 9B full-SFT queue remains intentionally behind the no-few-shot and few-shot candidate-rerank passes.
+
 ## Terminology-Conditioned SFT Prompt Matching
 
 Added terminology-conditioned prompts to `scripts/train_sft_unsloth.py`.

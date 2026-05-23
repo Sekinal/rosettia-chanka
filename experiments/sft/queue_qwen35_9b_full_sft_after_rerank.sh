@@ -43,10 +43,19 @@ import json
 import sys
 from pathlib import Path
 
+from scripts.summarize_gspo_canaries import selection_score
+
 eval_dir = Path(sys.argv[1])
 chanka_dir = Path(sys.argv[2])
 summary = json.loads((eval_dir / "summary.json").read_text())
-records = [row for row in summary.get("records", []) if row.get("selection_score") is not None]
+records = []
+for row in summary.get("records", []):
+    score = row.get("selection_score")
+    if score is None and row.get("metrics_json"):
+        score = selection_score(json.loads(Path(row["metrics_json"]).read_text()))
+        row = {**row, "selection_score": score}
+    if score is not None:
+        records.append(row)
 if not records:
     raise SystemExit("No scored checkpoint records found")
 best = max(records, key=lambda row: row["selection_score"])
@@ -141,28 +150,4 @@ for checkpoint in "${CHECKPOINTS[@]}"; do
     --progress-every 32
 done
 
-"$PYTHON" - <<'PY' "$EVAL_DIR"
-import json
-import sys
-from pathlib import Path
-
-eval_dir = Path(sys.argv[1])
-rows = []
-for metrics_path in sorted(eval_dir.glob("*/metrics.json")):
-    metrics = json.loads(metrics_path.read_text())
-    rows.append(
-        {
-            "checkpoint": metrics_path.parent.name,
-            "selection_score": metrics.get("selection_score"),
-            "chrf++": metrics.get("chrf++"),
-            "bleu": metrics.get("bleu"),
-            "token_f1": metrics.get("token_f1"),
-            "ter": metrics.get("ter"),
-            "metrics_json": str(metrics_path),
-        }
-    )
-rows.sort(key=lambda row: (row["selection_score"] is not None, row["selection_score"] or -1), reverse=True)
-summary_path = eval_dir / "summary.json"
-summary_path.write_text(json.dumps({"records": rows}, ensure_ascii=False, indent=2) + "\n")
-print(json.dumps({"best": rows[0] if rows else None, "summary_json": str(summary_path)}, ensure_ascii=False, indent=2))
-PY
+"$PYTHON" scripts/write_nested_metrics_summary.py "$EVAL_DIR"

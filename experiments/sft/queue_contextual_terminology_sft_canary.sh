@@ -95,30 +95,18 @@ import json
 import sys
 from pathlib import Path
 
+from scripts.write_nested_metrics_summary import collect_records
+
 eval_dir = Path(sys.argv[1])
 context_jsonl = Path(sys.argv[2])
 work_dir = Path(sys.argv[3])
-rows = []
-for metrics_path in sorted(eval_dir.glob("*/metrics.json")):
-    metrics = json.loads(metrics_path.read_text())
-    rows.append(
-        {
-            "checkpoint": metrics_path.parent.name,
-            "selection_score": metrics.get("selection_score"),
-            "chrf++": metrics.get("chrf++"),
-            "bleu": metrics.get("bleu"),
-            "token_f1": metrics.get("token_f1"),
-            "ter": metrics.get("ter"),
-            "metrics_json": str(metrics_path),
-        }
-    )
-rows.sort(key=lambda row: (row["selection_score"] is not None, row["selection_score"] or -1), reverse=True)
+records = collect_records(eval_dir, [])
 summary = {
     "context_jsonl": str(context_jsonl),
     "context_rows": sum(1 for _ in context_jsonl.open()),
-    "records": rows,
+    "records": records,
 }
 summary_path = work_dir / "summary.json"
 summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n")
-print(json.dumps({"best": rows[0] if rows else None, "summary_json": str(summary_path)}, ensure_ascii=False, indent=2))
+print(json.dumps({"best": records[0] if records else None, "summary_json": str(summary_path)}, ensure_ascii=False, indent=2))
 PY

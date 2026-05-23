@@ -39,6 +39,8 @@ import json
 import sys
 from pathlib import Path
 
+from scripts.summarize_gspo_canaries import selection_score
+
 eval_dir = Path(sys.argv[1])
 chanka_dir = Path(sys.argv[2])
 soup_size = int(sys.argv[3])
@@ -46,7 +48,14 @@ raw_weights = [float(item) for item in sys.argv[4].split(",") if item.strip()]
 output_path = Path(sys.argv[5])
 
 summary = json.loads((eval_dir / "summary.json").read_text())
-records = [row for row in summary.get("records", []) if row.get("selection_score") is not None]
+records = []
+for row in summary.get("records", []):
+    score = row.get("selection_score")
+    if score is None and row.get("metrics_json"):
+        score = selection_score(json.loads(Path(row["metrics_json"]).read_text()))
+        row = {**row, "selection_score": score}
+    if score is not None:
+        records.append(row)
 records.sort(key=lambda row: row["selection_score"], reverse=True)
 
 selected = []
@@ -118,12 +127,17 @@ soup_dir = Path(sys.argv[3])
 work_dir = Path(sys.argv[4])
 metrics = json.loads((eval_dir / "metrics.json").read_text())
 selection = json.loads(selection_path.read_text())
+score = metrics.get("selection_score")
+if score is None:
+    from scripts.summarize_gspo_canaries import selection_score
+
+    score = selection_score(metrics)
 summary = {
     "soup_dir": str(soup_dir),
     "selected": selection["selected"],
     "weights": selection["weights"],
     "metrics": {
-        "selection_score": metrics.get("selection_score"),
+        "selection_score": score,
         "chrf++": metrics.get("chrf++"),
         "bleu": metrics.get("bleu"),
         "token_f1": metrics.get("token_f1"),
