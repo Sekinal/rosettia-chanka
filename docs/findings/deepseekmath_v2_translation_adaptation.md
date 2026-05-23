@@ -129,6 +129,22 @@ That variant now exists as `self_verifiable_thinking_translation_2511` and is la
 
 Do not scale that variant until it proves it terminates and improves final translations. The first target is a canary against the meta-verifier-v2 run, not a replacement for the current deployable model.
 
+The first tightened bounded-thinking canary was a useful negative result. It stopped the runaway traces but did not produce a good translator:
+
+- run: `outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_20260523-thinking-meta-v2`
+- chrF++: 35.1158
+- BLEU: 12.9443
+- TER: 95.3757
+- token F1: 18.2616
+- trainer eval reward: 0.0911
+- format/thinking-format rate: 45.3125%
+- missing self-score rate: 54.6875%
+- average self-score / true-score: 0.9552 / 0.2577
+- false-confidence rate: 93.1034%
+- average thinking score: 0.1742
+
+Conclusion: the bounded thinking format is now mechanically viable, but a normal translator adapter does not reliably discover the reasoning/checking behavior from a tiny GSPO canary. The next serious branch should use the bounded-thinking generator SFT cold start before GSPO, while the meta-verifier-v3 queue mines this failed run for real false-confidence examples.
+
 ## Why This Fits Chanka Better Than Plain BLEU RL
 
 BLEU/chrF rewards are useful but too shallow for the user's goal of learning grammar structures. A translation can gain n-gram overlap while still copying Spanish structure, omitting agglutinative morphology, or choosing a misleading Chanka term. The DeepSeekMath-V2 adaptation makes the model expose its own quality judgement, then rewards calibration. This creates pressure toward internal checks like:
