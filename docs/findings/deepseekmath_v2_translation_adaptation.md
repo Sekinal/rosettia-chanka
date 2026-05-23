@@ -166,6 +166,13 @@ MAX_STEPS=8 EVAL_STEPS=4 SAVE_STEPS=4 \
 experiments/gspo/run_2511_self_verifiable_thinking_translation.sh
 ```
 
+If another GSPO process is still using the GPU, queue it with:
+
+```bash
+cd /root/rosettia-chanka
+experiments/gspo/queue_2511_self_verifiable_thinking_after_current_gspo.sh
+```
+
 To mine bounded-thinking failures and close the next loop:
 
 ```bash
