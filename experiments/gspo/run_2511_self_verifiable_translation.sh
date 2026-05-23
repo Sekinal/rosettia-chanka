@@ -9,6 +9,7 @@ BASE_MODEL="${BASE_MODEL:-outputs/full_sft_sweeps/20260523-qwen35-4b-full-sft-lr
 OUTPUT_DIR="${OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_self_verifiable_translation_${STAMP}}"
 METRICS_JSON="${METRICS_JSON:-${OUTPUT_DIR}/chanka_gspo/final_metrics.json}"
 TERMINOLOGY_FILE="${TERMINOLOGY_FILE:-clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet}"
+META_VERIFIER_ADAPTER="${META_VERIFIER_ADAPTER:-}"
 
 MAX_STEPS="${MAX_STEPS:-16}"
 EVAL_STEPS="${EVAL_STEPS:-8}"
@@ -21,6 +22,11 @@ LEARNING_RATE="${LEARNING_RATE:-2e-7}"
 
 cd "$ROOT_DIR"
 mkdir -p "$OUTPUT_DIR"
+
+META_ARGS=()
+if [[ -n "$META_VERIFIER_ADAPTER" ]]; then
+  META_ARGS+=(--meta-verifier-adapter-path "$META_VERIFIER_ADAPTER")
+fi
 
 "$PYTHON" scripts/train_gspo_chanka_unsloth.py \
   --adapter-path "$BASE_MODEL" \
@@ -52,6 +58,10 @@ mkdir -p "$OUTPUT_DIR"
   --terminology-top-k "${TERMINOLOGY_TOP_K:-1}" \
   --overlong-ratio-threshold "${OVERLONG_RATIO_THRESHOLD:-3.0}" \
   --overlong-penalty-weight "${OVERLONG_PENALTY_WEIGHT:-0.7}" \
+  "${META_ARGS[@]}" \
+  --meta-verifier-max-seq-length "${META_VERIFIER_MAX_SEQ_LENGTH:-768}" \
+  --meta-verifier-max-new-tokens "${META_VERIFIER_MAX_NEW_TOKENS:-96}" \
+  --meta-verifier-batch-size "${META_VERIFIER_BATCH_SIZE:-2}" \
   --metrics-json "$METRICS_JSON"
 
 cat "$METRICS_JSON"

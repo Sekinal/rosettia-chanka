@@ -47,7 +47,15 @@ Behavior:
 - `translation_meta_verifier_cold_start.jsonl`: faithful and deliberately flawed verifier analyses for meta-verifier training.
 - `self_verifiable_generator_sft.jsonl`: generator examples in the final/self-analysis/boxed-score format.
 
+`scripts/train_meta_verifier_chanka_unsloth.py` trains the meta-verifier LoRA. It can either consume the generated `translation_meta_verifier_cold_start.jsonl` or build the same rows directly from the clean corpus. It saves `final_meta_verifier_lora`.
+
 `experiments/gspo/run_2511_self_verifiable_translation.sh` launches a small GSPO canary from the current best standalone 4B full-SFT checkpoint with a fresh LoRA adapter.
+
+`experiments/gspo/run_2511_train_meta_verifier_then_self_gspo.sh` chains the first complete DeepSeekMath-style loop:
+
+1. Build cold-start verifier/meta-verifier/generator data.
+2. Train a meta-verifier.
+3. Run self-verifiable GSPO with `--meta-verifier-adapter-path`.
 
 ## Thinking vs. Self-Verification
 
@@ -80,7 +88,7 @@ This still does not magically prove grammatical understanding. It gives us an RL
 
 ## Important Limitation
 
-The current `self_verifiable_translation_2511` reward uses a deterministic meta-analysis proxy. It is not yet the full DeepSeekMath-V2 setup, because the paper's strongest loop uses a trained meta-verifier to judge verifier/self-analysis faithfulness.
+The current `self_verifiable_translation_2511` reward can use a trained meta-verifier via `--meta-verifier-adapter-path`, but the first available meta-verifier data is synthetic/cold-start. That is closer to DeepSeekMath-V2 than a deterministic proxy, but not yet the full loop. The paper's strongest loop repeatedly mines hard generator/verifier failures and retrains the verifier/meta-verifier.
 
 Next serious step:
 
@@ -109,3 +117,18 @@ experiments/gspo/run_2511_self_verifiable_translation.sh
 ```
 
 Keep this as a canary until we confirm the model reliably follows the structured format. If it spends too many tokens on self-analysis, reduce `MAX_COMPLETION_LENGTH` or shorten the prompt. If `Thinking Process:` or open `<think>` tags reappear, check that `force_tokenizer_no_thinking_template()` printed its patch message before training.
+
+To train and use the cold-start meta-verifier:
+
+```bash
+cd /root/rosettia-chanka
+experiments/gspo/run_2511_train_meta_verifier_then_self_gspo.sh
+```
+
+For a faster smoke:
+
+```bash
+MAX_META_SOURCE_ROWS=32 META_MAX_STEPS=4 META_EVAL_STEPS=2 META_SAVE_STEPS=2 \
+GSPO_MAX_STEPS=2 GSPO_EVAL_STEPS=1 GSPO_SAVE_STEPS=1 \
+experiments/gspo/run_2511_train_meta_verifier_then_self_gspo.sh
+```

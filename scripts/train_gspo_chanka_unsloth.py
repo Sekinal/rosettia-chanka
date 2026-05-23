@@ -170,6 +170,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Optional second verifier LoRA for learned_verifier_ensemble_vibe_2511.",
     )
+    parser.add_argument(
+        "--meta-verifier-adapter-path",
+        type=Path,
+        default=None,
+        help="Optional meta-verifier LoRA for self_verifiable_translation_2511.",
+    )
+    parser.add_argument("--meta-verifier-max-seq-length", type=int, default=768)
+    parser.add_argument("--meta-verifier-max-new-tokens", type=int, default=96)
+    parser.add_argument("--meta-verifier-batch-size", type=int, default=4)
     return parser.parse_args(argv)
 
 
@@ -818,12 +827,41 @@ def self_verifiable_translation_reward(
     overlong_penalty_weight: float = 1.0,
 ) -> float:
     parsed = parse_self_verification_output(completion_text(completion))
+    return self_verifiable_translation_reward_from_parsed(
+        parsed,
+        reference,
+        source,
+        learned_meta_score=None,
+        overlong_max_words=overlong_max_words,
+        overlong_ratio_threshold=overlong_ratio_threshold,
+        overlong_penalty_weight=overlong_penalty_weight,
+    )
+
+
+def self_verifiable_translation_reward_from_parsed(
+    parsed: dict[str, object],
+    reference: str,
+    source: str | None,
+    learned_meta_score: float | None = None,
+    overlong_max_words: int | None = None,
+    overlong_ratio_threshold: float = 0.0,
+    overlong_penalty_weight: float = 1.0,
+) -> float:
     translation = str(parsed["translation"])
     self_score = parsed["self_score"]
     true_score = bounded_translation_quality_score(translation, reference, source)
     format_reward = 1.0 if parsed["has_format"] else 0.15
     score_reward = 0.0 if self_score is None else 1.0 - abs(float(self_score) - true_score)
-    meta_reward = self_analysis_meta_score(str(parsed["analysis"]), self_score if isinstance(self_score, float) else None, true_score)
+    proxy_meta_reward = self_analysis_meta_score(
+        str(parsed["analysis"]),
+        self_score if isinstance(self_score, float) else None,
+        true_score,
+    )
+    meta_reward = (
+        max(0.0, min(1.0, learned_meta_score))
+        if learned_meta_score is not None
+        else proxy_meta_reward
+    )
     self_eval_reward = score_reward * meta_reward
     overlong = overlong_penalty_weight * overlong_completion_penalty(
         translation,
@@ -957,6 +995,35 @@ def verifier_prompt_text(tokenizer, source: str, reference: str, candidate: str)
     return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
 
+def meta_verifier_prompt_text(
+    tokenizer,
+    source: str,
+    reference: str,
+    candidate: str,
+    analysis: str,
+) -> str:
+    messages = [
+        {
+            "role": "system",
+            "content": "Eres un meta-verificador de analisis de traducciones español a quechua chanka.",
+        },
+        {
+            "role": "user",
+            "content": (
+                "Evalua si el analisis identifica problemas reales de la traduccion candidata "
+                "y si el puntaje se justifica. Penaliza analisis que inventan errores, ocultan "
+                "errores, o dan confianza falsa. Devuelve solo JSON compacto con score entre "
+                "0 y 1, severity y rationale.\n\n"
+                f"Español: {source}\n"
+                f"Referencia chanka: {reference}\n"
+                f"Candidata: {candidate}\n"
+                f"Analisis: {analysis}"
+            ),
+        },
+    ]
+    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+
 def parse_verifier_score(text: str) -> float:
     match = re.search(r'"score"\s*:\s*([01](?:\.\d+)?)', text)
     if match:
@@ -994,6 +1061,58 @@ class LearnedVerifierScorer:
         prompts = [
             verifier_prompt_text(self.tokenizer, source or "", reference, hypothesis)
             for source, reference, hypothesis in zip(sources, references, hypotheses, strict=True)
+        ]
+        scores: list[float] = []
+        for start in range(0, len(prompts), self.batch_size):
+            batch_prompts = prompts[start : start + self.batch_size]
+            inputs = self.tokenizer(
+                text=batch_prompts,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=self.max_seq_length,
+            ).to(self.model.device)
+            prompt_length = inputs["input_ids"].shape[1]
+            with self.torch.inference_mode():
+                output_ids = self.model.generate(
+                    **inputs,
+                    max_new_tokens=self.max_new_tokens,
+                    do_sample=False,
+                    temperature=None,
+                    top_p=None,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    pad_token_id=self.tokenizer.eos_token_id,
+                )
+            for row_index in range(len(batch_prompts)):
+                completion_ids = output_ids[row_index, prompt_length:]
+                decoded = self.tokenizer.decode(completion_ids, skip_special_tokens=True)
+                scores.append(parse_verifier_score(decoded))
+        return scores
+
+
+class LearnedMetaVerifierScorer(LearnedVerifierScorer):
+    def score_many(
+        self,
+        sources: list[str | None],
+        references: list[str],
+        hypotheses: list[str],
+        analyses: list[str],
+    ) -> list[float]:
+        prompts = [
+            meta_verifier_prompt_text(
+                self.tokenizer,
+                source or "",
+                reference,
+                hypothesis,
+                analysis,
+            )
+            for source, reference, hypothesis, analysis in zip(
+                sources,
+                references,
+                hypotheses,
+                analyses,
+                strict=True,
+            )
         ]
         scores: list[float] = []
         for start in range(0, len(prompts), self.batch_size):
@@ -1164,6 +1283,7 @@ def chanka_reward(
     target: list[str],
     source: list[str] | None = None,
     profile: str | None = None,
+    meta_verifier_scorer: LearnedMetaVerifierScorer | None = None,
     overlong_max_words: int | None = None,
     overlong_ratio_threshold: float = 0.0,
     overlong_penalty_weight: float = 1.0,
@@ -1173,20 +1293,39 @@ def chanka_reward(
     rewards: list[float] = []
     hypotheses: list[str] = []
     sources = list(source) if source is not None else [None] * len(target)
+    parsed_outputs: list[dict[str, object]] | None = None
+    learned_meta_scores: list[float | None] | None = None
+    if active_profile == "self_verifiable_translation_2511" and meta_verifier_scorer is not None:
+        parsed_outputs = [parse_self_verification_output(completion_text(completion)) for completion in completions]
+        learned_meta_scores = meta_verifier_scorer.score_many(
+            sources,
+            list(target),
+            [str(parsed["translation"]) for parsed in parsed_outputs],
+            [str(parsed["analysis"]) for parsed in parsed_outputs],
+        )
     for completion, reference, source_text in zip(completions, target, sources, strict=True):
         if active_profile == "self_verifiable_translation_2511":
-            reward = self_verifiable_translation_reward(
-                completion,
+            parsed = (
+                parsed_outputs[len(rewards)]
+                if parsed_outputs is not None
+                else parse_self_verification_output(completion_text(completion))
+            )
+            learned_meta_score = (
+                learned_meta_scores[len(rewards)]
+                if learned_meta_scores is not None
+                else None
+            )
+            reward = self_verifiable_translation_reward_from_parsed(
+                parsed,
                 reference,
                 source_text,
+                learned_meta_score=learned_meta_score,
                 overlong_max_words=overlong_max_words,
                 overlong_ratio_threshold=overlong_ratio_threshold,
                 overlong_penalty_weight=overlong_penalty_weight,
             )
             rewards.append(reward)
-            hypotheses.append(
-                str(parse_self_verification_output(completion_text(completion))["translation"])
-            )
+            hypotheses.append(str(parsed["translation"]))
             continue
         hypothesis = completion_text(completion)
         hypotheses.append(hypothesis)
@@ -1210,15 +1349,20 @@ def make_reward_fn(
     profile: str,
     verifier_adapter_path: Path | None = None,
     secondary_verifier_adapter_path: Path | None = None,
+    meta_verifier_adapter_path: Path | None = None,
     verifier_max_seq_length: int = 512,
     verifier_max_new_tokens: int = 96,
     verifier_batch_size: int = 4,
+    meta_verifier_max_seq_length: int = 768,
+    meta_verifier_max_new_tokens: int = 96,
+    meta_verifier_batch_size: int = 4,
     overlong_max_words: int | None = None,
     overlong_ratio_threshold: float = 0.0,
     overlong_penalty_weight: float = 1.0,
 ):
     verifier_scorer = None
     secondary_verifier_scorer = None
+    meta_verifier_scorer = None
     learned_profiles = {
         "learned_verifier_2511",
         "learned_verifier_vibe_2511",
@@ -1246,6 +1390,13 @@ def make_reward_fn(
             max_seq_length=verifier_max_seq_length,
             max_new_tokens=verifier_max_new_tokens,
             batch_size=verifier_batch_size,
+        )
+    if profile == "self_verifiable_translation_2511" and meta_verifier_adapter_path is not None:
+        meta_verifier_scorer = LearnedMetaVerifierScorer(
+            meta_verifier_adapter_path,
+            max_seq_length=meta_verifier_max_seq_length,
+            max_new_tokens=meta_verifier_max_new_tokens,
+            batch_size=meta_verifier_batch_size,
         )
 
     def reward_fn(completions: list, target: list[str], source: list[str] | None = None, **kwargs: object) -> list[float]:
@@ -1300,6 +1451,7 @@ def make_reward_fn(
             target,
             source=source,
             profile=profile,
+            meta_verifier_scorer=meta_verifier_scorer,
             overlong_max_words=overlong_max_words,
             overlong_ratio_threshold=overlong_ratio_threshold,
             overlong_penalty_weight=overlong_penalty_weight,
@@ -1562,9 +1714,13 @@ def main() -> None:
             args.reward_profile,
             verifier_adapter_path=args.verifier_adapter_path,
             secondary_verifier_adapter_path=args.secondary_verifier_adapter_path,
+            meta_verifier_adapter_path=args.meta_verifier_adapter_path,
             verifier_max_seq_length=args.verifier_max_seq_length,
             verifier_max_new_tokens=args.verifier_max_new_tokens,
             verifier_batch_size=args.verifier_batch_size,
+            meta_verifier_max_seq_length=args.meta_verifier_max_seq_length,
+            meta_verifier_max_new_tokens=args.meta_verifier_max_new_tokens,
+            meta_verifier_batch_size=args.meta_verifier_batch_size,
             overlong_max_words=args.overlong_max_words,
             overlong_ratio_threshold=args.overlong_ratio_threshold,
             overlong_penalty_weight=args.overlong_penalty_weight,

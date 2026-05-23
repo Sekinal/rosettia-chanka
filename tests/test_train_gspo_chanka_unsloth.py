@@ -237,6 +237,28 @@ suffix"""
         self.assertEqual(parsed["self_score"], 0.93)
         self.assertTrue(parsed["has_format"])
 
+    def test_meta_verifier_prompt_includes_candidate_and_analysis(self):
+        class Tokenizer:
+            def apply_chat_template(self, messages, **kwargs):
+                self.messages = messages
+                self.kwargs = kwargs
+                return "prompt"
+
+        tokenizer = Tokenizer()
+
+        rendered = train_gspo.meta_verifier_prompt_text(
+            tokenizer,
+            "Hola",
+            "Rimaykullayki",
+            "Hola",
+            "Puntaje: \\boxed{0.2}",
+        )
+
+        self.assertEqual(rendered, "prompt")
+        self.assertIn("Candidata: Hola", tokenizer.messages[1]["content"])
+        self.assertIn("Analisis: Puntaje", tokenizer.messages[1]["content"])
+        self.assertTrue(tokenizer.kwargs["add_generation_prompt"])
+
     def test_structured_translation_extractor_falls_back_to_plain_text(self):
         self.assertEqual(
             train_gspo.extract_translation_from_structured_output("Allin punchaw."),
@@ -395,6 +417,30 @@ suffix"""
             )
 
         self.assertGreater(good_reward, copied_reward)
+
+    def test_self_verifiable_translation_reward_accepts_learned_meta_score(self):
+        parsed = train_gspo.parse_self_verification_output(
+            "Traduccion final: Allin punchaw kamachiq. "
+            "Autoevaluacion: no veo errores importantes. "
+            "Puntaje: \\boxed{0.95}"
+        )
+        with mock.patch.object(train_gspo, "sentence_chrfpp", return_value=0.8), mock.patch.object(
+            train_gspo, "sentence_bleu", return_value=0.4
+        ):
+            high_meta = train_gspo.self_verifiable_translation_reward_from_parsed(
+                parsed,
+                "Allin punchaw kamachiq.",
+                "Buenos dias autoridad.",
+                learned_meta_score=1.0,
+            )
+            low_meta = train_gspo.self_verifiable_translation_reward_from_parsed(
+                parsed,
+                "Allin punchaw kamachiq.",
+                "Buenos dias autoridad.",
+                learned_meta_score=0.0,
+            )
+
+        self.assertGreater(high_meta, low_meta)
 
     def test_reference_rerank_metric_profile_penalizes_source_copy(self):
         with mock.patch.object(train_gspo, "sentence_chrfpp", return_value=0.7), mock.patch.object(
