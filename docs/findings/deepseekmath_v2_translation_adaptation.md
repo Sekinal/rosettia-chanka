@@ -145,6 +145,8 @@ The first tightened bounded-thinking canary was a useful negative result. It sto
 
 Conclusion: the bounded thinking format is now mechanically viable, but a normal translator adapter does not reliably discover the reasoning/checking behavior from a tiny GSPO canary. The next serious branch should use the bounded-thinking generator SFT cold start before GSPO, while the meta-verifier-v3 queue mines this failed run for real false-confidence examples.
 
+Operational note: `queue_meta_verifier_v3_from_thinking_outputs.sh` now mines with batch size 4 by default. The first restarted mining job used batch size 1 and was unnecessarily slow; the L40S had ample headroom, and the final evaluator path already proved batched decoding works for these structured outputs.
+
 ## Why This Fits Chanka Better Than Plain BLEU RL
 
 BLEU/chrF rewards are useful but too shallow for the user's goal of learning grammar structures. A translation can gain n-gram overlap while still copying Spanish structure, omitting agglutinative morphology, or choosing a misleading Chanka term. The DeepSeekMath-V2 adaptation makes the model expose its own quality judgement, then rewards calibration. This creates pressure toward internal checks like:

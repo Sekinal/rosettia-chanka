@@ -37,7 +37,7 @@ done
   --split "${MINE_SPLIT:-all}" \
   --max-train-samples "${MINE_MAX_TRAIN_SAMPLES:-256}" \
   --max-eval-samples "${MINE_MAX_EVAL_SAMPLES:-64}" \
-  --batch-size "${MINE_BATCH_SIZE:-1}" \
+  --batch-size "${MINE_BATCH_SIZE:-4}" \
   --max-seq-length "${MINE_MAX_SEQ_LENGTH:-256}" \
   --max-completion-length "${MINE_MAX_COMPLETION_LENGTH:-112}" \
   --self-verification-thinking-output \
