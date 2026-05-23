@@ -12,7 +12,7 @@ The biggest transferable point is that the winning systems were data systems fir
 - Prefer iterative data repair over blind scaling. The most relevant loop is: generate/evaluate candidate translations, identify rows with high candidate disagreement or severe reference mismatch, then manually/LLM-review those rows and add corrected examples.
 - Use pseudo-labels only when confidence is strong. Our earlier K16 MBR self-training agrees with the writeups: unfiltered pseudo-labels are risky, while conservative MBR+clean-anchor mixtures can help.
 - Treat checkpoint selection as a real variable. Do not trust `final_lora`; repeatedly our best checkpoints were early. Eval loss, held-out generation, and qualitative samples all matter.
-- Try weight averaging only after we have several nearby strong LoRA checkpoints or multiple small seed variants. It is plausible, but not higher priority than selector/data quality right now.
+- Try weight averaging only after we have several nearby strong LoRA checkpoints or multiple small seed variants. This is now queued for the 9B Chanka path via `experiments/sft/queue_qwen35_9b_checkpoint_soup_eval.sh`, which waits for the main 9B rerank work and then evaluates a top-three weighted LoRA soup.
 
 ## Less Directly Useful
 

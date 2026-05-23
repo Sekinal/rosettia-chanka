@@ -168,6 +168,7 @@ Automation:
 - `experiments/sft/queue_qwen35_9b_full_sft_after_rerank.sh` chains after the few-shot rerank summary, merges the best 9B LoRA checkpoint to a 16-bit full model, runs a 2-step FFT smoke, then runs a 32-step Chanka full-SFT canary if memory permits. This keeps full fine-tuning behind the current scale/retrieval experiments and avoids GPU contention.
 - `scripts/train_sft_unsloth.py` now supports terminology-conditioned SFT prompts through `--terminology-file` / `--terminology-top-k`. This matters because our best evaluation profile uses terminology prompts, while previous plain Chanka SFT runs trained without seeing that prompt form.
 - `experiments/sft/queue_qwen35_9b_terminology_chanka_sft.sh` waits for the current 9B rerank/full-SFT chain, then reruns the clean Chanka LoRA continuation from the 9B broad checkpoint with terminology top-1 prompts and evaluates the resulting checkpoints with the same terminology prompt. This tests prompt-format matching rather than just model scale.
+- `experiments/sft/queue_qwen35_9b_checkpoint_soup_eval.sh` waits until the main 9B checkpoint eval and few-shot rerank chain complete, then builds a weighted LoRA soup from the top three externally scored 9B Chanka checkpoints and evaluates the soup with terminology top-1 prompting. This ports the Deep Past weight-averaging idea into our Qwen/LoRA stack without competing for the GPU while the main rerank/full-SFT queues are still more important.
 
 Decision so far:
 
