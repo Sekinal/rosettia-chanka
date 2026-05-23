@@ -141,3 +141,30 @@ Takeaway:
 
 - The 4B curriculum/full-SFT path is worth scaling, but primarily as a multi-candidate generator.
 - The next base-model improvement experiment should be Qwen3.5 9B broad -> clean Chanka LoRA first; only merge and full-SFT it if the LoRA checkpoint has strong external generation metrics.
+
+## Qwen3.5 9B Curriculum Run
+
+Started on 2026-05-22 / 2026-05-23 UTC to scale the successful 4B recipe.
+
+Setup:
+
+- Model: `unsloth/Qwen3.5-9B`
+- Output root: `outputs/qwen35_9b_curriculum/20260522-broad256-chanka192-r64`
+- Broad stage: 166,480 train / 3,397 validation rows, max sequence length `256`, LoRA r64/alpha128, LR `5e-5`, effective batch `16`, max steps `256`, eval/save every `64` steps.
+- Chanka stage: planned from broad `checkpoint-256`, max sequence length `128`, LoRA r64/alpha128, LR `2e-5`, effective batch `8`, max steps `192`, eval/save every `32` steps.
+
+Early broad status:
+
+| Checkpoint | eval loss | Notes |
+| --- | ---: | --- |
+| checkpoint-64 | 1.8167 | Saved successfully; train loss logs decreased from `2.68` at step 16 to `1.891` at step 64. |
+
+Automation:
+
+- `experiments/sft/queue_qwen35_curriculum_eval.sh` waits for the 9B curriculum to finish, then evaluates all Chanka checkpoints with terminology top-1.
+- `experiments/sft/queue_qwen35_9b_candidate_rerank.sh` waits for that checkpoint-eval summary, selects the best 9B Chanka checkpoint, generates train/eval K16 candidate pools, merges them with the current K32 + 4B-full K16 pools, then trains matching feature/text/ensemble selectors.
+
+Decision so far:
+
+- The 9B run is mechanically feasible on the L40S in 16-bit LoRA mode.
+- Do not judge it from broad eval loss alone. The important evidence will be Chanka held-out generation and whether its K16 candidate pool improves the current multi-model oracle/selector profile.
