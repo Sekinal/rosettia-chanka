@@ -257,6 +257,7 @@ Decision:
 - This improves over the previous 4B full-SFT best (`30.4393` selection, chrF++ `43.3102`, BLEU `16.2178`, token F1 `30.6209`, TER `85.2535`) and over the recovered `5e-7/checkpoint-24` on selection/chrF++/BLEU/TER, though `5e-7/checkpoint-24` still had higher token F1.
 - Full fine-tuning is useful, but only as a short late-stage refinement after a strong broad Quechua -> clean Chanka LoRA curriculum is merged. Direct raw-base full SFT and JSONL-only full SFT remain negative.
 - A candidate-pool harvest is running from `2e-6/checkpoint-36`: log `outputs/logs/qwen35_4b_fft2e6ckpt36_candidate_rerank_20260523.log`, output root `outputs/qwen35_4b_full_sft_candidate_rerank/20260523-qwen35-4b-fft2e6ckpt36-candidate-rerank`.
+- Eval-side K16 sampling from this checkpoint has real selector headroom: first candidate selection `29.1882`, chrF++ `42.5822`, BLEU `16.4238`, TER `81.7972`; oracle selection `41.3831`, chrF++ `54.6467`, BLEU `25.0224`, TER `63.5945`. This is below the current multi-model oracle ceiling, but strong enough to justify the active merged-pool listwise rerank.
 
 Code hygiene:
 
