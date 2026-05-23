@@ -27,6 +27,13 @@ META_ARGS=()
 if [[ -n "$META_VERIFIER_ADAPTER" ]]; then
   META_ARGS+=(--meta-verifier-adapter-path "$META_VERIFIER_ADAPTER")
 fi
+SAMPLE_ARGS=()
+if [[ -n "${MAX_TRAIN_SAMPLES:-}" ]]; then
+  SAMPLE_ARGS+=(--max-train-samples "$MAX_TRAIN_SAMPLES")
+fi
+if [[ -n "${MAX_EVAL_SAMPLES:-}" ]]; then
+  SAMPLE_ARGS+=(--max-eval-samples "$MAX_EVAL_SAMPLES")
+fi
 
 "$PYTHON" scripts/train_gspo_chanka_unsloth.py \
   --adapter-path "$BASE_MODEL" \
@@ -56,6 +63,7 @@ fi
   --repetition-penalty "${REPETITION_PENALTY:-1.05}" \
   --terminology-file "$TERMINOLOGY_FILE" \
   --terminology-top-k "${TERMINOLOGY_TOP_K:-1}" \
+  "${SAMPLE_ARGS[@]}" \
   --overlong-ratio-threshold "${OVERLONG_RATIO_THRESHOLD:-3.0}" \
   --overlong-penalty-weight "${OVERLONG_PENALTY_WEIGHT:-0.7}" \
   "${META_ARGS[@]}" \

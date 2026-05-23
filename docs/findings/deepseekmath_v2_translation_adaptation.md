@@ -63,6 +63,8 @@ Both `scripts/evaluate_gspo_checkpoint.py` and final GSPO metrics now include se
 
 Final GSPO held-out generation is batched through `generate_predictions(..., batch_size=...)` using `--per-device-eval-batch-size`. This matters for the self-verification experiments because row-by-row final decoding was a large source of queue latency after the trainer finished.
 
+The self-verifiable launchers accept `MAX_TRAIN_SAMPLES` and `MAX_EVAL_SAMPLES`. The queue scripts default GSPO canaries to `256` train rows and `64` eval rows. Use this smaller validation surface for format/calibration iteration, then remove the caps only once the model reliably emits useful self-verification.
+
 Structured-output parsing strips trailing `Autoevaluacion` and `Puntaje` even when the model omits the `Traduccion final:` marker. This is necessary because early self-verification adapters often emitted partial structure such as `Quechua sentence Autoevaluacion: ... Puntaje: ...`; metrics and verifier mining should score only the Quechua sentence.
 
 ## Meta-Verifier V2 Result

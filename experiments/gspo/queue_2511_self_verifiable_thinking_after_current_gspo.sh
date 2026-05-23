@@ -26,4 +26,6 @@ STAMP="${STAMP:-20260523-thinking-meta-v2}" \
 MAX_STEPS="${MAX_STEPS:-8}" \
 EVAL_STEPS="${EVAL_STEPS:-4}" \
 SAVE_STEPS="${SAVE_STEPS:-4}" \
+MAX_TRAIN_SAMPLES="${MAX_TRAIN_SAMPLES:-256}" \
+MAX_EVAL_SAMPLES="${MAX_EVAL_SAMPLES:-64}" \
 experiments/gspo/run_2511_self_verifiable_thinking_translation.sh
