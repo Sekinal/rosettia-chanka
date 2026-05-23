@@ -122,7 +122,7 @@ Autoevaluacion: ...
 Puntaje: \boxed{...}
 ```
 
-That variant now exists as `self_verifiable_thinking_translation_2511` and is launched by `experiments/gspo/run_2511_self_verifiable_thinking_translation.sh`. It deliberately does **not** use the tokenizer's raw `<think>` mode. Instead, it asks for a short, parseable `Analisis de traduccion` field before the final translation and rewards it only when it is bounded and translation-specific. This is closer to the DeepSeekMath/R1 idea than plain `Autoevaluacion`, while still keeping external metrics on `Traduccion final` only.
+That variant now exists as `self_verifiable_thinking_translation_2511` and is launched by `experiments/gspo/run_2511_self_verifiable_thinking_translation.sh`. It deliberately does **not** use the tokenizer's raw `<think>` mode. Instead, it asks for a short, parseable `Analisis de traduccion` field before the final translation and rewards it only when it is bounded and translation-specific. After the first canary produced ~100-token analyses with 25% clipping, the target was tightened to 1-2 checks, at most 35 words, no step-by-step rationale, and the launcher default completion cap was reduced to 112 tokens. This is closer to the DeepSeekMath/R1 idea than plain `Autoevaluacion`, while still keeping external metrics on `Traduccion final` only.
 
 Do not scale that variant until it proves it terminates and improves final translations. The first target is a canary against the meta-verifier-v2 run, not a replacement for the current deployable model.
 

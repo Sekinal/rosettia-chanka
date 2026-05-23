@@ -345,7 +345,7 @@ def prompt_messages(
         user_content += (
             "\n\nFormato obligatorio inspirado en verificacion formal:\n"
             + (
-                "Analisis de traduccion: <2 a 4 chequeos breves sobre significado, gramatica chanka, entidades o copia del espanol>\n"
+                "Analisis de traduccion: <1 a 2 chequeos muy breves sobre significado, gramatica chanka, entidades o copia del espanol; maximo 35 palabras>\n"
                 if self_verification_thinking
                 else ""
             )
@@ -355,7 +355,7 @@ def prompt_messages(
             "El puntaje debe reflejar fidelidad, gramatica chanka, terminologia, "
             "ausencia de copia del espanol y naturalidad. "
             + (
-                "El analisis debe ser corto y debe terminar antes de 'Traduccion final:'."
+                "El analisis debe ser corto, no debe explicar paso a paso, y debe terminar antes de 'Traduccion final:'."
                 if self_verification_thinking
                 else "No escribas un proceso de razonamiento ni texto antes de 'Traduccion final:'."
             )
@@ -859,10 +859,12 @@ def translation_thinking_score(thinking: str) -> float:
     tokens = word_tokens(normalized)
     if len(tokens) < 6:
         length_score = 0.25
-    elif len(tokens) <= 70:
+    elif len(tokens) <= 35:
         length_score = 1.0
-    elif len(tokens) <= 100:
+    elif len(tokens) <= 55:
         length_score = 0.55
+    elif len(tokens) <= 70:
+        length_score = 0.25
     else:
         length_score = 0.10
 

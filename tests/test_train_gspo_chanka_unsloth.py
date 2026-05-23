@@ -77,6 +77,8 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
 
         self.assertIn("Analisis de traduccion:", messages[1]["content"])
         self.assertIn("Traduccion final:", messages[1]["content"])
+        self.assertIn("1 a 2 chequeos", messages[1]["content"])
+        self.assertIn("maximo 35 palabras", messages[1]["content"])
         self.assertIn("debe ser corto", messages[1]["content"])
 
     def test_chat_template_helper_disables_thinking_when_supported(self):
