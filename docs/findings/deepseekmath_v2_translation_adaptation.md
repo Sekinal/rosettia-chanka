@@ -62,7 +62,7 @@ This is the practical equivalent of mathematical reasoning primitives. The model
 
 For the thinking variant, the better cold-start path is now explicit: build `self_verifiable_thinking_generator_sft.jsonl`, SFT it with `scripts/train_jsonl_sft_unsloth.py --prompt-self-verification-thinking --target-field target`, then run `self_verifiable_thinking_translation_2511` GSPO. The wrapper `experiments/gspo/run_2511_train_thinking_generator_then_gspo.sh` performs that chain. This teaches the response structure before RL, which is closer to DeepSeekMath than asking a normal translator adapter to discover the reasoning format during GSPO.
 
-`experiments/gspo/queue_2511_thinking_generator_sft_after_active.sh` queues that branch behind active mining/training/evaluation jobs with canary-sized defaults. Use it when the GPU is occupied by meta-verifier mining but the next desired experiment is the SFT-seeded reasoning-format path.
+`experiments/gspo/queue_2511_thinking_generator_sft_after_active.sh` queues that branch behind active mining/training/evaluation jobs with canary-sized defaults. Use it when the GPU is occupied by meta-verifier mining but the next desired experiment is the SFT-seeded reasoning-format path. The runner now prefers meta-verifier v3 if its adapter exists and falls back to v2 only if v3 is absent; the queued GSPO canary uses 32 eval rows and evaluates at the final step to keep primitive-thinking iteration from being dominated by slow verifier evaluation.
 
 `experiments/gspo/run_2511_self_verifiable_translation.sh` launches a small GSPO canary from the current best standalone 4B full-SFT checkpoint with a fresh LoRA adapter.
 

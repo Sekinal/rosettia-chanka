@@ -10,10 +10,19 @@ BASE_ADAPTER="${BASE_ADAPTER:-outputs/full_sft_sweeps/20260523-qwen35-4b-full-sf
 THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/self_verifiable_thinking_generator_sft_${STAMP}}"
 THINKING_SFT_ADAPTER="${THINKING_SFT_ADAPTER:-${THINKING_SFT_OUTPUT_DIR}/final_lora}"
 GSPO_OUTPUT_DIR="${GSPO_OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_sft_seeded_${STAMP}}"
-META_VERIFIER_ADAPTER="${META_VERIFIER_ADAPTER:-outputs/chanka_translation_meta_verifier_v2_20260523-meta-v2-self/final_meta_verifier_lora}"
 TERMINOLOGY_FILE="${TERMINOLOGY_FILE:-clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet}"
 
 cd "$ROOT_DIR"
+
+if [[ -z "${META_VERIFIER_ADAPTER:-}" ]]; then
+  META_VERIFIER_V3="outputs/chanka_translation_meta_verifier_v3_thinking_20260523-meta-v3-thinking/final_meta_verifier_lora"
+  META_VERIFIER_V2="outputs/chanka_translation_meta_verifier_v2_20260523-meta-v2-self/final_meta_verifier_lora"
+  if [[ -d "$META_VERIFIER_V3" ]]; then
+    META_VERIFIER_ADAPTER="$META_VERIFIER_V3"
+  else
+    META_VERIFIER_ADAPTER="$META_VERIFIER_V2"
+  fi
+fi
 
 DATA_ARGS=()
 if [[ -n "${MAX_SOURCE_ROWS:-}" ]]; then
