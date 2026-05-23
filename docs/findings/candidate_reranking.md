@@ -416,6 +416,44 @@ Decision:
 - The remaining oracle gap is still huge, so more candidate diversity from 9B/35B-A3B SFT or a stronger QE/listwise selector is more promising than another plain continuation from the 2B policy.
 - Retrieval-augmented prompts are now available in `scripts/evaluate_gspo_checkpoint.py` via `--few-shot-top-k`, and in the multi-adapter deployment wrapper via the same flag. The retriever uses clean train rows only and excludes exact source matches, so eval references are not placed in the prompt. This is intended for a controlled follow-up after the 9B no-few-shot candidate pass.
 
+## 2026-05-23 Tuned MBR Consensus Selector
+
+Purpose: adapt the Kaggle Deep Past MBR idea more directly for our candidate pools: select the candidate with highest consensus against other candidates, then tune the reference-free signal weights on a train candidate pool.
+
+Code:
+
+- `scripts/train_mbr_consensus_selector.py`
+- Unit tests: `tests/test_train_mbr_consensus_selector.py`
+
+Implementation notes:
+
+- Eval-time selection is reference-free.
+- Training uses references only to tune weights on a separate train candidate pool.
+- Signals include fast chrF-like char n-gram overlap, BLEU-like token n-gram precision, token F1, token precision, Jaccard, length consensus, duplicate rate, copy/leakage/artifact/repetition guards, and candidate index.
+- The default utility is `--utility-mode fast`; sacrebleu pairwise utility was too slow for full candidate pools.
+- Weight search is clamped so copy/leakage/artifact/repetition/exact-copy/candidate-index signals cannot become positive rewards, and overlap/consensus signals cannot become penalties.
+
+Current K32 + 4B full-SFT pool result:
+
+- Train pool: `outputs/verifier_candidate_mining/20260522-train-current-k32-plus-qwen35-4b-full-k16-term/train_current_k32_plus_4bfull_k16_predictions.jsonl`
+- Eval pool: `outputs/rerank_candidate_evals/20260522-current-k32-plus-qwen35-4b-full-k16-term/candidates_predictions.jsonl`
+- Output: `outputs/rerank_candidate_evals/20260523-current-k32-plus-4bfull-tuned-mbr-clamped`
+- Settings: `--search-iterations 1000 --max-peers 4 --utility-mode fast`
+
+| Method | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| first | 25.9309 | 40.7905 | 8.9543 | 25.1761 | 2.7637 | 0.3165 | 92.1659 |
+| default MBR | 29.8908 | 44.3650 | 10.6186 | 28.7035 | 1.5401 | 0.0000 | 84.7926 |
+| tuned fast MBR | 29.9682 | 44.0250 | 10.6333 | 29.6208 | 1.8038 | 0.0000 | 82.7189 |
+| score ensemble | 35.5481 | 48.1624 | 24.0635 | 35.9579 | 2.4156 | 0.0000 | 70.5069 |
+| oracle | 50.0788 | 63.5158 | 35.7333 | 54.9308 | 2.0992 | 0.0000 | 51.3825 |
+
+Decision:
+
+- Tuned fast MBR is a small improvement over default MBR on selection, token F1, and TER, but it does not approach the text/score ensemble.
+- It should be kept as a cheap deployable diagnostic and possible future ensemble signal, not as the primary selector.
+- The next selector work should target stronger learned QE/listwise reranking over the high-oracle candidate pools.
+
 Example inference shape:
 
 ```bash
