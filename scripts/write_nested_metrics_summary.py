@@ -1,4 +1,4 @@
-"""Write summary.json for eval dirs containing */metrics.json files."""
+"""Write summary.json for eval dirs containing metric JSON files."""
 
 from __future__ import annotations
 
@@ -36,8 +36,12 @@ def record_from_metrics(metrics_path: Path, extra_fields: Sequence[str]) -> dict
     score = metrics.get("selection_score")
     if score is None:
         score = selection_score(metrics)
+    if metrics_path.name == "metrics.json":
+        checkpoint = metrics_path.parent.name
+    else:
+        checkpoint = metrics_path.stem.removesuffix("_metrics")
     record = {
-        "checkpoint": metrics_path.parent.name,
+        "checkpoint": checkpoint,
         "selection_score": score,
         "metrics_json": str(metrics_path),
     }
@@ -47,10 +51,8 @@ def record_from_metrics(metrics_path: Path, extra_fields: Sequence[str]) -> dict
 
 
 def collect_records(eval_dir: Path, extra_fields: Sequence[str]) -> list[dict[str, Any]]:
-    records = [
-        record_from_metrics(metrics_path, extra_fields)
-        for metrics_path in sorted(eval_dir.glob("*/metrics.json"))
-    ]
+    metric_paths = sorted({*eval_dir.glob("*/metrics.json"), *eval_dir.glob("*_metrics.json")})
+    records = [record_from_metrics(metrics_path, extra_fields) for metrics_path in metric_paths]
     records.sort(
         key=lambda row: (
             row.get("selection_score") is not None,

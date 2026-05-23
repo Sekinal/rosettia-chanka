@@ -264,6 +264,7 @@ Code hygiene:
 - `scripts/train_sft_unsloth.py` and `scripts/train_jsonl_sft_unsloth.py` now expose `--save-total-limit`; use `--save-total-limit 0` for full-SFT sweeps when model-only checkpointing is enabled.
 - `experiments/sft/queue_qwen35_4b_full_sft_lr_sweep.sh` defaults `SAVE_TOTAL_LIMIT=0` so future full-SFT sweeps do not silently prune early checkpoints before external generation eval.
 - `experiments/sft/queue_qwen35_4b_full_sft_candidate_rerank.sh` can take `FULL_SFT_CHECKPOINT=...` to harvest candidates from a known best checkpoint directly instead of selecting from one sweep summary.
+- `scripts/write_nested_metrics_summary.py` now handles both nested `*/metrics.json` and flat `*_metrics.json` layouts. The first GSPO retry summary was empty only because this queue writes flat metric files.
 
 GSPO follow-up:
 
@@ -271,6 +272,16 @@ GSPO follow-up:
 - `experiments/gspo/queue_qwen35_4b_full_sft_gspo_canary.sh` queues a small LoRA-on-full-checkpoint GSPO canary from `2e-6/checkpoint-36`, using the current learned-verifier-vibe reward profile and terminology top-1 prompts.
 - First two launches failed before training because Unsloth GRPO requires both train and eval per-device batch sizes to be divisible by `num_generations`. The queue script now defaults train/eval batch size to `4` when `NUM_GENERATIONS=4`.
 - Remote retry log: `outputs/logs/qwen35_4b_fft2e6ckpt36_lora_gspo_retry2_20260523.log`. It has passed the batching guard and is training from `2e-6/checkpoint-36`.
+- Result: the canary completed, but it did not beat the full-SFT base. Trainer-side eval reward peaked at step 8 (`0.1487`) and fell by step 16 (`0.1349`); all trainer eval completions hit the 80-token cap with no terminations, so reward is not trustworthy on its own.
+- External held-out eval with terminology top-1:
+
+| Checkpoint | Selection | chrF++ | BLEU | token F1 | TER |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-8` | 29.5960 | 43.0832 | 14.9256 | 28.9678 | 86.1751 |
+| `checkpoint-16` | 30.9849 | 44.3754 | 18.1300 | 29.2240 | 81.7972 |
+| `final_gspo_lora` | 30.9849 | 44.3754 | 18.1300 | 29.2240 | 81.7972 |
+
+- Decision: LoRA-GSPO from the best 4B full-SFT checkpoint is mechanically viable but negative as run. It slightly improves BLEU over the full-SFT base (`18.13` vs `18.00`) but loses selection (`30.98` vs `31.20`), token F1 (`29.22` vs `29.99`), and TER (`81.80` vs `81.57`). Do not scale this exact reward/length recipe; fix termination/length reward first or move GSPO back to a stronger adapter/checkpoint with a better candidate selector target.
 
 Candidate-rerank follow-up:
 
