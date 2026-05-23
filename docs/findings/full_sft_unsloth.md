@@ -127,6 +127,13 @@ Next best SFT path:
 3. Only if a larger LoRA checkpoint approaches or beats the current 2B adapter, merge it and run a short full-SFT continuation from that strong state.
 4. Evaluate larger full-SFT checkpoints both greedily and as candidate generators. The 4B result shows the reranked candidate pool can improve even when the single-model greedy metrics only move slightly.
 
+Queued focused 4B FFT sweep:
+
+- `experiments/sft/queue_qwen35_4b_full_sft_lr_sweep.sh` reuses the proven 4B broad -> Chanka LoRA checkpoint `outputs/qwen35_4b_curriculum/20260522-broad512-chanka-r64-a128-s128-256steps/chanka/checkpoint-224`.
+- It merges the adapter to `outputs/merged_full_models/20260522-qwen35-4b-broad512-chanka224-merged16` if needed, then runs terminology-conditioned full-SFT continuations for `LR_LIST="5e-7 1e-6 2e-6"` by default, `MAX_STEPS=96`, eval/save every `12` steps.
+- It waits behind the 9B merge -> full-SFT chain by default so it does not steal the L40S from the current scale experiment. Set `WAIT_FOR_SUCCESS="" WAIT_FOR_FAILURE=""` to run it immediately.
+- This is a targeted sweep around the only full-finetuning recipe that has shown signal. It should replace ad hoc raw-base FFT attempts.
+
 Details: `docs/findings/qwen35_4b_curriculum_sft.md`.
 
 ## Queued 9B Merge -> Full SFT
