@@ -79,6 +79,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--lora-alpha", type=int, default=128)
     parser.add_argument("--lora-dropout", type=float, default=0.0)
     parser.add_argument("--weight-decay", type=float, default=0.01)
+    parser.add_argument(
+        "--optim",
+        default="adamw_8bit",
+        help=(
+            "Trainer optimizer. Use paged_adamw_8bit for large full-finetuning "
+            "smokes when regular adamw_8bit runs out of GPU memory."
+        ),
+    )
     parser.add_argument("--eval-steps", type=int, default=None)
     parser.add_argument("--save-steps", type=int, default=None)
     parser.add_argument(
@@ -384,7 +392,7 @@ def main() -> None:
             metric_for_best_model="eval_loss",
             greater_is_better=False,
             output_dir=str(args.output_dir),
-            optim="adamw_8bit",
+            optim=args.optim,
             seed=args.seed,
             dataset_num_proc=args.dataset_num_proc,
             report_to="wandb" if args.wandb_project else "none",
@@ -417,8 +425,9 @@ def main() -> None:
     if args.training_mode == "lora":
         print(f"LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")
     print(f"Validation: every {args.eval_steps} steps, best checkpoint by eval_loss")
-    print(f"Saving: every {args.save_steps} steps, keeping the 3 most recent checkpoints")
+    print(f"Saving: every {args.save_steps} steps, keeping {args.save_total_limit} checkpoints")
     print(f"Save only model: {args.save_only_model}")
+    print(f"Optimizer: {args.optim}")
 
     trainer.train()
     metrics = trainer.evaluate()

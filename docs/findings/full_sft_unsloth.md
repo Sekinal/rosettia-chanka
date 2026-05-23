@@ -259,6 +259,45 @@ Decision:
 - A candidate-pool harvest is running from `2e-6/checkpoint-36`: log `outputs/logs/qwen35_4b_fft2e6ckpt36_candidate_rerank_20260523.log`, output root `outputs/qwen35_4b_full_sft_candidate_rerank/20260523-qwen35-4b-fft2e6ckpt36-candidate-rerank`.
 - Eval-side K16 sampling from this checkpoint has real selector headroom: first candidate selection `29.1882`, chrF++ `42.5822`, BLEU `16.4238`, TER `81.7972`; oracle selection `41.3831`, chrF++ `54.6467`, BLEU `25.0224`, TER `63.5945`. This is below the current multi-model oracle ceiling, but strong enough to justify the active merged-pool listwise rerank.
 
+## 2026-05-23 9B Full-SFT Optimizer Canary
+
+Purpose: test whether the completed Qwen3.5 9B broad -> clean Chanka LoRA checkpoint can be merged and improved through full fine-tuning on the L40S host.
+
+Code changes:
+
+- `scripts/train_sft_unsloth.py` and `scripts/train_jsonl_sft_unsloth.py` now expose `--optim`.
+- Default remains `adamw_8bit`.
+- For large full-SFT memory canaries, use `--optim paged_adamw_8bit`.
+- Added queue scripts:
+  - `experiments/sft/queue_qwen35_9b_full_sft_direct_smoke.sh`
+  - `experiments/sft/queue_qwen35_9b_full_sft_paged_canary.sh`
+
+Direct smoke:
+
+- Starting adapter: `outputs/qwen35_9b_curriculum/20260522-broad256-chanka192-r64/chanka/chanka/checkpoint-192`
+- Merged model: `outputs/merged_full_models/20260523-qwen35-9b-direct-full-sft-smoke-merged16`
+- Regular `adamw_8bit` full SFT OOMed on the first optimizer step on the 44 GB L40S.
+- `paged_adamw_8bit` completed the 2-step memory smoke, proving 9B full SFT is mechanically possible on this host only with the paged optimizer.
+
+Paged canary:
+
+- Output root: `outputs/qwen35_9b_full_sft/20260523-qwen35-9b-paged-full-sft-canary`
+- Training: clean Chanka SFT, terminology top-1 prompts, LR `5e-7`, `8` optimizer steps, eval/save every `4` steps, `paged_adamw_8bit`.
+- Trainer eval loss: step 4 about `1.008`; final about `1.00676`.
+
+Held-out terminology-prompt generation metrics:
+
+| Checkpoint | Selection | chrF++ | BLEU | token F1 | TER |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-4` | 28.0082 | 41.4058 | 11.6963 | 29.0952 | 85.9447 |
+| `final_full_model` | 28.4456 | 41.9470 | 13.0248 | 28.8405 | 81.3364 |
+
+Decision:
+
+- This is a negative quality result. It is slightly better than the 9B LoRA checkpoint on BLEU/TER, but it remains below the best standalone 4B full-SFT checkpoint (`31.1999` selection, chrF++ `44.4295`, BLEU `18.0014`) and far below the multi-model listwise reranked system.
+- Keep the paged optimizer path for future 9B/30B memory probes, but do not scale this exact 9B full-SFT recipe.
+- The remote full-model artifacts were deleted after metrics were captured to recover disk; only `checkpoint_eval` metrics/predictions and the log were kept.
+
 Code hygiene:
 
 - `scripts/train_sft_unsloth.py` and `scripts/train_jsonl_sft_unsloth.py` now expose `--save-total-limit`; use `--save-total-limit 0` for full-SFT sweeps when model-only checkpointing is enabled.
