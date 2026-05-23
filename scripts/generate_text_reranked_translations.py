@@ -81,7 +81,7 @@ def main() -> None:
     model.generation_config.pad_token_id = tokenizer.eos_token_id
     FastLanguageModel.for_inference(model)
 
-    generated_rows, predictions, _generated_terms = evaluate.generate_predictions_with_progress(
+    generated_rows, predictions, _generated_terms, _generated_few_shots = evaluate.generate_predictions_with_progress(
         model=model,
         tokenizer=tokenizer,
         rows=source_rows,

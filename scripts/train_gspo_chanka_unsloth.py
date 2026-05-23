@@ -263,12 +263,29 @@ def validate_grpo_batching(args: argparse.Namespace) -> None:
         )
 
 
-def prompt_messages(source: str, terminology: Sequence[tuple[str, str]] | None = None) -> list[dict[str, str]]:
+def prompt_messages(
+    source: str,
+    terminology: Sequence[tuple[str, str]] | None = None,
+    few_shot_examples: Sequence[tuple[str, str]] | None = None,
+) -> list[dict[str, str]]:
     user_content = (
         "Traduce del español al quechua chanka. Usa una traducción directa, "
         "natural y fiel. Conserva nombres, números y entidades; evita copiar "
         "el español salvo cuando sea necesario."
     )
+    if few_shot_examples:
+        example_lines: list[str] = []
+        for index, (example_source, example_target) in enumerate(few_shot_examples, start=1):
+            example_lines.append(
+                f"Ejemplo {index}\n"
+                f"Español: {normalize_text(example_source)}\n"
+                f"Quechua chanka: {normalize_text(example_target)}"
+            )
+        user_content += (
+            "\n\nEjemplos de referencia: imita el estilo cuando sea pertinente, "
+            "pero traduce solo el texto final.\n"
+            + "\n\n".join(example_lines)
+        )
     if terminology:
         glossary_lines = [
             f"- {spanish_term} = {chanka_term}"

@@ -53,6 +53,18 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--terminology-top-k", type=int, default=6)
     parser.add_argument("--terminology-min-source-chars", type=int, default=3)
+    parser.add_argument(
+        "--few-shot-top-k",
+        type=int,
+        default=0,
+        help="Retrieve this many similar clean train examples and include them in each prompt.",
+    )
+    parser.add_argument(
+        "--few-shot-max-candidates",
+        type=int,
+        default=128,
+        help="Limit retrieval scoring to the first N train examples by token-overlap prefilter. Use <=0 for all.",
+    )
     parser.add_argument("--seed", type=int, default=3407)
     return parser.parse_args(argv)
 
@@ -121,6 +133,48 @@ def select_terminology(
     return selected
 
 
+def content_tokens(text: str) -> set[str]:
+    return {
+        token
+        for token in gspo.word_tokens(text)
+        if len(token) >= 3 and token not in gspo.SPANISH_STOPWORDS
+    }
+
+
+def select_few_shot_examples(
+    source: str,
+    examples: Sequence[dict[str, str]],
+    top_k: int,
+    max_candidates: int = 128,
+) -> list[tuple[str, str]]:
+    if top_k <= 0 or not examples:
+        return []
+    source_key = gspo.normalize_text(source).lower()
+    source_tokens = content_tokens(source)
+    if not source_tokens:
+        return []
+
+    scored: list[tuple[float, int, dict[str, str]]] = []
+    for index, example in enumerate(examples):
+        example_source = gspo.normalize_text(example["source"])
+        if example_source.lower() == source_key:
+            continue
+        example_tokens = content_tokens(example_source)
+        if not example_tokens:
+            continue
+        overlap = len(source_tokens.intersection(example_tokens))
+        if overlap <= 0:
+            continue
+        union = len(source_tokens.union(example_tokens))
+        score = overlap / max(1, union)
+        scored.append((score, -abs(len(example_source) - len(source)), example))
+
+    scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    if max_candidates > 0:
+        scored = scored[:max_candidates]
+    return [(row["source"], row["target"]) for _score, _length_score, row in scored[:top_k]]
+
+
 def generate_predictions_with_progress(
     model,
     tokenizer,
@@ -136,7 +190,10 @@ def generate_predictions_with_progress(
     strip_chat_artifacts: bool,
     terminology_entries: Sequence[tuple[str, str]] | None = None,
     terminology_top_k: int = 0,
-) -> tuple[list[dict[str, str]], list[str], list[list[tuple[str, str]]]]:
+    few_shot_examples: Sequence[dict[str, str]] | None = None,
+    few_shot_top_k: int = 0,
+    few_shot_max_candidates: int = 128,
+) -> tuple[list[dict[str, str]], list[str], list[list[tuple[str, str]]], list[list[tuple[str, str]]]]:
     import torch
 
     if num_return_sequences > 1 and not do_sample:
@@ -145,6 +202,7 @@ def generate_predictions_with_progress(
     generated_rows: list[dict[str, str]] = []
     predictions: list[str] = []
     generated_terms: list[list[tuple[str, str]]] = []
+    generated_few_shots: list[list[tuple[str, str]]] = []
     model.eval()
     total = len(rows)
     batch_size = max(1, batch_size)
@@ -157,12 +215,18 @@ def generate_predictions_with_progress(
             else []
             for row in batch_rows
         ]
+        batch_few_shots = [
+            select_few_shot_examples(row["source"], few_shot_examples or [], few_shot_top_k, few_shot_max_candidates)
+            if few_shot_examples and few_shot_top_k > 0
+            else []
+            for row in batch_rows
+        ]
         prompts = []
-        for row, terms in zip(batch_rows, batch_terms, strict=True):
+        for row, terms, few_shots in zip(batch_rows, batch_terms, batch_few_shots, strict=True):
             prompts.append(
                 gspo.apply_chat_template_no_thinking(
                     tokenizer,
-                    gspo.prompt_messages(row["source"], terms),
+                    gspo.prompt_messages(row["source"], terms, few_shots),
                     tokenize=False,
                     add_generation_prompt=True,
                 )
@@ -192,10 +256,11 @@ def generate_predictions_with_progress(
             generated_rows.append(row)
             predictions.append(prediction)
             generated_terms.append(batch_terms[output_index // num_return_sequences])
+            generated_few_shots.append(batch_few_shots[output_index // num_return_sequences])
         completed = min(total, start + len(batch_rows))
         if progress_every > 0 and (completed == total or completed % progress_every == 0):
             print(f"generated {completed}/{total} predictions", flush=True)
-    return generated_rows, predictions, generated_terms
+    return generated_rows, predictions, generated_terms, generated_few_shots
 
 
 def main() -> None:
@@ -238,7 +303,7 @@ def main() -> None:
     model.generation_config.pad_token_id = tokenizer.eos_token_id
     FastLanguageModel.for_inference(model)
 
-    generated_rows, predictions, generated_terms = generate_predictions_with_progress(
+    generated_rows, predictions, generated_terms, generated_few_shots = generate_predictions_with_progress(
         model,
         tokenizer,
         generation_rows,
@@ -253,6 +318,9 @@ def main() -> None:
         args.strip_chat_artifacts,
         terminology_entries,
         args.terminology_top_k,
+        train_rows,
+        args.few_shot_top_k,
+        args.few_shot_max_candidates,
     )
     references = [row["target"] for row in generated_rows]
     sources = [row["source"] for row in generated_rows]
@@ -269,6 +337,12 @@ def main() -> None:
         metrics["terminology_top_k"] = args.terminology_top_k
         metrics["terminology_matched_rows"] = matched_rows
         metrics["terminology_matched_row_rate"] = 100.0 * matched_rows / max(1, len(generated_terms))
+    if args.few_shot_top_k > 0:
+        few_shot_matched_rows = sum(1 for examples in generated_few_shots if examples)
+        metrics["few_shot_top_k"] = args.few_shot_top_k
+        metrics["few_shot_max_candidates"] = args.few_shot_max_candidates
+        metrics["few_shot_matched_rows"] = few_shot_matched_rows
+        metrics["few_shot_matched_row_rate"] = 100.0 * few_shot_matched_rows / max(1, len(generated_few_shots))
 
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(json.dumps(metrics, indent=2, sort_keys=True) + "\n")
@@ -277,7 +351,13 @@ def main() -> None:
     if args.predictions_jsonl:
         args.predictions_jsonl.parent.mkdir(parents=True, exist_ok=True)
         with args.predictions_jsonl.open("w") as handle:
-            for row, prediction, terms in zip(generated_rows, predictions, generated_terms, strict=True):
+            for row, prediction, terms, few_shots in zip(
+                generated_rows,
+                predictions,
+                generated_terms,
+                generated_few_shots,
+                strict=True,
+            ):
                 handle.write(
                     json.dumps(
                         {
@@ -289,6 +369,10 @@ def main() -> None:
                             "terminology": [
                                 {"source_term": source_term, "target_text": target_text}
                                 for source_term, target_text in terms
+                            ],
+                            "few_shot_examples": [
+                                {"source": example_source, "target": example_target}
+                                for example_source, example_target in few_shots
                             ],
                         },
                         ensure_ascii=False,

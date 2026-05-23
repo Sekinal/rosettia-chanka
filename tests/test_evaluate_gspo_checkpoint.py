@@ -68,6 +68,23 @@ class EvaluateGspoCheckpointTests(unittest.TestCase):
         )
         self.assertEqual(args.terminology_top_k, 4)
 
+    def test_few_shot_options_are_parsed(self):
+        args = evaluate.parse_args(
+            [
+                "--adapter-path",
+                "outputs/run/chanka_gspo/checkpoint-56",
+                "--output-json",
+                "outputs/run/fewshot_metrics.json",
+                "--few-shot-top-k",
+                "3",
+                "--few-shot-max-candidates",
+                "64",
+            ]
+        )
+
+        self.assertEqual(args.few_shot_top_k, 3)
+        self.assertEqual(args.few_shot_max_candidates, 64)
+
     def test_select_terminology_prefers_longest_matches_and_dedupes_targets(self):
         terms = [
             ("madre abandonada", "saqisqa mama"),
@@ -83,6 +100,21 @@ class EvaluateGspoCheckpointTests(unittest.TestCase):
         )
 
         self.assertEqual(selected, [("madre abandonada", "saqisqa mama"), ("madre", "mama")])
+
+    def test_select_few_shot_examples_uses_overlap_and_excludes_same_source(self):
+        examples = [
+            {"source": "Yo vivo en Quinua.", "target": "Quinuapim tiyani."},
+            {"source": "Yo vivo en Ayacucho.", "target": "Ayacuchopim tiyani."},
+            {"source": "Tengo treinta años.", "target": "Kimsa chunka watayuqmi kani."},
+        ]
+
+        selected = evaluate.select_few_shot_examples(
+            "Yo vivo en Quinua.",
+            examples,
+            top_k=2,
+        )
+
+        self.assertEqual(selected, [("Yo vivo en Ayacucho.", "Ayacuchopim tiyani.")])
 
 
 if __name__ == "__main__":

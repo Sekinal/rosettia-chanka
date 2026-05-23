@@ -38,12 +38,15 @@ class GenerateMultiAdapterEnsembleRerankedTranslationsTests(unittest.TestCase):
                 "0.65",
                 "--temperature",
                 "0.75",
+                "--few-shot-top-k",
+                "2",
             ]
         )
 
         self.assertEqual(args.adapter_path, [Path("outputs/a"), Path("outputs/b")])
         self.assertEqual(args.num_return_sequences, [32, 16])
         self.assertEqual(args.temperature, [0.65, 0.75])
+        self.assertEqual(args.few_shot_top_k, 2)
 
     def test_merge_candidate_groups_dedupes_and_reindexes(self):
         groups = generate_multi.merge_candidate_groups(

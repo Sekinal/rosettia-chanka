@@ -14,6 +14,8 @@ BASE_TRAIN_POOL="${BASE_TRAIN_POOL:-outputs/verifier_candidate_mining/20260522-t
 WORK_DIR="${WORK_DIR:-outputs/qwen35_9b_candidate_rerank/${STAMP}}"
 TERMINOLOGY_FILE="${TERMINOLOGY_FILE:-clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet}"
 TERMINOLOGY_TOP_K="${TERMINOLOGY_TOP_K:-1}"
+FEW_SHOT_TOP_K="${FEW_SHOT_TOP_K:-0}"
+FEW_SHOT_MAX_CANDIDATES="${FEW_SHOT_MAX_CANDIDATES:-128}"
 
 NUM_RETURN_SEQUENCES="${NUM_RETURN_SEQUENCES:-16}"
 TEMPERATURE="${TEMPERATURE:-0.65}"
@@ -30,6 +32,14 @@ FEATURE_EPOCHS="${FEATURE_EPOCHS:-120}"
 ENSEMBLE_SEARCH_ITERATIONS="${ENSEMBLE_SEARCH_ITERATIONS:-8000}"
 
 mkdir -p "$WORK_DIR"
+
+FEW_SHOT_ARGS=()
+if [[ "$FEW_SHOT_TOP_K" -gt 0 ]]; then
+  FEW_SHOT_ARGS=(
+    --few-shot-top-k "$FEW_SHOT_TOP_K"
+    --few-shot-max-candidates "$FEW_SHOT_MAX_CANDIDATES"
+  )
+fi
 
 while [[ ! -f "${CHECKPOINT_EVAL_DIR}/summary.json" ]]; do
   echo "$(date -u +%FT%TZ) waiting for checkpoint eval summary: ${CHECKPOINT_EVAL_DIR}/summary.json"
@@ -79,6 +89,7 @@ if [[ ! -f "$EVAL_9B_POOL" ]]; then
     --strip-chat-artifacts \
     --terminology-file "$TERMINOLOGY_FILE" \
     --terminology-top-k "$TERMINOLOGY_TOP_K" \
+    "${FEW_SHOT_ARGS[@]}" \
     --progress-every "$PROGRESS_EVERY"
 fi
 
@@ -98,6 +109,7 @@ if [[ ! -f "$TRAIN_9B_POOL" ]]; then
     --strip-chat-artifacts \
     --terminology-file "$TERMINOLOGY_FILE" \
     --terminology-top-k "$TERMINOLOGY_TOP_K" \
+    "${FEW_SHOT_ARGS[@]}" \
     --progress-every "$PROGRESS_EVERY"
 fi
 

@@ -57,6 +57,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--terminology-file", default=None)
     parser.add_argument("--terminology-top-k", type=int, default=1)
     parser.add_argument("--terminology-min-source-chars", type=int, default=3)
+    parser.add_argument(
+        "--few-shot-top-k",
+        type=int,
+        default=0,
+        help="Retrieve this many similar clean train examples and include them in generation prompts.",
+    )
+    parser.add_argument("--few-shot-max-candidates", type=int, default=128)
+    parser.add_argument("--few-shot-dataset-file", default=gspo.CHANKA_FILE)
     return parser.parse_args(argv)
 
 
@@ -113,6 +121,7 @@ def generate_groups_for_adapter(
     adapter_path: Path,
     source_rows: Sequence[dict[str, str]],
     terminology_entries: Sequence[tuple[str, str]],
+    few_shot_examples: Sequence[dict[str, str]],
     args: argparse.Namespace,
     num_return_sequences: int,
     temperature: float,
@@ -136,7 +145,7 @@ def generate_groups_for_adapter(
     FastLanguageModel.for_inference(model)
 
     try:
-        generated_rows, predictions, _generated_terms = evaluate.generate_predictions_with_progress(
+        generated_rows, predictions, _generated_terms, _generated_few_shots = evaluate.generate_predictions_with_progress(
             model=model,
             tokenizer=tokenizer,
             rows=source_rows,
@@ -151,6 +160,9 @@ def generate_groups_for_adapter(
             strip_chat_artifacts=args.strip_chat_artifacts,
             terminology_entries=terminology_entries,
             terminology_top_k=args.terminology_top_k,
+            few_shot_examples=few_shot_examples,
+            few_shot_top_k=args.few_shot_top_k,
+            few_shot_max_candidates=args.few_shot_max_candidates,
         )
         return feature_generate.candidate_groups_from_generation(generated_rows, predictions, num_return_sequences)
     finally:
@@ -181,6 +193,16 @@ def main() -> None:
         if args.terminology_file
         else []
     )
+    if args.few_shot_top_k > 0:
+        few_shot_rows, _eval_rows = gspo.split_rows(
+            gspo.load_chanka_rows(args.dataset_repo, args.few_shot_dataset_file),
+            validation_fraction=0.15,
+            seed=3407,
+            max_train_samples=None,
+            max_eval_samples=None,
+        )
+    else:
+        few_shot_rows = []
     feature_model = feature_reranker.model_from_json(json.loads(args.feature_weights_json.read_text()))
     text_model = text_reranker.model_from_json(json.loads(args.text_model_json.read_text()))
     ensemble_model = ensemble_reranker.model_from_json(json.loads(args.ensemble_json.read_text()))
@@ -206,6 +228,7 @@ def main() -> None:
                 adapter_path,
                 source_rows,
                 terminology_entries,
+                few_shot_rows,
                 args,
                 num_return_sequences[index],
                 temperatures[index],

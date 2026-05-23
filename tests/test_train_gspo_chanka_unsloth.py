@@ -49,6 +49,17 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
         self.assertIn("no fuerces", messages[1]["content"])
         self.assertIn("La señora vive en Quinua.", messages[1]["content"])
 
+    def test_prompt_can_include_few_shot_examples(self):
+        messages = train_gspo.prompt_messages(
+            "Yo vivo en Quinua.",
+            few_shot_examples=[("Yo vivo en Ayacucho.", "Ayacuchopim tiyani.")],
+        )
+
+        self.assertIn("Ejemplos de referencia", messages[1]["content"])
+        self.assertIn("Español: Yo vivo en Ayacucho.", messages[1]["content"])
+        self.assertIn("Quechua chanka: Ayacuchopim tiyani.", messages[1]["content"])
+        self.assertIn("Español: Yo vivo en Quinua.", messages[1]["content"])
+
     def test_chat_template_helper_disables_thinking_when_supported(self):
         class ThinkingAwareTokenizer:
             def apply_chat_template(self, messages, enable_thinking=True, **kwargs):

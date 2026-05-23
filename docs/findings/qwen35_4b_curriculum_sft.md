@@ -163,6 +163,7 @@ Automation:
 
 - `experiments/sft/queue_qwen35_curriculum_eval.sh` waits for the 9B curriculum to finish, then evaluates all Chanka checkpoints with terminology top-1.
 - `experiments/sft/queue_qwen35_9b_candidate_rerank.sh` waits for that checkpoint-eval summary, selects the best 9B Chanka checkpoint, generates train/eval K16 candidate pools, merges them with the current K32 + 4B-full K16 pools, then trains matching feature/text/ensemble selectors.
+- The 9B candidate queue supports retrieval-augmented prompts through `FEW_SHOT_TOP_K` / `FEW_SHOT_MAX_CANDIDATES`, but defaults to no few-shot examples so the first 9B pass isolates model-scale candidate diversity.
 
 Decision so far:
 

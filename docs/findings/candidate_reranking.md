@@ -414,6 +414,7 @@ Decision:
 - Full-SFT did not become the best greedy model, but it did create high-value candidate diversity.
 - The current best deployable direction is multi-model candidate generation plus a matching-distribution text/score reranker.
 - The remaining oracle gap is still huge, so more candidate diversity from 9B/35B-A3B SFT or a stronger QE/listwise selector is more promising than another plain continuation from the 2B policy.
+- Retrieval-augmented prompts are now available in `scripts/evaluate_gspo_checkpoint.py` via `--few-shot-top-k`, and in the multi-adapter deployment wrapper via the same flag. The retriever uses clean train rows only and excludes exact source matches, so eval references are not placed in the prompt. This is intended for a controlled follow-up after the 9B no-few-shot candidate pass.
 
 Example inference shape:
 
