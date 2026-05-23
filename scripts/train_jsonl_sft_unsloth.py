@@ -45,6 +45,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--terminology-min-source-chars", type=int, default=3)
     parser.add_argument("--model-id", default=train_sft.DEFAULT_MODEL_ID)
     parser.add_argument(
+        "--load-in-4bit",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "--adapter-method",
         choices=["lora", "dora", "rslora"],
         default="lora",
@@ -334,8 +339,8 @@ def main() -> None:
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_name_or_adapter,
         max_seq_length=args.max_seq_length,
-        load_in_4bit=False,
-        load_in_16bit=args.training_mode == "lora",
+        load_in_4bit=args.load_in_4bit,
+        load_in_16bit=args.training_mode == "lora" and not args.load_in_4bit,
         full_finetuning=args.training_mode == "full",
     )
     if args.training_mode == "lora" and args.adapter_path is None:

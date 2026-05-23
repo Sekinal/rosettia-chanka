@@ -502,3 +502,34 @@ Guardrails:
 - Generated JSONL is an artifact under `outputs/`, not a git-tracked dataset.
 
 Queued canary: `experiments/sft/queue_contextual_terminology_sft_canary.sh` waits until the current 9B terminology-SFT chain has a summary, builds a small contextual terminology JSONL, mixes it with the current clean+MBR JSONL, continues from the current deployable 2B adapter at LR `1e-7` for 16 steps, and evaluates checkpoints with terminology top-1 prompting.
+
+### Contextual Terminology Canary Result
+
+Run:
+
+- Output: `outputs/contextual_terminology_sft/20260523-contextual-terminology-sft-now`
+- Context JSONL: `contextual_terminology_target.jsonl`
+- Context rows: `192` rows from 96 accepted glossary terms, 2 templates per term.
+- Training mix: current clean+MBR JSONL plus contextual terminology rows.
+- Base adapter: `outputs/mbr_self_training_sft/20260522-k16-fullnewbest-noterm-margin000-clean512-termtrain-lr2e-7-24steps/checkpoint-8`
+- LR: `1e-7`
+- Steps: `16`
+- Terminology prompting: top-1 in training and evaluation.
+
+Held-out terminology-prompt metrics:
+
+| Checkpoint | Selection | chrF++ | BLEU | token F1 | TER |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `checkpoint-8` | 26.3522 | 41.3141 | 6.7073 | 26.4407 | 88.0184 |
+| `checkpoint-16` | 26.2446 | 41.1661 | 6.7744 | 26.2599 | 88.0184 |
+| `final_lora` | 26.2446 | 41.1661 | 6.7744 | 26.2599 | 88.0184 |
+
+Decision:
+
+- This is negative. The contextual terminology drills did not beat the current deployable 2B adapter (`checkpoint-8` from the terminology-aware JSONL continuation) and are far below the multi-model listwise reranked system.
+- The rows are cleaner than bare glossary term-pair rows, but the synthetic context is still too narrow and likely over-regularizes short legal/administrative terms.
+- Do not scale this exact synthetic terminology drill recipe. If revisiting terminology augmentation, generate full-sentence examples from real source distributions or use terminology only as a reranker/verifier feature.
+
+Implementation note:
+
+- This run exposed a shared-argument bug: `scripts/train_jsonl_sft_unsloth.py` called `train_sft.validate_training_mode_args` without defining `load_in_4bit`. The script now defines a hidden `--load-in-4bit` flag and passes load flags consistently to `FastLanguageModel.from_pretrained`.
