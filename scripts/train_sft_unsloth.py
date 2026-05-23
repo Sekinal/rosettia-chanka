@@ -63,6 +63,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Optional local/HF LoRA adapter to continue training from. Only valid with --training-mode lora.",
     )
     parser.add_argument("--dataset-repo", default=DATASET_REPO)
+    parser.add_argument(
+        "--terminology-file",
+        default=None,
+        help="Optional dataset-repo parquet glossary for terminology-conditioned SFT prompts.",
+    )
+    parser.add_argument("--terminology-top-k", type=int, default=6)
+    parser.add_argument("--terminology-min-source-chars", type=int, default=3)
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"))
     parser.add_argument("--max-seq-length", type=int, default=None)
     parser.add_argument("--seed", type=int, default=3407)
@@ -260,23 +267,132 @@ def instruction_for(stage: str) -> str:
     return "Traduce del español al quechua. Conserva el significado y no copies el español."
 
 
-def hymt2_user_prompt(source: str, target_language_name: str) -> str:
-    return (
+def terminology_block(terminology: Sequence[tuple[str, str]] | None) -> str:
+    if not terminology:
+        return ""
+    lines = [
+        "",
+        "Glosario sugerido (úsalo solo cuando encaje con el contexto; no fuerces términos incorrectos):",
+    ]
+    lines.extend(f"- {source_term} = {target_text}" for source_term, target_text in terminology)
+    return "\n".join(lines)
+
+
+def load_terminology_entries(
+    repo_id: str,
+    filename: str,
+    min_source_chars: int,
+) -> list[tuple[str, str]]:
+    path = download_parquet(repo_id, filename)
+    frame = pl.read_parquet(path)
+    required = {"direction", "source_term", "target_text"}
+    missing = required.difference(frame.columns)
+    if missing:
+        raise ValueError(f"Terminology file {filename} is missing columns: {sorted(missing)}")
+
+    if "glossary_status" in frame.columns:
+        frame = frame.filter(pl.col("glossary_status") == "simple_term_pair")
+    frame = frame.filter(pl.col("direction") == "spa_Latn-quy_Latn")
+
+    entries: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for row in frame.select(["source_term", "target_text"]).iter_rows(named=True):
+        source_term = normalize_text(str(row["source_term"]))
+        target_text = normalize_text(str(row["target_text"]))
+        if len(source_term) < min_source_chars or not target_text:
+            continue
+        key = (source_term.lower(), target_text.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        entries.append((source_term, target_text))
+    entries.sort(key=lambda item: (-len(item[0]), item[0].lower(), item[1].lower()))
+    return entries
+
+
+def normalize_text(text: str) -> str:
+    return " ".join(text.strip().split())
+
+
+def source_contains_term(source: str, source_term: str) -> bool:
+    import re
+
+    source_norm = normalize_text(source).lower()
+    term_norm = normalize_text(source_term).lower()
+    if not term_norm:
+        return False
+    return re.search(rf"(?<!\w){re.escape(term_norm)}(?!\w)", source_norm) is not None
+
+
+def select_terminology(
+    source: str,
+    entries: Sequence[tuple[str, str]],
+    top_k: int,
+) -> list[tuple[str, str]]:
+    selected: list[tuple[str, str]] = []
+    used_targets: set[str] = set()
+    for source_term, target_term in entries:
+        if not source_contains_term(source, source_term):
+            continue
+        target_key = target_term.lower()
+        if target_key in used_targets:
+            continue
+        selected.append((source_term, target_term))
+        used_targets.add(target_key)
+        if len(selected) >= top_k:
+            break
+    return selected
+
+
+def terminology_for_row(
+    row: dict[str, str],
+    terminology_entries: Sequence[tuple[str, str]] | None,
+    terminology_top_k: int,
+) -> list[tuple[str, str]] | None:
+    if not terminology_entries or terminology_top_k <= 0:
+        return None
+    selected = select_terminology(row["source"], terminology_entries, terminology_top_k)
+    return selected or None
+
+
+def hymt2_user_prompt(
+    source: str,
+    target_language_name: str,
+    terminology: Sequence[tuple[str, str]] | None = None,
+) -> str:
+    prompt = (
         f"Translate the following text into {target_language_name}. "
         "Note that you should only output the translated result without any additional explanation:\n\n"
         f"{source}"
     )
+    if terminology:
+        prompt += "\n" + terminology_block(terminology)
+    return prompt
 
 
-def messages_for_example(args: argparse.Namespace, row: dict[str, str]) -> list[dict[str, str]]:
+def messages_for_example(
+    args: argparse.Namespace,
+    row: dict[str, str],
+    terminology: Sequence[tuple[str, str]] | None = None,
+) -> list[dict[str, str]]:
     if args.prompt_style == "hymt2":
         return [
-            {"role": "user", "content": hymt2_user_prompt(row["source"], target_language_name_for(args.stage, args.target_language_name))},
+            {
+                "role": "user",
+                "content": hymt2_user_prompt(
+                    row["source"],
+                    target_language_name_for(args.stage, args.target_language_name),
+                    terminology,
+                ),
+            },
             {"role": "assistant", "content": row["target"]},
         ]
     return [
         {"role": "system", "content": "Eres un traductor profesional español-quechua."},
-        {"role": "user", "content": f"{instruction_for(args.stage)}\n\nEspañol: {row['source']}"},
+        {
+            "role": "user",
+            "content": f"{instruction_for(args.stage)}{terminology_block(terminology)}\n\nEspañol: {row['source']}",
+        },
         {"role": "assistant", "content": row["target"]},
     ]
 
@@ -289,11 +405,18 @@ def apply_chat_template_no_thinking(tokenizer, messages: list[dict[str, str]], *
         return tokenizer.apply_chat_template(messages, **kwargs)
 
 
-def format_example(tokenizer, args: argparse.Namespace, row: dict[str, str]) -> dict[str, str]:
+def format_example(
+    tokenizer,
+    args: argparse.Namespace,
+    row: dict[str, str],
+    terminology_entries: Sequence[tuple[str, str]] | None = None,
+    terminology_top_k: int = 0,
+) -> dict[str, str]:
+    terminology = terminology_for_row(row, terminology_entries, terminology_top_k)
     return {
         "text": apply_chat_template_no_thinking(
             tokenizer,
-            messages_for_example(args, row),
+            messages_for_example(args, row, terminology),
             tokenize=False,
             add_generation_prompt=False,
         ),
@@ -324,8 +447,16 @@ def response_marker_parts(tokenizer) -> tuple[str, str]:
     raise ValueError("Unsupported chat template for response-only SFT masking")
 
 
-def build_dataset(tokenizer, args: argparse.Namespace, rows: Iterable[dict[str, str]]) -> Dataset:
-    return Dataset.from_list([format_example(tokenizer, args, row) for row in rows])
+def build_dataset(
+    tokenizer,
+    args: argparse.Namespace,
+    rows: Iterable[dict[str, str]],
+    terminology_entries: Sequence[tuple[str, str]] | None = None,
+    terminology_top_k: int = 0,
+) -> Dataset:
+    return Dataset.from_list(
+        [format_example(tokenizer, args, row, terminology_entries, terminology_top_k) for row in rows]
+    )
 
 
 def main() -> None:
@@ -349,6 +480,21 @@ def main() -> None:
         seed=args.seed,
         max_train_samples=args.max_train_samples,
         max_eval_samples=args.max_eval_samples,
+    )
+    terminology_entries = (
+        load_terminology_entries(args.dataset_repo, args.terminology_file, args.terminology_min_source_chars)
+        if args.terminology_file
+        else []
+    )
+    train_term_rows = (
+        sum(1 for row in train_rows if terminology_for_row(row, terminology_entries, args.terminology_top_k))
+        if terminology_entries
+        else 0
+    )
+    eval_term_rows = (
+        sum(1 for row in eval_rows if terminology_for_row(row, terminology_entries, args.terminology_top_k))
+        if terminology_entries
+        else 0
     )
 
     run_dir = args.output_dir / args.stage
@@ -387,8 +533,8 @@ def main() -> None:
             **peft_kwargs,
         )
 
-    train_dataset = build_dataset(tokenizer, args, train_rows)
-    eval_dataset = build_dataset(tokenizer, args, eval_rows)
+    train_dataset = build_dataset(tokenizer, args, train_rows, terminology_entries, args.terminology_top_k)
+    eval_dataset = build_dataset(tokenizer, args, eval_rows, terminology_entries, args.terminology_top_k)
     configure_step_schedule(args, len(train_dataset))
 
     trainer = SFTTrainer(
@@ -442,6 +588,11 @@ def main() -> None:
     print(f"Validation rows: {len(eval_dataset):,}")
     print(f"Stage: {args.stage}")
     print(f"Prompt style: {args.prompt_style}")
+    if args.terminology_file:
+        print(f"Terminology file: {args.terminology_file}")
+        print(f"Terminology entries: {len(terminology_entries):,}")
+        print(f"Terminology-matched train rows: {train_term_rows:,}")
+        print(f"Terminology-matched validation rows: {eval_term_rows:,}")
     print(f"Training mode: {args.training_mode}")
     if args.training_mode == "lora":
         print(f"Adapter method: {args.adapter_method}")

@@ -145,3 +145,19 @@ Design:
 - Evaluate every full-SFT checkpoint and `final_full_model` with terminology top-1 prompting.
 
 Caveat: 9B FFT may be memory-bound on the current L40S despite Unsloth support. If it fails here, keep the recipe for the larger RTX PRO 6000 and do not treat the failure as evidence against full fine-tuning itself.
+
+## Terminology-Conditioned SFT Prompt Matching
+
+Added terminology-conditioned prompts to `scripts/train_sft_unsloth.py`.
+
+Why: the best inference profiles use terminology top-1 prompting from `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet`, but most plain Chanka SFT runs trained only on the base translation prompt. That creates a train/eval prompt mismatch exactly where we are extracting gains from glossary hints.
+
+New controls:
+
+- `--terminology-file`
+- `--terminology-top-k`
+- `--terminology-min-source-chars`
+
+The implementation mirrors the existing eval/JSONL logic: longest source-term matches first, dedupe by target term, and include the glossary block only when a row has a relevant match.
+
+Queued follow-up: `experiments/sft/queue_qwen35_9b_terminology_chanka_sft.sh` waits for the active 9B rerank/full-SFT chain, then reruns the clean Chanka continuation from the 9B broad checkpoint with terminology top-1 prompts and evaluates all checkpoints with terminology top-1 prompting.

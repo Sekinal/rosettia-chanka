@@ -52,6 +52,24 @@ class TrainSftUnslothTests(unittest.TestCase):
 
         self.assertEqual(args.prompt_style, "hymt2")
 
+    def test_sft_cli_accepts_terminology_options(self):
+        args = train_sft.parse_args(
+            [
+                "--stage",
+                "chanka",
+                "--terminology-file",
+                "clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet",
+                "--terminology-top-k",
+                "2",
+            ]
+        )
+
+        self.assertEqual(
+            args.terminology_file,
+            "clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet",
+        )
+        self.assertEqual(args.terminology_top_k, 2)
+
     def test_chat_template_helper_disables_thinking_when_supported(self):
         class ThinkingAwareTokenizer:
             def apply_chat_template(self, messages, enable_thinking=True, **kwargs):
@@ -195,6 +213,43 @@ class TrainSftUnslothTests(unittest.TestCase):
         self.assertEqual(formatted["variant"], "quy/chanka")
         self.assertFalse(tokenizer.tokenize)
         self.assertFalse(tokenizer.add_generation_prompt)
+
+    def test_chanka_format_can_include_terminology_prompt(self):
+        tokenizer = DummyTokenizer()
+        row = {
+            "source": "¿Es usted casado?",
+            "target": "¿Warmiyuqchu kanki?",
+            "source_name": "manual",
+            "variant": "quy/chanka",
+        }
+
+        args = train_sft.parse_args(["--stage", "chanka"])
+
+        formatted = train_sft.format_example(
+            tokenizer,
+            args,
+            row,
+            terminology_entries=[("Casado", "Warmiyuq")],
+            terminology_top_k=1,
+        )
+
+        self.assertIn("Glosario sugerido", formatted["text"])
+        self.assertIn("- Casado = Warmiyuq", formatted["text"])
+        self.assertIn("¿Es usted casado?", formatted["text"])
+        self.assertIn("¿Warmiyuqchu kanki?", formatted["text"])
+
+    def test_select_terminology_prefers_longest_matches_and_dedupes_targets(self):
+        selected = train_sft.select_terminology(
+            "La madre abandonada hablo con la señora.",
+            [
+                ("madre abandonada", "saqisqa mama"),
+                ("madre", "mama"),
+                ("señora", "mama"),
+            ],
+            top_k=3,
+        )
+
+        self.assertEqual(selected, [("madre abandonada", "saqisqa mama"), ("madre", "mama")])
 
     def test_hymt2_format_uses_user_only_translation_prompt(self):
         tokenizer = DummyTokenizer()

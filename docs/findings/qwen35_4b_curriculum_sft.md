@@ -166,6 +166,8 @@ Automation:
 - The 9B candidate queue supports retrieval-augmented prompts through `FEW_SHOT_TOP_K` / `FEW_SHOT_MAX_CANDIDATES`, but defaults to no few-shot examples so the first 9B pass isolates model-scale candidate diversity.
 - `experiments/sft/queue_qwen35_9b_fewshot_candidate_rerank.sh` chains after the no-few-shot 9B rerank summary and reruns the candidate-rerank pipeline with `FEW_SHOT_TOP_K=2` by default. This gives a sequential scale-only vs retrieval-augmented comparison without concurrent GPU contention.
 - `experiments/sft/queue_qwen35_9b_full_sft_after_rerank.sh` chains after the few-shot rerank summary, merges the best 9B LoRA checkpoint to a 16-bit full model, runs a 2-step FFT smoke, then runs a 32-step Chanka full-SFT canary if memory permits. This keeps full fine-tuning behind the current scale/retrieval experiments and avoids GPU contention.
+- `scripts/train_sft_unsloth.py` now supports terminology-conditioned SFT prompts through `--terminology-file` / `--terminology-top-k`. This matters because our best evaluation profile uses terminology prompts, while previous plain Chanka SFT runs trained without seeing that prompt form.
+- `experiments/sft/queue_qwen35_9b_terminology_chanka_sft.sh` waits for the current 9B rerank/full-SFT chain, then reruns the clean Chanka LoRA continuation from the 9B broad checkpoint with terminology top-1 prompts and evaluates the resulting checkpoints with the same terminology prompt. This tests prompt-format matching rather than just model scale.
 
 Decision so far:
 
