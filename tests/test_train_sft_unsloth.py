@@ -148,6 +148,7 @@ class TrainSftUnslothTests(unittest.TestCase):
             lora_r=None,
             lora_alpha=None,
             evals_per_epoch=None,
+            save_only_model=None,
         )
 
         train_sft.stage_defaults(args)
@@ -157,6 +158,28 @@ class TrainSftUnslothTests(unittest.TestCase):
         self.assertEqual(args.per_device_train_batch_size, 1)
         self.assertEqual(args.per_device_eval_batch_size, 2)
         self.assertEqual(args.gradient_accumulation_steps, 8)
+        self.assertTrue(args.save_only_model)
+
+    def test_lora_defaults_keep_optimizer_checkpoints(self):
+        args = argparse.Namespace(
+            stage="chanka",
+            training_mode="lora",
+            max_seq_length=None,
+            validation_fraction=None,
+            num_train_epochs=None,
+            learning_rate=None,
+            per_device_train_batch_size=None,
+            per_device_eval_batch_size=None,
+            gradient_accumulation_steps=None,
+            lora_r=None,
+            lora_alpha=None,
+            evals_per_epoch=None,
+            save_only_model=None,
+        )
+
+        train_sft.stage_defaults(args)
+
+        self.assertFalse(args.save_only_model)
 
     def test_broad_stage_defaults_keep_longer_context_and_accumulation(self):
         args = argparse.Namespace(

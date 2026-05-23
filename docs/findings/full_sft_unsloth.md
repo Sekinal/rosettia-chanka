@@ -204,7 +204,25 @@ Early signal:
 
 - The `5e-7` run fits on the L40S and started normally.
 - First checkpoint eval at step 12: `eval_loss = 0.9906`.
+- The original sweep crashed at checkpoint 48 because `/root` filled while saving full-model optimizer states, not because the training step failed. Deleted only full-SFT `optimizer.pt` files to recover 131 GB of free space.
+- `scripts/train_sft_unsloth.py` and `scripts/train_jsonl_sft_unsloth.py` now default `--save-only-model` to true for `--training-mode full`, avoiding 12 GB optimizer-state files per 4B FFT checkpoint.
+
+Recovered `5e-7` held-out generation metrics:
+
+| Checkpoint | Selection | chrF++ | BLEU | token F1 | TER |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| checkpoint-12 | 30.1047 | 42.7808 | 16.4394 | 29.8419 | 84.5622 |
+| checkpoint-24 | 30.5455 | 43.4370 | 15.3563 | 31.0685 | 84.7926 |
+| checkpoint-36 | 30.1001 | 42.9743 | 15.0028 | 30.5275 | 85.7143 |
+| checkpoint-48 | 29.6333 | 42.5131 | 14.3296 | 30.3165 | 88.4793 |
+
+Decision:
+
+- `checkpoint-24` is the best 4B full-SFT checkpoint so far by selection, chrF++, and token F1, beating the previous 4B full-SFT best (`30.4393` selection, chrF++ `43.3102`, token F1 `30.6209`) but losing BLEU (`15.3563` vs `16.2178`).
+- The run peaks early; longer `5e-7` full SFT is not useful.
+- Follow-up run `outputs/full_sft_sweeps/20260523-qwen35-4b-full-sft-lr-followups` is testing `1e-6` and `2e-6` for only `48` steps with model-only checkpoint saves.
 
 Caveat:
 
 - Loading the merged local model emitted a Transformers tokenizer warning suggesting `fix_mistral_regex=True`. Do not overinterpret one canary if generation metrics look strange; the next script hardening pass should test passing that tokenizer fix flag through Unsloth when loading merged full models.
+- Directly passing `fix_mistral_regex=True` to this Transformers/Unsloth tokenizer path currently crashes on the merged tokenizer, so this is not safe to patch blindly.

@@ -151,8 +151,10 @@ class TrainJsonlSftUnslothTests(unittest.TestCase):
 
     def test_step_schedule_uses_max_steps_when_present(self):
         args = argparse.Namespace(
+            training_mode="lora",
             eval_steps=None,
             save_steps=None,
+            save_only_model=None,
             max_steps=64,
             evals_per_epoch=8,
             per_device_train_batch_size=4,
@@ -163,6 +165,23 @@ class TrainJsonlSftUnslothTests(unittest.TestCase):
 
         self.assertEqual(args.eval_steps, 8)
         self.assertEqual(args.save_steps, 8)
+        self.assertFalse(args.save_only_model)
+
+    def test_step_schedule_saves_only_model_for_full_finetuning(self):
+        args = argparse.Namespace(
+            training_mode="full",
+            eval_steps=8,
+            save_steps=8,
+            save_only_model=None,
+            max_steps=64,
+            evals_per_epoch=8,
+            per_device_train_batch_size=1,
+            gradient_accumulation_steps=8,
+        )
+
+        train_jsonl_sft.configure_step_schedule(args, train_row_count=512)
+
+        self.assertTrue(args.save_only_model)
 
 
 if __name__ == "__main__":

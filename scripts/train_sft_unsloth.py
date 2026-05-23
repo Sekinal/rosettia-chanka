@@ -95,6 +95,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--eval-steps", type=int, default=None)
     parser.add_argument("--save-steps", type=int, default=None)
     parser.add_argument(
+        "--save-only-model",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=(
+            "Save only model/tokenizer files at checkpoints. Defaults to true for full fine-tuning "
+            "because optimizer states can exceed model checkpoint size."
+        ),
+    )
+    parser.add_argument(
         "--evals-per-epoch",
         type=int,
         default=None,
@@ -142,6 +151,8 @@ def stage_defaults(args: argparse.Namespace) -> None:
         args.lora_alpha = args.lora_r * 2
     if args.evals_per_epoch is None:
         args.evals_per_epoch = 4 if args.stage == "broad" else 8
+    if getattr(args, "save_only_model", None) is None:
+        args.save_only_model = training_mode == "full"
 
 
 def adapter_flags(adapter_method: str) -> dict[str, bool]:
@@ -569,6 +580,7 @@ def main() -> None:
             save_strategy="steps",
             save_steps=args.save_steps,
             save_total_limit=3,
+            save_only_model=args.save_only_model,
             load_best_model_at_end=True,
             metric_for_best_model="eval_loss",
             greater_is_better=False,
@@ -611,6 +623,7 @@ def main() -> None:
         print(f"LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")
     print(f"Validation: every {args.eval_steps} steps, best checkpoint by eval_loss")
     print(f"Saving: every {args.save_steps} steps, keeping the 3 most recent checkpoints")
+    print(f"Save only model: {args.save_only_model}")
 
     trainer.train()
     metrics = trainer.evaluate()

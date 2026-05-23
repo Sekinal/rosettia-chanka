@@ -500,12 +500,14 @@ Matched-selector update:
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | matched listwise text | 38.1557 | 51.2895 | 23.4968 | 39.9106 | 2.0992 | 0.0000 | 67.9724 |
 | matched listwise feature | 31.8334 | 44.8211 | 13.6102 | 33.4293 | 2.3101 | 0.0000 | 74.1935 |
+| matched score ensemble | 37.8162 | 50.7433 | 23.7969 | 39.3138 | 2.0992 | 0.0000 | 67.5115 |
 | 9B-augmented oracle | 51.6170 | 64.8936 | 37.1419 | 56.9913 | 2.0992 | 0.0000 | 48.3871 |
 
 Decision:
 
 - The matched text selector recovers most of the transfer loss but still trails the current K32+4B listwise text profile (`38.9423` selection, chrF++ `51.8586`, BLEU `26.0207`).
 - The feature selector is not competitive on this pool.
+- The score ensemble improves TER over matched text but still trails on selection, chrF++, BLEU, and token F1.
 - 9B remains useful as evidence of extra oracle headroom, but it is not a deployable win until the selector improves or the 9B base checkpoint is improved through better SFT.
 
 ## 2026-05-23 Tuned MBR Consensus Selector
