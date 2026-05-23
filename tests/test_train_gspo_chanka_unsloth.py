@@ -88,6 +88,27 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
         self.assertFalse(tokenizer.enable_thinking)
         self.assertEqual(tokenizer.kwargs["add_generation_prompt"], True)
 
+    def test_force_tokenizer_no_thinking_template_closes_qwen_think_tag(self):
+        class Tokenizer:
+            chat_template = """prefix
+{%- if add_generation_prompt %}
+    {{- '<|im_start|>assistant\\n' }}
+    {%- if enable_thinking is defined and enable_thinking is false %}
+        {{- '<think>\\n\\n</think>\\n\\n' }}
+    {%- else %}
+        {{- '<think>\\n' }}
+    {%- endif %}
+{%- endif %}
+suffix"""
+
+        tokenizer = Tokenizer()
+
+        patched = train_gspo.force_tokenizer_no_thinking_template(tokenizer)
+
+        self.assertTrue(patched)
+        self.assertIn("</think>", tokenizer.chat_template)
+        self.assertNotIn("enable_thinking is defined", tokenizer.chat_template)
+
     def test_select_terminology_prefers_longest_matches_and_dedupes_targets(self):
         selected = train_gspo.select_terminology(
             "La madre abandonada hablo con la señora.",

@@ -37,6 +37,7 @@ mkdir -p "$OUTPUT_DIR"
   --save-steps "$SAVE_STEPS" \
   --save-total-limit "${SAVE_TOTAL_LIMIT:-2}" \
   --logging-steps "${LOGGING_STEPS:-4}" \
+  --no-log-completions \
   --per-device-train-batch-size "$TRAIN_BATCH_SIZE" \
   --per-device-eval-batch-size "$EVAL_BATCH_SIZE" \
   --gradient-accumulation-steps "${GRADIENT_ACCUMULATION_STEPS:-1}" \

@@ -333,7 +333,8 @@ def prompt_messages(
             "Autoevaluacion: <menciona brevemente errores o di que no ves errores>\n"
             "Puntaje: \\boxed{<0.0 a 1.0>}\n"
             "El puntaje debe reflejar fidelidad, gramatica chanka, terminologia, "
-            "ausencia de copia del espanol y naturalidad."
+            "ausencia de copia del espanol y naturalidad. No escribas un proceso "
+            "de razonamiento ni texto antes de 'Traduccion final:'."
         )
     user_content += f"\n\nEspañol: {source}"
     return [
@@ -351,6 +352,36 @@ def apply_chat_template_no_thinking(tokenizer, messages: list[dict[str, str]], *
         return tokenizer.apply_chat_template(messages, enable_thinking=False, **kwargs)
     except TypeError:
         return tokenizer.apply_chat_template(messages, **kwargs)
+
+
+def force_tokenizer_no_thinking_template(tokenizer) -> bool:
+    """Make TRL's implicit chat-template rendering close Qwen thinking tags.
+
+    GRPOTrainer renders conversational prompts internally and does not expose
+    the `enable_thinking=False` tokenizer kwarg. Qwen chat templates therefore
+    otherwise leave generation after an open `<think>` tag, which teaches the
+    RL run to spend the completion budget on reasoning traces instead of the
+    translation format.
+    """
+    template = getattr(tokenizer, "chat_template", None)
+    if not isinstance(template, str) or "enable_thinking" not in template:
+        return False
+    old_block = """{%- if add_generation_prompt %}
+    {{- '<|im_start|>assistant\\n' }}
+    {%- if enable_thinking is defined and enable_thinking is false %}
+        {{- '<think>\\n\\n</think>\\n\\n' }}
+    {%- else %}
+        {{- '<think>\\n' }}
+    {%- endif %}
+{%- endif %}"""
+    new_block = """{%- if add_generation_prompt %}
+    {{- '<|im_start|>assistant\\n' }}
+    {{- '<think>\\n\\n</think>\\n\\n' }}
+{%- endif %}"""
+    if old_block not in template:
+        return False
+    tokenizer.chat_template = template.replace(old_block, new_block)
+    return True
 
 
 def source_contains_term(source: str, source_term: str) -> bool:
@@ -1462,6 +1493,7 @@ def main() -> None:
         load_in_16bit=True,
         full_finetuning=False,
     )
+    patched_no_thinking_template = force_tokenizer_no_thinking_template(tokenizer)
     if args.attach_lora:
         if hasattr(model, "peft_config"):
             raise ValueError("--attach-lora expects a base/full model, but the loaded model already has PEFT config")
@@ -1518,6 +1550,8 @@ def main() -> None:
     print(f"Reward profile: {args.reward_profile}")
     if use_self_verification_prompt:
         print("Self-verification prompt: enabled")
+    if patched_no_thinking_template:
+        print("Tokenizer chat template: forced closed thinking block for TRL prompt rendering")
     print(f"Validation: every {args.eval_steps} steps")
     print(f"Saving: every {args.save_steps} steps")
 

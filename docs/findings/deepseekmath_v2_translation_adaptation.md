@@ -39,6 +39,7 @@ Behavior:
 - Uses the DeepSeekMath-V2 generator weighting idea: `0.76 * translation_quality + 0.24 * calibrated_self_evaluation`.
 - Keeps existing overlong, source-copy, Spanish leakage, repetition, and chat-artifact penalties.
 - During final eval, structured outputs are stripped down to final translations before corpus metrics are computed.
+- Patches Qwen chat templates during GSPO so TRL's internal prompt rendering closes the `<think>` block. Without this, Qwen starts completions inside a reasoning trace and all generations clip at the completion limit.
 
 `scripts/build_self_verifiable_translation_data.py` builds cold-start JSONL data from the clean Chanka corpus:
 
@@ -47,6 +48,23 @@ Behavior:
 - `self_verifiable_generator_sft.jsonl`: generator examples in the final/self-analysis/boxed-score format.
 
 `experiments/gspo/run_2511_self_verifiable_translation.sh` launches a small GSPO canary from the current best standalone 4B full-SFT checkpoint with a fresh LoRA adapter.
+
+## Thinking vs. Self-Verification
+
+We should use the DeepSeekMath-V2 idea of thinking, but not as an uncontrolled open `<think>` trace during GSPO. In the failed first canary, Qwen used the entire completion budget on generic English "Thinking Process" boilerplate and never reached a usable Chanka translation. That is not the DeepSeekMath mechanism we want.
+
+For this project, the useful reasoning signal is the explicit, rewardable `Autoevaluacion`: the model states whether the translation preserved meaning, Chanka grammar, terminology, entities, and avoided Spanish copying. This can be judged by the reward and later by a learned meta-verifier. Hidden or free-form thinking is hard to score, easy to clip, and can dominate the short translation output.
+
+Later, if we want a true long-thinking variant, use a separate profile with a larger completion budget and a parser that requires:
+
+```text
+<think>...bounded translation analysis...</think>
+Traduccion final: ...
+Autoevaluacion: ...
+Puntaje: \boxed{...}
+```
+
+Do not scale that variant until it proves it terminates and improves final translations. The current canary intentionally trains structured self-verification first.
 
 ## Why This Fits Chanka Better Than Plain BLEU RL
 
@@ -90,4 +108,4 @@ LEARNING_RATE=2e-7 NUM_GENERATIONS=4 \
 experiments/gspo/run_2511_self_verifiable_translation.sh
 ```
 
-Keep this as a canary until we confirm the model reliably follows the structured format. If it spends too many tokens on self-analysis, reduce `MAX_COMPLETION_LENGTH` or shorten the prompt.
+Keep this as a canary until we confirm the model reliably follows the structured format. If it spends too many tokens on self-analysis, reduce `MAX_COMPLETION_LENGTH` or shorten the prompt. If `Thinking Process:` or open `<think>` tags reappear, check that `force_tokenizer_no_thinking_template()` printed its patch message before training.
