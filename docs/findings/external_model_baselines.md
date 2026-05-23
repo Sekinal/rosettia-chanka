@@ -404,6 +404,27 @@ Decision:
 - Do not retry Gemma 4 26B-A4B on this host without an explicit CPU-offload/device-map implementation. Prefer the RTX PRO 6000 or a smaller Gemma 4 checkpoint.
 - The temporary 49 GB cache entry was deleted after the smoke to restore disk space.
 
+## Qwen3.5 35B-A3B Smoke Queue
+
+Added `experiments/sft/queue_qwen35_35b_a3b_smoke.sh`.
+
+Purpose: test whether the largest Qwen3.5 MoE path can at least load and train a tiny Chanka LoRA through Unsloth on the L40S. This is only a compatibility/memory probe; serious Qwen3.5 work should still prefer 16-bit/full or paged full-SFT paths where feasible because earlier QLoRA was unstable for this project.
+
+Result on 2026-05-23:
+
+- Model: `unsloth/Qwen3.5-35B-A3B`
+- Output: `outputs/qwen35_35b_a3b_canaries/20260523-qwen35-35b-a3b-smoke`
+- Unsloth recognized the family and started the `Fast Qwen3_5_MoE` path, so this is not an architecture blocker.
+- It downloaded the model files, then failed during 4-bit loading because modules would be dispatched to CPU/disk:
+  - `ValueError: Some modules are dispatched on the CPU or the disk. Make sure you have enough GPU RAM to fit the quantized model.`
+- The local HF cache occupied about `67 GB` after download.
+
+Decision:
+
+- This is a memory blocker on the 44 GB L40S, not a translation-quality result.
+- Do not retry Qwen3.5 35B-A3B on this host without explicit offload/device-map work. Prefer the RTX PRO 6000 for the next serious 35B-A3B experiment.
+- The temporary cache entry was deleted after the smoke; `/root` returned to about `120 GB` free.
+
 ## Decision
 
 Gemma 4 E4B and Hy-MT2 can both be used with Unsloth after chat-marker fixes, but Gemma 4 E4B clean-only SFT, Gemma 4 E4B broad-to-Chanka SFT, and the tiny Hy-MT2 7B broad-to-Chanka run are not competitive with the current Qwen3.5 adapter. Neither family justifies replacing the Qwen base from current results. If these families are revisited, they need much larger broad Quechua SFT before clean Chanka SFT/GSPO, with generation evals at checkpoints rather than relying on trainer loss.
