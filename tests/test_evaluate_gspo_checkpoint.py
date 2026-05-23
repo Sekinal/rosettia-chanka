@@ -85,6 +85,19 @@ class EvaluateGspoCheckpointTests(unittest.TestCase):
         self.assertEqual(args.few_shot_top_k, 3)
         self.assertEqual(args.few_shot_max_candidates, 64)
 
+    def test_self_verification_output_option_is_parsed(self):
+        args = evaluate.parse_args(
+            [
+                "--adapter-path",
+                "outputs/run/chanka_gspo/checkpoint-56",
+                "--output-json",
+                "outputs/run/self_verify_metrics.json",
+                "--self-verification-output",
+            ]
+        )
+
+        self.assertTrue(args.self_verification_output)
+
     def test_select_terminology_prefers_longest_matches_and_dedupes_targets(self):
         terms = [
             ("madre abandonada", "saqisqa mama"),

@@ -47,6 +47,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--progress-every", type=int, default=16)
     parser.add_argument("--strip-chat-artifacts", action="store_true")
     parser.add_argument(
+        "--self-verification-output",
+        action="store_true",
+        help="Prompt for structured self-verifying translations and score metrics on Traduccion final only.",
+    )
+    parser.add_argument(
         "--terminology-file",
         default=None,
         help="Optional dataset-repo parquet file with glossary entries for terminology-conditioned prompting.",
@@ -193,7 +198,8 @@ def generate_predictions_with_progress(
     few_shot_examples: Sequence[dict[str, str]] | None = None,
     few_shot_top_k: int = 0,
     few_shot_max_candidates: int = 128,
-) -> tuple[list[dict[str, str]], list[str], list[list[tuple[str, str]]], list[list[tuple[str, str]]]]:
+    self_verification_output: bool = False,
+) -> tuple[list[dict[str, str]], list[str], list[str], list[list[tuple[str, str]]], list[list[tuple[str, str]]]]:
     import torch
 
     if num_return_sequences > 1 and not do_sample:
@@ -201,6 +207,7 @@ def generate_predictions_with_progress(
 
     generated_rows: list[dict[str, str]] = []
     predictions: list[str] = []
+    raw_predictions: list[str] = []
     generated_terms: list[list[tuple[str, str]]] = []
     generated_few_shots: list[list[tuple[str, str]]] = []
     model.eval()
@@ -226,7 +233,12 @@ def generate_predictions_with_progress(
             prompts.append(
                 gspo.apply_chat_template_no_thinking(
                     tokenizer,
-                    gspo.prompt_messages(row["source"], terms, few_shots),
+                    gspo.prompt_messages(
+                        row["source"],
+                        terms,
+                        few_shots,
+                        self_verification=self_verification_output,
+                    ),
                     tokenize=False,
                     add_generation_prompt=True,
                 )
@@ -249,18 +261,22 @@ def generate_predictions_with_progress(
             row = batch_rows[output_index // num_return_sequences]
             completion_ids = output_ids[output_index, prompt_length:]
             prediction = tokenizer.decode(completion_ids, skip_special_tokens=True)
+            raw_prediction = gspo.normalize_text(prediction)
             if strip_chat_artifacts:
                 prediction = gspo.strip_chat_artifacts(prediction)
             else:
                 prediction = gspo.normalize_text(prediction)
+            if self_verification_output:
+                prediction = gspo.extract_translation_from_structured_output(prediction)
             generated_rows.append(row)
             predictions.append(prediction)
+            raw_predictions.append(raw_prediction)
             generated_terms.append(batch_terms[output_index // num_return_sequences])
             generated_few_shots.append(batch_few_shots[output_index // num_return_sequences])
         completed = min(total, start + len(batch_rows))
         if progress_every > 0 and (completed == total or completed % progress_every == 0):
             print(f"generated {completed}/{total} predictions", flush=True)
-    return generated_rows, predictions, generated_terms, generated_few_shots
+    return generated_rows, predictions, raw_predictions, generated_terms, generated_few_shots
 
 
 def main() -> None:
@@ -303,7 +319,7 @@ def main() -> None:
     model.generation_config.pad_token_id = tokenizer.eos_token_id
     FastLanguageModel.for_inference(model)
 
-    generated_rows, predictions, generated_terms, generated_few_shots = generate_predictions_with_progress(
+    generated_rows, predictions, raw_predictions, generated_terms, generated_few_shots = generate_predictions_with_progress(
         model,
         tokenizer,
         generation_rows,
@@ -321,6 +337,7 @@ def main() -> None:
         train_rows,
         args.few_shot_top_k,
         args.few_shot_max_candidates,
+        args.self_verification_output,
     )
     references = [row["target"] for row in generated_rows]
     sources = [row["source"] for row in generated_rows]
@@ -330,6 +347,7 @@ def main() -> None:
     metrics["split"] = args.split
     metrics["num_return_sequences"] = args.num_return_sequences
     metrics["adapter_path"] = str(args.adapter_path)
+    metrics["self_verification_output"] = bool(args.self_verification_output)
     if args.terminology_file:
         matched_rows = sum(1 for terms in generated_terms if terms)
         metrics["terminology_file"] = args.terminology_file
@@ -351,19 +369,23 @@ def main() -> None:
     if args.predictions_jsonl:
         args.predictions_jsonl.parent.mkdir(parents=True, exist_ok=True)
         with args.predictions_jsonl.open("w") as handle:
-            for row, prediction, terms, few_shots in zip(
+            for row, prediction, raw_prediction, terms, few_shots in zip(
                 generated_rows,
                 predictions,
+                raw_predictions,
                 generated_terms,
                 generated_few_shots,
                 strict=True,
             ):
+                parsed = gspo.parse_self_verification_output(raw_prediction) if args.self_verification_output else None
                 handle.write(
                     json.dumps(
                         {
                             "source": row["source"],
                             "reference": row["target"],
                             "prediction": prediction,
+                            "raw_prediction": raw_prediction,
+                            "self_verification": parsed,
                             "source_name": row.get("source_name"),
                             "variant": row.get("variant"),
                             "terminology": [

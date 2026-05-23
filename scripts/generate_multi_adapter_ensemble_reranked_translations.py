@@ -152,7 +152,7 @@ def generate_groups_for_adapter(
     FastLanguageModel.for_inference(model)
 
     try:
-        generated_rows, predictions, _generated_terms, _generated_few_shots = evaluate.generate_predictions_with_progress(
+        generated_rows, predictions, _raw_predictions, _generated_terms, _generated_few_shots = evaluate.generate_predictions_with_progress(
             model=model,
             tokenizer=tokenizer,
             rows=source_rows,

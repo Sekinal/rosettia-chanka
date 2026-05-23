@@ -39,7 +39,7 @@ class TrainMetaVerifierChankaUnslothTests(unittest.TestCase):
 
             rows = meta.load_meta_rows(
                 Namespace(
-                    meta_jsonl=path,
+                    meta_jsonl=[path],
                     max_rows=None,
                     dataset_repo="unused",
                     dataset_file="unused",
@@ -49,6 +49,30 @@ class TrainMetaVerifierChankaUnslothTests(unittest.TestCase):
 
         self.assertEqual(rows[0]["source"], row["source"])
         self.assertEqual(rows[0]["analysis"], row["analysis"])
+
+    def test_load_meta_rows_dedupes_multiple_jsonls(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "meta.jsonl"
+            row = {
+                "source": "s",
+                "reference": "r",
+                "candidate": "c",
+                "analysis": "a",
+                "label": json.dumps({"score": 1.0, "severity": "none", "rationale": "ok"}),
+            }
+            path.write_text(json.dumps(row) + "\n")
+
+            rows = meta.load_meta_rows(
+                Namespace(
+                    meta_jsonl=[path, path],
+                    max_rows=None,
+                    dataset_repo="unused",
+                    dataset_file="unused",
+                    seed=1,
+                )
+            )
+
+        self.assertEqual(len(rows), 1)
 
     def test_configure_step_schedule_uses_effective_batch(self):
         args = Namespace(

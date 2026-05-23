@@ -57,6 +57,18 @@ Behavior:
 2. Train a meta-verifier.
 3. Run self-verifiable GSPO with `--meta-verifier-adapter-path`.
 
+`scripts/evaluate_gspo_checkpoint.py --self-verification-output` can now prompt a model for structured self-verifying translations, score only the parsed final translation, and write both `prediction` and `raw_prediction` plus the parsed `self_verification` object to JSONL.
+
+`scripts/build_meta_verifier_from_self_outputs.py` converts those real model outputs into meta-verifier training rows. It compares the model's boxed self-score against the hidden-reference translation score, labels false confidence, underconfidence/hallucinated issues, missing scores, and well-calibrated analyses, and writes JSONL usable by `scripts/train_meta_verifier_chanka_unsloth.py`.
+
+`experiments/gspo/queue_meta_verifier_v2_from_self_outputs.sh` is the first rollout-to-meta-verifier loop:
+
+1. Wait for a self-verifiable translator adapter.
+2. Mine real self-verifying outputs with `--self-verification-output`.
+3. Build real meta-verifier rows from the model's own analyses.
+4. Train meta-verifier v2 on cold-start + real self-output rows.
+5. Run self-verifiable GSPO with meta-verifier v2.
+
 ## Thinking vs. Self-Verification
 
 We should use the DeepSeekMath-V2 idea of thinking, but not as an uncontrolled open `<think>` trace during GSPO. In the failed first canary, Qwen used the entire completion budget on generic English "Thinking Process" boilerplate and never reached a usable Chanka translation. That is not the DeepSeekMath mechanism we want.
@@ -96,8 +108,8 @@ Next serious step:
 2. Train a translation verifier on candidate/reference/source triples.
 3. Train a meta-verifier on verifier analyses.
 4. Replace or blend the deterministic `self_analysis_meta_score` with the learned meta-verifier score.
-5. Mine hard examples from K-sample outputs of the current best translator, especially cases with high self-score but low hidden-reference score.
-6. Iterate verifier -> generator GSPO -> hard-case mining -> verifier.
+5. Mine hard examples from K-sample outputs of the current best translator, especially cases with high self-score but low hidden-reference score. `queue_meta_verifier_v2_from_self_outputs.sh` implements the first version.
+6. Iterate verifier -> generator GSPO -> hard-case mining -> verifier/meta-verifier.
 
 ## Canary Command
 
@@ -123,6 +135,13 @@ To train and use the cold-start meta-verifier:
 ```bash
 cd /root/rosettia-chanka
 experiments/gspo/run_2511_train_meta_verifier_then_self_gspo.sh
+```
+
+To mine real self-analysis failures and train meta-verifier v2:
+
+```bash
+cd /root/rosettia-chanka
+experiments/gspo/queue_meta_verifier_v2_from_self_outputs.sh
 ```
 
 For a faster smoke:

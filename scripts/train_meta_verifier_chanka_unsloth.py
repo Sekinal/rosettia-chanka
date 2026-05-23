@@ -39,7 +39,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--meta-jsonl",
         type=Path,
-        default=None,
+        action="append",
+        default=[],
         help="Optional prebuilt translation_meta_verifier_cold_start.jsonl. If omitted, rows are generated from the clean corpus.",
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
@@ -72,22 +73,33 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def load_meta_rows(args: argparse.Namespace) -> list[dict[str, str]]:
-    if args.meta_jsonl is not None:
+    if args.meta_jsonl:
         rows: list[dict[str, str]] = []
-        with args.meta_jsonl.open() as handle:
-            for line in handle:
-                if not line.strip():
-                    continue
-                payload = json.loads(line)
-                rows.append(
-                    {
+        seen: set[tuple[str, str, str, str, str]] = set()
+        for path in args.meta_jsonl:
+            with path.open() as handle:
+                for line in handle:
+                    if not line.strip():
+                        continue
+                    payload = json.loads(line)
+                    row = {
                         "source": str(payload["source"]),
                         "reference": str(payload["reference"]),
                         "candidate": str(payload["candidate"]),
                         "analysis": str(payload["analysis"]),
                         "label": str(payload["label"]),
                     }
-                )
+                    key = (
+                        gspo.normalize_text(row["source"]),
+                        gspo.normalize_text(row["reference"]),
+                        gspo.normalize_text(row["candidate"]),
+                        gspo.normalize_text(row["analysis"]),
+                        row["label"],
+                    )
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    rows.append(row)
         if args.max_rows is not None:
             rows = rows[: args.max_rows]
         return rows
