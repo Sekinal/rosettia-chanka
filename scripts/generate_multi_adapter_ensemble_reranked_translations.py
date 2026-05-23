@@ -117,6 +117,7 @@ def merge_candidate_groups(
                         source_name=candidate.source_name,
                         variant=candidate.variant,
                         candidate_index=len(grouped[key]),
+                        pool_path=candidate.pool_path,
                     )
                 )
 
@@ -170,7 +171,12 @@ def generate_groups_for_adapter(
             few_shot_top_k=args.few_shot_top_k,
             few_shot_max_candidates=args.few_shot_max_candidates,
         )
-        return feature_generate.candidate_groups_from_generation(generated_rows, predictions, num_return_sequences)
+        return feature_generate.candidate_groups_from_generation(
+            generated_rows,
+            predictions,
+            num_return_sequences,
+            pool_path=str(adapter_path),
+        )
     finally:
         del model
         del tokenizer

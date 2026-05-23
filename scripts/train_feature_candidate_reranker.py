@@ -42,6 +42,13 @@ BASE_FEATURE_NAMES = [
     "target_token_count",
     "target_source_token_ratio",
 ]
+POOL_ORIGIN_FEATURE_NAMES = [
+    "pool_is_current",
+    "pool_is_qwen35_4b_full",
+    "pool_is_qwen35_9b",
+    "pool_is_other",
+    "pool_is_unknown",
+]
 EXPERIMENTAL_FEATURE_NAMES = [
     "source_root_copy_ratio",
     "terminology_target_coverage",
@@ -106,6 +113,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Opt in to experimental glossary target-coverage and source-root leakage features.",
     )
+    parser.add_argument(
+        "--include-pool-origin-features",
+        action="store_true",
+        help="Opt in to candidate-origin one-hot features from pool_path for mixed-model pools.",
+    )
     parser.add_argument("--seed", type=int, default=3407)
     return parser.parse_args(argv)
 
@@ -120,6 +132,36 @@ def load_groups(paths: Sequence[Path]) -> list[list[oracle_rerank.Candidate]]:
 
 def normalized_prediction(text: str) -> str:
     return gspo.normalize_text(text).lower()
+
+
+def pool_origin_category(pool_path: str | None) -> str:
+    if not pool_path:
+        return "unknown"
+    normalized = pool_path.lower().replace("-", "_")
+    if "qwen35_9b" in normalized or "qwen3.5_9b" in normalized or "_9b" in normalized:
+        return "qwen35_9b"
+    if (
+        "qwen35_4b" in normalized
+        or "qwen3.5_4b" in normalized
+        or "4bfull" in normalized
+        or "4b_full" in normalized
+        or "_4b" in normalized
+    ):
+        return "qwen35_4b_full"
+    if "current" in normalized or "mbr_self_training" in normalized:
+        return "current"
+    return "other"
+
+
+def pool_origin_features(pool_path: str | None) -> dict[str, float]:
+    category = pool_origin_category(pool_path)
+    return {
+        "pool_is_current": 1.0 if category == "current" else 0.0,
+        "pool_is_qwen35_4b_full": 1.0 if category == "qwen35_4b_full" else 0.0,
+        "pool_is_qwen35_9b": 1.0 if category == "qwen35_9b" else 0.0,
+        "pool_is_other": 1.0 if category == "other" else 0.0,
+        "pool_is_unknown": 1.0 if category == "unknown" else 0.0,
+    }
 
 
 def significant_term_tokens(text: str) -> list[str]:
@@ -242,6 +284,7 @@ def feature_rows_for_group(
             "candidate_index_fraction": candidate.candidate_index / max_index,
             "target_token_count": float(target_count),
             "target_source_token_ratio": target_count / source_count,
+            **pool_origin_features(candidate.pool_path),
         }
         rows.append(CandidateFeatures(candidate, raw, oracle_rerank.candidate_oracle_score(candidate)))
     return rows
@@ -343,6 +386,11 @@ def initial_weights() -> dict[str, float]:
         "candidate_index_fraction": -0.03,
         "target_token_count": 0.0,
         "target_source_token_ratio": 0.0,
+        "pool_is_current": 0.0,
+        "pool_is_qwen35_4b_full": 0.0,
+        "pool_is_qwen35_9b": 0.0,
+        "pool_is_other": 0.0,
+        "pool_is_unknown": 0.0,
     }
 
 
@@ -654,6 +702,8 @@ def load_optional_terminology(args: argparse.Namespace) -> list[tuple[str, str]]
 
 def selected_feature_names(args: argparse.Namespace) -> list[str]:
     feature_names = BASE_FEATURE_NAMES[:]
+    if args.include_pool_origin_features:
+        feature_names.extend(POOL_ORIGIN_FEATURE_NAMES)
     if args.include_source_root_copy:
         feature_names.append("source_root_copy_ratio")
     if args.include_terminology_features:

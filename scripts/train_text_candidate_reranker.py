@@ -83,6 +83,18 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-candidate-tokens", type=int, default=14)
     parser.add_argument("--include-manual-features", action="store_true", default=True)
     parser.add_argument("--no-include-manual-features", action="store_false", dest="include_manual_features")
+    parser.add_argument(
+        "--include-pool-origin-features",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Add sparse candidate-origin indicators from pool_path, useful for mixed-model pools.",
+    )
+    parser.add_argument(
+        "--include-pool-token-cross-features",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Add origin x candidate-token interactions. Higher capacity and easier to overfit.",
+    )
     parser.add_argument("--seed", type=int, default=3407)
     return parser.parse_args(argv)
 
@@ -152,9 +164,16 @@ def sparse_features_for_row(
         for token in prediction_tokens
         if len(token) >= 2
     ][: int(config["max_candidate_tokens"])]
+    pool_origin = feature_reranker.pool_origin_category(candidate.pool_path)
+    if config.get("include_pool_origin_features", False):
+        add_feature(features, f"pool_origin:{pool_origin}", 1.0, model.hash_size)
+        if candidate.candidate_index == 0:
+            add_feature(features, f"pool_origin_first:{pool_origin}", 1.0, model.hash_size)
 
     for token in candidate_tokens:
         add_feature(features, f"cand_tok:{token}", 1.0, model.hash_size)
+        if config.get("include_pool_token_cross_features", False):
+            add_feature(features, f"pool_cand_tok:{pool_origin}:{token}", 0.5, model.hash_size)
     for ngram in word_ngrams(candidate_tokens, int(config["word_ngram_max"])):
         add_feature(features, f"cand_wng:{ngram}", 1.0, model.hash_size)
     for ngram in char_ngrams(
@@ -216,6 +235,8 @@ def model_shell(
     args: argparse.Namespace,
 ) -> TextRankerModel:
     feature_names = feature_reranker.BASE_FEATURE_NAMES[:]
+    if args.include_pool_origin_features:
+        feature_names.extend(feature_reranker.POOL_ORIGIN_FEATURE_NAMES)
     means, stds = feature_reranker.normalization_stats(train_groups, feature_names)
     config = {
         "char_ngram_min": args.char_ngram_min,
@@ -224,6 +245,8 @@ def model_shell(
         "max_source_tokens": args.max_source_tokens,
         "max_candidate_tokens": args.max_candidate_tokens,
         "include_manual_features": args.include_manual_features,
+        "include_pool_origin_features": args.include_pool_origin_features,
+        "include_pool_token_cross_features": args.include_pool_token_cross_features,
     }
     return TextRankerModel(
         hash_size=args.hash_size,

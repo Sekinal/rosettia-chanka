@@ -598,3 +598,34 @@ Decision:
 - The new 4B full-SFT checkpoint is the best standalone 4B base so far and has a useful K16 oracle.
 - Adding it to the current deployable pool raises the oracle slightly over the old K32+4B pool, but the matched listwise text selector does not beat the current deployable result (`38.9423` selection, chrF++ `51.8586`, BLEU `26.0207`).
 - This is a selector problem more than a generation problem. Keep the checkpoint for future reranker/verifier work, but do not change the default deployment recipe yet.
+
+## 2026-05-23 Candidate Provenance Features
+
+Implemented candidate provenance plumbing:
+
+- `scripts/rerank_candidate_predictions.py` now preserves optional `pool_path` on each candidate.
+- `scripts/merge_candidate_prediction_pools.py` already writes `pool_path`; downstream loaders now keep it.
+- Generation wrappers now set `pool_path` to the adapter path when writing candidate JSONL.
+- `scripts/train_feature_candidate_reranker.py` has optional pool-origin one-hot features.
+- `scripts/train_text_candidate_reranker.py` has optional sparse pool-origin indicators and disabled-by-default pool-origin x candidate-token interactions.
+
+Mixed 4B+9B ablations on:
+
+- Train: `outputs/qwen35_9b_candidate_rerank/20260523-qwen35-9b-candidate-rerank/train_current_k32_4b_k16_9b_k16.jsonl`
+- Eval: `outputs/qwen35_9b_candidate_rerank/20260523-qwen35-9b-candidate-rerank/eval_current_k32_4b_k16_9b_k16.jsonl`
+
+Results:
+
+| Selector | Selection | chrF++ | BLEU | token F1 | TER |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| previous matched listwise text | 38.1557 | 51.2895 | 23.4968 | 39.9106 | 67.9724 |
+| current no-origin retrain control | 33.7561 | 46.2980 | 21.8392 | 34.2470 | 71.6590 |
+| origin + origin-token text features | 36.1156 | 49.2064 | 21.9106 | 37.0936 | 68.6636 |
+| origin-only text features | 35.7782 | 48.9125 | 21.7656 | 36.6295 | 69.1244 |
+| oracle | 51.6170 | 64.8936 | 37.1419 | 56.9913 | 48.3871 |
+
+Decision:
+
+- Candidate provenance is useful metadata, but these simple origin features are negative on the mixed 4B+9B selector.
+- Origin features are opt-in/off and old saved selector models remain loadable, but the current no-origin retrain control did not reproduce the earlier matched-selector result. Do not replace any saved best selector with a freshly retrained one without external eval.
+- Do not spend more time on simple origin tags; the selector gap needs a stronger QE/listwise/verifier objective, not just model-origin priors.

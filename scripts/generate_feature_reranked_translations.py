@@ -103,6 +103,7 @@ def candidate_groups_from_generation(
     generated_rows: Sequence[dict[str, str]],
     predictions: Sequence[str],
     num_return_sequences: int,
+    pool_path: str | None = None,
 ) -> list[list[oracle_rerank.Candidate]]:
     if len(generated_rows) != len(predictions):
         raise ValueError("generated_rows and predictions must have the same length")
@@ -126,6 +127,7 @@ def candidate_groups_from_generation(
                     source_name=row.get("source_name"),
                     variant=row.get("variant"),
                     candidate_index=index,
+                    pool_path=pool_path,
                 )
             )
         groups.append(group)
@@ -154,6 +156,7 @@ def write_selected(path: Path, selected: Sequence[oracle_rerank.Candidate]) -> N
                         "candidate_index": candidate.candidate_index,
                         "source_name": candidate.source_name,
                         "variant": candidate.variant,
+                        "pool_path": candidate.pool_path,
                     },
                     ensure_ascii=False,
                     sort_keys=True,
@@ -175,6 +178,7 @@ def write_candidates(path: Path, groups: Sequence[Sequence[oracle_rerank.Candida
                             "candidate_index": candidate.candidate_index,
                             "source_name": candidate.source_name,
                             "variant": candidate.variant,
+                            "pool_path": candidate.pool_path,
                         },
                         ensure_ascii=False,
                         sort_keys=True,
@@ -229,7 +233,12 @@ def main() -> None:
         terminology_entries=terminology_entries,
         terminology_top_k=args.terminology_top_k,
     )
-    groups = candidate_groups_from_generation(generated_rows, predictions, args.num_return_sequences)
+    groups = candidate_groups_from_generation(
+        generated_rows,
+        predictions,
+        args.num_return_sequences,
+        pool_path=str(args.adapter_path),
+    )
     selected = select_translations(groups, feature_model, terminology_entries, args.terminology_top_k)
     write_selected(args.output_jsonl, selected)
     if args.candidates_jsonl:

@@ -103,6 +103,7 @@ def summarize(records: Sequence[dict[str, Any]]) -> dict[str, Any]:
             source_name=record.get("source_name"),
             variant=record.get("variant"),
             candidate_index=int(record.get("candidate_index", 0)),
+            pool_path=record.get("pool_path"),
         )
         for record in records
     ]

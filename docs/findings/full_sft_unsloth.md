@@ -305,6 +305,30 @@ Code hygiene:
 - `experiments/sft/queue_qwen35_4b_full_sft_candidate_rerank.sh` can take `FULL_SFT_CHECKPOINT=...` to harvest candidates from a known best checkpoint directly instead of selecting from one sweep summary.
 - `scripts/write_nested_metrics_summary.py` now handles both nested `*/metrics.json` and flat `*_metrics.json` layouts. The first GSPO retry summary was empty only because this queue writes flat metric files.
 
+## 2026-05-23 Active 4B Full-SFT Refinement
+
+Launched a longer low-LR full fine-tune from the current best standalone 4B full-SFT checkpoint.
+
+Setup:
+
+- Remote host: `root@216.81.248.197 -p 20299`
+- PID at launch: `254147`
+- Log: `outputs/full_sft_sweeps/20260523-qwen35-4b-full-sft-refine-from-ckpt36-lr5e-7-72steps/run.log`
+- Starting model: `outputs/full_sft_sweeps/20260523-qwen35-4b-full-sft-lr-followups/lr_2em6_48steps/chanka/checkpoint-36`
+- Output root: `outputs/full_sft_sweeps/20260523-qwen35-4b-full-sft-refine-from-ckpt36-lr5e-7-72steps`
+- Training: clean Chanka SFT with terminology top-1 prompts.
+- Full fine-tuning, all `4,539,265,536` parameters trainable.
+- Optimizer: `paged_adamw_8bit`
+- LR: `5e-7`
+- Steps: `72`
+- Eval/save every `8` steps, `save_only_model=True`, keeping `4` checkpoints.
+
+Reason:
+
+- The current best standalone base is the `2e-6/checkpoint-36` 4B full-SFT model: selection `31.1999`, chrF++ `44.4295`, BLEU `18.0014`, token F1 `29.9850`, TER `81.5668`.
+- This run tests whether a slower follow-up phase from that checkpoint can preserve BLEU while improving chrF++/TER or reduce overfit relative to the 48-step `2e-6` sweep.
+- Keep validation-generation eval after training; trainer eval loss alone is not enough for model selection.
+
 GSPO follow-up:
 
 - `scripts/train_gspo_chanka_unsloth.py` now supports `--attach-lora`, `--lora-r`, `--lora-alpha`, and `--lora-dropout`. This is intended for RL from a merged/full checkpoint without full-parameter RL.

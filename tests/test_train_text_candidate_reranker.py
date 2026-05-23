@@ -12,7 +12,13 @@ from scripts import train_text_candidate_reranker as text_reranker
 class TrainTextCandidateRerankerTests(unittest.TestCase):
     def test_sparse_features_include_candidate_and_cross_features(self):
         group = [
-            oracle_rerank.Candidate("En la fiesta", "Raymipim", "Raymipim", candidate_index=0),
+            oracle_rerank.Candidate(
+                "En la fiesta",
+                "Raymipim",
+                "Raymipim",
+                candidate_index=0,
+                pool_path="outputs/qwen35_4b_full/eval.jsonl",
+            ),
         ]
         rows = feature_reranker.featurize_groups([group])
         args = Namespace(
@@ -23,6 +29,8 @@ class TrainTextCandidateRerankerTests(unittest.TestCase):
             max_source_tokens=4,
             max_candidate_tokens=6,
             include_manual_features=True,
+            include_pool_origin_features=True,
+            include_pool_token_cross_features=False,
         )
         model = text_reranker.model_shell(rows, args)
 
@@ -30,6 +38,7 @@ class TrainTextCandidateRerankerTests(unittest.TestCase):
 
         self.assertGreater(len(features), 0)
         self.assertIn(text_reranker.stable_hash("src_cand:fiesta->raymipim", 1024), features)
+        self.assertIn(text_reranker.stable_hash("pool_origin:qwen35_4b_full", 1024), features)
 
     def test_train_text_ranker_can_learn_oracle_winner(self):
         group = [
@@ -57,6 +66,8 @@ class TrainTextCandidateRerankerTests(unittest.TestCase):
             max_source_tokens=4,
             max_candidate_tokens=6,
             include_manual_features=True,
+            include_pool_origin_features=True,
+            include_pool_token_cross_features=False,
             seed=1,
         )
 
@@ -95,6 +106,8 @@ class TrainTextCandidateRerankerTests(unittest.TestCase):
             max_source_tokens=4,
             max_candidate_tokens=6,
             include_manual_features=True,
+            include_pool_origin_features=True,
+            include_pool_token_cross_features=False,
             seed=1,
         )
 

@@ -21,8 +21,33 @@ class TrainFeatureCandidateRerankerTests(unittest.TestCase):
         self.assertIn("duplicate_rate", rows[0].raw)
         self.assertIn("source_root_copy_ratio", rows[0].raw)
         self.assertIn("terminology_target_coverage", rows[0].raw)
+        self.assertIn("pool_is_unknown", rows[0].raw)
         self.assertEqual(rows[1].raw["exact_source_copy"], 1.0)
         self.assertGreaterEqual(rows[0].oracle_score, 0.0)
+
+    def test_pool_origin_features_detect_mixed_model_paths(self):
+        group = [
+            oracle_rerank.Candidate(
+                "src",
+                "ref",
+                "a",
+                candidate_index=0,
+                pool_path="outputs/verifier_candidate_mining/train_current_k32_predictions.jsonl",
+            ),
+            oracle_rerank.Candidate(
+                "src",
+                "ref",
+                "b",
+                candidate_index=1,
+                pool_path="outputs/qwen35_9b_candidate_rerank/eval_9b_k16.jsonl",
+            ),
+        ]
+
+        rows = feature_reranker.feature_rows_for_group(group)
+
+        self.assertEqual(rows[0].raw["pool_is_current"], 1.0)
+        self.assertEqual(rows[0].raw["pool_is_qwen35_9b"], 0.0)
+        self.assertEqual(rows[1].raw["pool_is_qwen35_9b"], 1.0)
 
     def test_source_root_copy_ratio_detects_suffix_copying(self):
         ratio = feature_reranker.source_root_copy_ratio("En la fiesta", "Fiestapim")

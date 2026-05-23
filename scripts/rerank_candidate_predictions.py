@@ -25,6 +25,7 @@ class Candidate:
     source_name: str | None = None
     variant: str | None = None
     candidate_index: int = 0
+    pool_path: str | None = None
 
     @property
     def key(self) -> tuple[str, str, str | None, str | None]:
@@ -66,6 +67,7 @@ def load_candidates(path: Path) -> list[Candidate]:
             source_name=record.get("source_name"),
             variant=record.get("variant"),
             candidate_index=0,
+            pool_path=record.get("pool_path"),
         )
         index = group_counts.get(candidate.key, 0)
         group_counts[candidate.key] = index + 1
@@ -77,6 +79,7 @@ def load_candidates(path: Path) -> list[Candidate]:
                 source_name=candidate.source_name,
                 variant=candidate.variant,
                 candidate_index=index,
+                pool_path=candidate.pool_path,
             )
         )
     return candidates
@@ -166,6 +169,7 @@ def write_predictions(path: Path, selected: Sequence[Candidate]) -> None:
                         "source": candidate.source,
                         "source_name": candidate.source_name,
                         "variant": candidate.variant,
+                        "pool_path": candidate.pool_path,
                     },
                     ensure_ascii=False,
                     sort_keys=True,

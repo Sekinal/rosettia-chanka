@@ -15,7 +15,7 @@ class RerankCandidatePredictionsTests(unittest.TestCase):
             path.write_text(
                 "\n".join(
                     [
-                        '{"source":"s1","reference":"r1","prediction":"p1","source_name":"manual","variant":"chanka"}',
+                        '{"source":"s1","reference":"r1","prediction":"p1","source_name":"manual","variant":"chanka","pool_path":"outputs/current/preds.jsonl"}',
                         '{"source":"s1","reference":"r1","prediction":"p2","source_name":"manual","variant":"chanka"}',
                         '{"source":"s2","reference":"r2","prediction":"p3","source_name":"manual","variant":"chanka"}',
                     ]
@@ -27,6 +27,7 @@ class RerankCandidatePredictionsTests(unittest.TestCase):
             groups = rerank.group_candidates(candidates)
 
         self.assertEqual([candidate.candidate_index for candidate in candidates], [0, 1, 0])
+        self.assertEqual(candidates[0].pool_path, "outputs/current/preds.jsonl")
         self.assertEqual(len(groups), 2)
         self.assertEqual([candidate.prediction for candidate in groups[0]], ["p1", "p2"])
 
