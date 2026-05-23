@@ -149,6 +149,23 @@ Conclusion: the bounded thinking format is now mechanically viable, but a normal
 
 Operational note: `queue_meta_verifier_v3_from_thinking_outputs.sh` now mines with batch size 4 by default. The first restarted mining job used batch size 1 and was unnecessarily slow; the L40S had ample headroom, and the final evaluator path already proved batched decoding works for these structured outputs.
 
+The v3 mining run from that failed adapter produced the desired hard negatives:
+
+- run directory: `outputs/self_verification_mining/20260523-meta-v3-thinking/`
+- rows: 320 generated / 317 meta-verifier records after dedupe
+- chrF++: 39.4663
+- BLEU: 9.0469
+- token F1: 28.3023
+- TER: 105.8957
+- format/thinking-format rate: 86.875%
+- missing self-score rate: 13.125%
+- average self-score / true-score: 0.9586 / 0.3278
+- false-confidence rate: 91.7266%
+- label rationales: 254 false-confidence, 40 missing-score, 22 matching-analysis, 1 underconfident
+- severities: 269 critical, 26 major, 18 minor, 4 none
+
+This confirms that the main failure is not lack of self-evaluation syntax anymore; it is calibration. The meta-verifier should be trained heavily on these real false-confidence traces, then the next GSPO run should reward agreement with that meta-verifier rather than trusting the model's boxed score.
+
 ## Why This Fits Chanka Better Than Plain BLEU RL
 
 BLEU/chrF rewards are useful but too shallow for the user's goal of learning grammar structures. A translation can gain n-gram overlap while still copying Spanish structure, omitting agglutinative morphology, or choosing a misleading Chanka term. The DeepSeekMath-V2 adaptation makes the model expose its own quality judgement, then rewards calibration. This creates pressure toward internal checks like:
