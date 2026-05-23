@@ -48,6 +48,16 @@ Behavior:
 - `self_verifiable_generator_sft.jsonl`: generator examples in the final/self-analysis/boxed-score format.
 - `self_verifiable_thinking_generator_sft.jsonl`: generator examples with a bounded `Analisis de traduccion` field before the final translation.
 
+The thinking variant now uses explicit translation primitive tags:
+
+- `[SIGNIFICADO]`: meaning, omissions, additions, and faithfulness.
+- `[GRAMATICA]`: Chanka grammar, suffixes, case/possession, verb shape, and naturalness.
+- `[ENTIDADES]`: names, numbers, people, places, and dates.
+- `[TERMINOLOGIA]`: glossary terms and stable equivalents.
+- `[ANTI_COPIA]`: Spanish copying, calques, and unnecessary loans.
+
+This is the practical equivalent of mathematical reasoning primitives. The model is not rewarded for a long hidden chain of thought; it is rewarded for exposing one or two short, parseable checks that correspond to translation failure modes we can score. `translation_thinking_score()` gives extra reward for valid primitive tags while still checking bounded length and translation-specific content. Diagnostics now report average thinking primitive count, so future canaries can distinguish "formatted but empty" thinking from actual primitive use.
+
 `scripts/train_meta_verifier_chanka_unsloth.py` trains the meta-verifier LoRA. It can either consume the generated `translation_meta_verifier_cold_start.jsonl` or build the same rows directly from the clean corpus. It saves `final_meta_verifier_lora`.
 
 For the thinking variant, the better cold-start path is now explicit: build `self_verifiable_thinking_generator_sft.jsonl`, SFT it with `scripts/train_jsonl_sft_unsloth.py --prompt-self-verification-thinking --target-field target`, then run `self_verifiable_thinking_translation_2511` GSPO. The wrapper `experiments/gspo/run_2511_train_thinking_generator_then_gspo.sh` performs that chain. This teaches the response structure before RL, which is closer to DeepSeekMath than asking a normal translator adapter to discover the reasoning format during GSPO.
@@ -127,7 +137,7 @@ Autoevaluacion: ...
 Puntaje: \boxed{...}
 ```
 
-That variant now exists as `self_verifiable_thinking_translation_2511` and is launched by `experiments/gspo/run_2511_self_verifiable_thinking_translation.sh`. It deliberately does **not** use the tokenizer's raw `<think>` mode. Instead, it asks for a short, parseable `Analisis de traduccion` field before the final translation and rewards it only when it is bounded and translation-specific. After the first canary produced ~100-token analyses with 25% clipping, the target was tightened to 1-2 checks, at most 35 words, no step-by-step rationale, and the launcher default completion cap was reduced to 112 tokens. This is closer to the DeepSeekMath/R1 idea than plain `Autoevaluacion`, while still keeping external metrics on `Traduccion final` only.
+That variant now exists as `self_verifiable_thinking_translation_2511` and is launched by `experiments/gspo/run_2511_self_verifiable_thinking_translation.sh`. It deliberately does **not** use the tokenizer's raw `<think>` mode. Instead, it asks for a short, parseable `Analisis de traduccion` field before the final translation and rewards it only when it is bounded and translation-specific. After the first canary produced ~100-token analyses with 25% clipping, the target was tightened to 1-2 checks, at most 35 words, no step-by-step rationale, and the launcher default completion cap was reduced to 112 tokens. The next revision adds explicit primitive tags such as `[SIGNIFICADO]` and `[ANTI_COPIA]`, making the reasoning field closer to DeepSeekMath/R1-style structured work while still keeping external metrics on `Traduccion final` only.
 
 Do not scale that variant until it proves it terminates and improves final translations. The first target is a canary against the meta-verifier-v2 run, not a replacement for the current deployable model.
 

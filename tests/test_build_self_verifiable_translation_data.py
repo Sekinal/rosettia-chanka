@@ -26,6 +26,8 @@ class BuildSelfVerifiableTranslationDataTests(unittest.TestCase):
         self.assertIn("Puntaje:", generator_records[0]["target"])
         thinking_target = builder.thinking_generator_target(rows[0]["target"])
         self.assertIn("Analisis de traduccion:", thinking_target)
+        self.assertIn("[SIGNIFICADO]", thinking_target)
+        self.assertIn("[ANTI_COPIA]", thinking_target)
         self.assertIn("Traduccion final:", thinking_target)
         self.assertIn("Puntaje:", thinking_target)
         self.assertEqual(len(meta_records), len(verifier_records) * 2)

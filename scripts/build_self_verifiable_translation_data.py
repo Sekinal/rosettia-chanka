@@ -94,7 +94,7 @@ def generator_target(reference: str) -> str:
 
 def thinking_generator_target(reference: str) -> str:
     return (
-        "Analisis de traduccion: conserva el significado y evita copia del espanol; la respuesta final usa quechua chanka natural.\n"
+        "Analisis de traduccion: [SIGNIFICADO] conserva el sentido; [ANTI_COPIA] evita copiar espanol y mantiene quechua chanka natural.\n"
         f"Traduccion final: {gspo.normalize_text(reference)}\n"
         "Autoevaluacion: No veo errores importantes; conserva el significado, no copia el espanol y usa quechua chanka natural.\n"
         "Puntaje: \\boxed{0.98}"

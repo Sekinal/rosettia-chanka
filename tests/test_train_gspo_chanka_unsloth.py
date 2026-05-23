@@ -78,6 +78,8 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
         self.assertIn("Analisis de traduccion:", messages[1]["content"])
         self.assertIn("Traduccion final:", messages[1]["content"])
         self.assertIn("1 a 2 chequeos", messages[1]["content"])
+        self.assertIn("[SIGNIFICADO]", messages[1]["content"])
+        self.assertIn("[ANTI_COPIA]", messages[1]["content"])
         self.assertIn("maximo 35 palabras", messages[1]["content"])
         self.assertIn("debe ser corto", messages[1]["content"])
 
@@ -268,6 +270,22 @@ suffix"""
         self.assertIn("conserva el significado", parsed["thinking"])
         self.assertIn("no veo errores", parsed["self_evaluation"])
         self.assertTrue(parsed["has_thinking_format"])
+
+    def test_translation_thinking_score_prefers_primitive_tags(self):
+        plain = train_gspo.translation_thinking_score(
+            "conserva el significado y evita copia del espanol"
+        )
+        tagged = train_gspo.translation_thinking_score(
+            "[SIGNIFICADO] conserva el sentido; [ANTI_COPIA] evita copia del espanol"
+        )
+
+        self.assertGreater(tagged, plain)
+        self.assertEqual(
+            train_gspo.thinking_primitive_count(
+                "[SIGNIFICADO] conserva; [GRAMATICA] revisa verbo; [UNKNOWN] nada"
+            ),
+            2,
+        )
 
     def test_meta_verifier_prompt_includes_candidate_and_analysis(self):
         class Tokenizer:
@@ -500,6 +518,7 @@ suffix"""
         self.assertEqual(diagnostics["self_verification_required_format_rate"], 50.0)
         self.assertEqual(diagnostics["self_verification_missing_score_rate"], 50.0)
         self.assertGreater(diagnostics["self_verification_avg_thinking_score"], 0.0)
+        self.assertIn("self_verification_avg_thinking_primitives", diagnostics)
 
     def test_reference_rerank_metric_profile_penalizes_source_copy(self):
         with mock.patch.object(train_gspo, "sentence_chrfpp", return_value=0.7), mock.patch.object(

@@ -50,6 +50,13 @@ SELF_VERIFIABLE_PROFILES = {
     "self_verifiable_translation_2511",
     "self_verifiable_thinking_translation_2511",
 }
+TRANSLATION_THINKING_PRIMITIVES = {
+    "SIGNIFICADO": ("significado", "fidelidad", "sentido", "omite", "agrega", "conserva"),
+    "GRAMATICA": ("gramatica", "chanka", "sufijo", "caso", "posesivo", "verbo", "natural"),
+    "ENTIDADES": ("nombre", "numero", "entidad", "persona", "lugar", "fecha"),
+    "TERMINOLOGIA": ("termino", "glosario", "vocabulario", "equivalente"),
+    "ANTI_COPIA": ("espanol", "copia", "calco", "prestamo"),
+}
 SPANISH_STOPWORDS = {
     "el",
     "la",
@@ -345,7 +352,7 @@ def prompt_messages(
         user_content += (
             "\n\nFormato obligatorio inspirado en verificacion formal:\n"
             + (
-                "Analisis de traduccion: <1 a 2 chequeos muy breves sobre significado, gramatica chanka, entidades o copia del espanol; maximo 35 palabras>\n"
+                "Analisis de traduccion: <1 a 2 chequeos muy breves; usa etiquetas como [SIGNIFICADO], [GRAMATICA], [ENTIDADES], [TERMINOLOGIA] o [ANTI_COPIA]; maximo 35 palabras>\n"
                 if self_verification_thinking
                 else ""
             )
@@ -868,16 +875,25 @@ def translation_thinking_score(thinking: str) -> float:
     else:
         length_score = 0.10
 
-    categories = (
-        ("significado", "fidelidad", "sentido", "omite", "agrega", "conserva"),
-        ("gramatica", "chanka", "sufijo", "caso", "posesivo", "verbo", "natural"),
-        ("nombre", "numero", "entidad", "persona", "lugar", "fecha"),
-        ("termino", "glosario", "vocabulario", "equivalente"),
-        ("espanol", "copia", "calco", "prestamo"),
+    category_hits = sum(
+        1
+        for words in TRANSLATION_THINKING_PRIMITIVES.values()
+        if any(word in normalized for word in words)
     )
-    category_hits = sum(1 for words in categories if any(word in normalized for word in words))
     category_score = min(1.0, category_hits / 3.0)
-    return (0.35 * length_score) + (0.65 * category_score)
+    primitive_count = thinking_primitive_count(thinking)
+    primitive_score = min(1.0, primitive_count / 2.0)
+    return (0.30 * length_score) + (0.45 * category_score) + (0.25 * primitive_score)
+
+
+def thinking_primitive_count(thinking: str) -> int:
+    """Count explicit translation-thinking primitive tags in an analysis span."""
+    tags = {
+        match.group(1).upper()
+        for match in re.finditer(r"\[([A-Z_]+)\]", thinking)
+        if match.group(1).upper() in TRANSLATION_THINKING_PRIMITIVES
+    }
+    return len(tags)
 
 
 def self_verifiable_translation_reward(
@@ -1610,6 +1626,9 @@ def self_verification_diagnostics(
     ]
     format_key = "has_thinking_format" if require_thinking else "has_format"
     thinking_scores = [translation_thinking_score(str(parsed.get("thinking", ""))) for parsed in parsed_outputs]
+    thinking_primitive_counts = [
+        thinking_primitive_count(str(parsed.get("thinking", ""))) for parsed in parsed_outputs
+    ]
     analysis_word_counts = [len(word_tokens(str(parsed.get("analysis", "")))) for parsed in parsed_outputs]
     thinking_word_counts = [len(word_tokens(str(parsed.get("thinking", "")))) for parsed in parsed_outputs]
     total = max(1, len(parsed_outputs))
@@ -1628,6 +1647,7 @@ def self_verification_diagnostics(
         "self_verification_false_confidence_rate": 100.0 * sum(false_confidence) / max(1, len(paired_scores)),
         "self_verification_underconfidence_rate": 100.0 * sum(underconfidence) / max(1, len(paired_scores)),
         "self_verification_avg_thinking_score": sum(thinking_scores) / total,
+        "self_verification_avg_thinking_primitives": sum(thinking_primitive_counts) / total,
         "self_verification_avg_analysis_words": sum(analysis_word_counts) / total,
         "self_verification_avg_thinking_words": sum(thinking_word_counts) / total,
     }
