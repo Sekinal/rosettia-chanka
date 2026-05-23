@@ -43,8 +43,13 @@ REWARD_PROFILES = (
     "learned_verifier_ensemble_vibe_2511",
     "learned_verifier_bleu_margin_vibe_2511",
     "self_verifiable_translation_2511",
+    "self_verifiable_thinking_translation_2511",
     "reference_rerank_vibe_v1",
 )
+SELF_VERIFIABLE_PROFILES = {
+    "self_verifiable_translation_2511",
+    "self_verifiable_thinking_translation_2511",
+}
 SPANISH_STOPWORDS = {
     "el",
     "la",
@@ -306,6 +311,7 @@ def prompt_messages(
     terminology: Sequence[tuple[str, str]] | None = None,
     few_shot_examples: Sequence[tuple[str, str]] | None = None,
     self_verification: bool = False,
+    self_verification_thinking: bool = False,
 ) -> list[dict[str, str]]:
     user_content = (
         "Traduce del español al quechua chanka. Usa una traducción directa, "
@@ -338,12 +344,21 @@ def prompt_messages(
     if self_verification:
         user_content += (
             "\n\nFormato obligatorio inspirado en verificacion formal:\n"
-            "Traduccion final: <solo la traduccion al quechua chanka>\n"
+            + (
+                "Analisis de traduccion: <2 a 4 chequeos breves sobre significado, gramatica chanka, entidades o copia del espanol>\n"
+                if self_verification_thinking
+                else ""
+            )
+            + "Traduccion final: <solo la traduccion al quechua chanka>\n"
             "Autoevaluacion: <menciona brevemente errores o di que no ves errores>\n"
             "Puntaje: \\boxed{<0.0 a 1.0>}\n"
             "El puntaje debe reflejar fidelidad, gramatica chanka, terminologia, "
-            "ausencia de copia del espanol y naturalidad. No escribas un proceso "
-            "de razonamiento ni texto antes de 'Traduccion final:'."
+            "ausencia de copia del espanol y naturalidad. "
+            + (
+                "El analisis debe ser corto y debe terminar antes de 'Traduccion final:'."
+                if self_verification_thinking
+                else "No escribas un proceso de razonamiento ni texto antes de 'Traduccion final:'."
+            )
         )
     user_content += f"\n\nEspañol: {source}"
     return [
@@ -426,6 +441,7 @@ def build_dataset(
     terminology_entries: Sequence[tuple[str, str]] | None = None,
     terminology_top_k: int = 0,
     self_verification: bool = False,
+    self_verification_thinking: bool = False,
 ) -> Dataset:
     return Dataset.from_list(
         [
@@ -436,6 +452,7 @@ def build_dataset(
                     if terminology_entries and terminology_top_k > 0
                     else None,
                     self_verification=self_verification,
+                    self_verification_thinking=self_verification_thinking,
                 ),
                 "target": row["target"],
                 "source": row["source"],
@@ -479,6 +496,10 @@ def extract_translation_from_structured_output(text: str) -> str:
 def parse_self_verification_output(text: str) -> dict[str, object]:
     normalized = normalize_text(text)
     translation = extract_translation_from_structured_output(normalized)
+    thinking_match = re.search(
+        r"(?is)(?:analisis\s+de\s+traducci[oó]n|an[aá]lisis\s+de\s+traducci[oó]n|translation\s+analysis)\s*:\s*(.*?)(?:\s+traducci[oó]n\s+final\s*:|\s+final\s+translation\s*:|$)",
+        normalized,
+    )
     analysis_match = re.search(
         r"(?is)(?:autoevaluaci[oó]n|self[- ]?evaluation)\s*:\s*(.*?)(?:\s+puntaje\s*:|\s+score\s*:|$)",
         normalized,
@@ -487,12 +508,18 @@ def parse_self_verification_output(text: str) -> dict[str, object]:
     if not score_match:
         score_match = re.search(r"(?is)(?:puntaje|score)\s*:\s*([01](?:\.\d+)?)", normalized)
     score = max(0.0, min(1.0, float(score_match.group(1)))) if score_match else None
+    thinking = normalize_text(thinking_match.group(1)) if thinking_match else ""
+    self_evaluation = normalize_text(analysis_match.group(1)) if analysis_match else ""
+    combined_analysis = normalize_text(" ".join(part for part in (thinking, self_evaluation) if part))
     has_format = bool(translation and analysis_match and score is not None)
     return {
         "translation": translation,
-        "analysis": normalize_text(analysis_match.group(1)) if analysis_match else "",
+        "thinking": thinking,
+        "self_evaluation": self_evaluation,
+        "analysis": combined_analysis,
         "self_score": score,
         "has_format": has_format,
+        "has_thinking_format": bool(translation and thinking_match and analysis_match and score is not None),
     }
 
 
@@ -818,6 +845,33 @@ def self_analysis_meta_score(analysis: str, self_score: float | None, true_score
     return 1.0
 
 
+def translation_thinking_score(thinking: str) -> float:
+    """Reward bounded, translation-specific reasoning without favoring long traces."""
+    normalized = normalize_text(thinking).lower()
+    if not normalized:
+        return 0.0
+    tokens = word_tokens(normalized)
+    if len(tokens) < 6:
+        length_score = 0.25
+    elif len(tokens) <= 70:
+        length_score = 1.0
+    elif len(tokens) <= 100:
+        length_score = 0.55
+    else:
+        length_score = 0.10
+
+    categories = (
+        ("significado", "fidelidad", "sentido", "omite", "agrega", "conserva"),
+        ("gramatica", "chanka", "sufijo", "caso", "posesivo", "verbo", "natural"),
+        ("nombre", "numero", "entidad", "persona", "lugar", "fecha"),
+        ("termino", "glosario", "vocabulario", "equivalente"),
+        ("espanol", "copia", "calco", "prestamo"),
+    )
+    category_hits = sum(1 for words in categories if any(word in normalized for word in words))
+    category_score = min(1.0, category_hits / 3.0)
+    return (0.35 * length_score) + (0.65 * category_score)
+
+
 def self_verifiable_translation_reward(
     completion: object,
     reference: str,
@@ -825,6 +879,7 @@ def self_verifiable_translation_reward(
     overlong_max_words: int | None = None,
     overlong_ratio_threshold: float = 0.0,
     overlong_penalty_weight: float = 1.0,
+    require_thinking: bool = False,
 ) -> float:
     parsed = parse_self_verification_output(completion_text(completion))
     return self_verifiable_translation_reward_from_parsed(
@@ -835,6 +890,7 @@ def self_verifiable_translation_reward(
         overlong_max_words=overlong_max_words,
         overlong_ratio_threshold=overlong_ratio_threshold,
         overlong_penalty_weight=overlong_penalty_weight,
+        require_thinking=require_thinking,
     )
 
 
@@ -846,11 +902,13 @@ def self_verifiable_translation_reward_from_parsed(
     overlong_max_words: int | None = None,
     overlong_ratio_threshold: float = 0.0,
     overlong_penalty_weight: float = 1.0,
+    require_thinking: bool = False,
 ) -> float:
     translation = str(parsed["translation"])
     self_score = parsed["self_score"]
     true_score = bounded_translation_quality_score(translation, reference, source)
-    format_reward = 1.0 if parsed["has_format"] else 0.15
+    format_key = "has_thinking_format" if require_thinking else "has_format"
+    format_reward = 1.0 if parsed[format_key] else 0.15
     score_reward = 0.0 if self_score is None else 1.0 - abs(float(self_score) - true_score)
     proxy_meta_reward = self_analysis_meta_score(
         str(parsed["analysis"]),
@@ -862,7 +920,8 @@ def self_verifiable_translation_reward_from_parsed(
         if learned_meta_score is not None
         else proxy_meta_reward
     )
-    self_eval_reward = score_reward * meta_reward
+    thinking_reward = translation_thinking_score(str(parsed.get("thinking", ""))) if require_thinking else 1.0
+    self_eval_reward = score_reward * meta_reward * ((0.75 + 0.25 * thinking_reward) if require_thinking else 1.0)
     overlong = overlong_penalty_weight * overlong_completion_penalty(
         translation,
         reference,
@@ -1295,7 +1354,7 @@ def chanka_reward(
     sources = list(source) if source is not None else [None] * len(target)
     parsed_outputs: list[dict[str, object]] | None = None
     learned_meta_scores: list[float | None] | None = None
-    if active_profile == "self_verifiable_translation_2511" and meta_verifier_scorer is not None:
+    if active_profile in SELF_VERIFIABLE_PROFILES and meta_verifier_scorer is not None:
         parsed_outputs = [parse_self_verification_output(completion_text(completion)) for completion in completions]
         learned_meta_scores = meta_verifier_scorer.score_many(
             sources,
@@ -1304,7 +1363,7 @@ def chanka_reward(
             [str(parsed["analysis"]) for parsed in parsed_outputs],
         )
     for completion, reference, source_text in zip(completions, target, sources, strict=True):
-        if active_profile == "self_verifiable_translation_2511":
+        if active_profile in SELF_VERIFIABLE_PROFILES:
             parsed = (
                 parsed_outputs[len(rewards)]
                 if parsed_outputs is not None
@@ -1323,6 +1382,7 @@ def chanka_reward(
                 overlong_max_words=overlong_max_words,
                 overlong_ratio_threshold=overlong_ratio_threshold,
                 overlong_penalty_weight=overlong_penalty_weight,
+                require_thinking=active_profile == "self_verifiable_thinking_translation_2511",
             )
             rewards.append(reward)
             hypotheses.append(str(parsed["translation"]))
@@ -1391,7 +1451,7 @@ def make_reward_fn(
             max_new_tokens=verifier_max_new_tokens,
             batch_size=verifier_batch_size,
         )
-    if profile == "self_verifiable_translation_2511" and meta_verifier_adapter_path is not None:
+    if profile in SELF_VERIFIABLE_PROFILES and meta_verifier_adapter_path is not None:
         meta_verifier_scorer = LearnedMetaVerifierScorer(
             meta_verifier_adapter_path,
             max_seq_length=meta_verifier_max_seq_length,
@@ -1516,6 +1576,7 @@ def generate_predictions(
     terminology_entries: Sequence[tuple[str, str]] | None = None,
     terminology_top_k: int = 0,
     self_verification: bool = False,
+    self_verification_thinking: bool = False,
 ) -> list[str]:
     import torch
 
@@ -1529,7 +1590,12 @@ def generate_predictions(
         )
         prompt = apply_chat_template_no_thinking(
             tokenizer,
-            prompt_messages(row["source"], terminology, self_verification=self_verification),
+            prompt_messages(
+                row["source"],
+                terminology,
+                self_verification=self_verification,
+                self_verification_thinking=self_verification_thinking,
+            ),
             tokenize=False,
             add_generation_prompt=True,
         )
@@ -1673,18 +1739,21 @@ def main() -> None:
     model.generation_config.eos_token_id = tokenizer.eos_token_id
     model.generation_config.pad_token_id = tokenizer.eos_token_id
 
-    use_self_verification_prompt = args.reward_profile == "self_verifiable_translation_2511"
+    use_self_verification_prompt = args.reward_profile in SELF_VERIFIABLE_PROFILES
+    use_self_verification_thinking = args.reward_profile == "self_verifiable_thinking_translation_2511"
     train_dataset = build_dataset(
         train_rows,
         terminology_entries,
         args.terminology_top_k,
         self_verification=use_self_verification_prompt,
+        self_verification_thinking=use_self_verification_thinking,
     )
     eval_dataset = build_dataset(
         eval_rows,
         terminology_entries,
         args.terminology_top_k,
         self_verification=use_self_verification_prompt,
+        self_verification_thinking=use_self_verification_thinking,
     )
 
     print(f"Loaded Chanka rows: {len(rows):,}")
@@ -1790,6 +1859,7 @@ def main() -> None:
         terminology_entries,
         args.terminology_top_k,
         self_verification=use_self_verification_prompt,
+        self_verification_thinking=use_self_verification_thinking,
     )
     references = [row["target"] for row in eval_rows]
     sources = [row["source"] for row in eval_rows]

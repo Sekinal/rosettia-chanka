@@ -68,6 +68,17 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
         self.assertIn("Autoevaluacion:", messages[1]["content"])
         self.assertIn("Puntaje:", messages[1]["content"])
 
+    def test_prompt_can_request_bounded_thinking_self_verification_format(self):
+        messages = train_gspo.prompt_messages(
+            "No es un buen esposo.",
+            self_verification=True,
+            self_verification_thinking=True,
+        )
+
+        self.assertIn("Analisis de traduccion:", messages[1]["content"])
+        self.assertIn("Traduccion final:", messages[1]["content"])
+        self.assertIn("debe ser corto", messages[1]["content"])
+
     def test_chat_template_helper_disables_thinking_when_supported(self):
         class ThinkingAwareTokenizer:
             def apply_chat_template(self, messages, enable_thinking=True, **kwargs):
@@ -237,6 +248,18 @@ suffix"""
         self.assertEqual(parsed["self_score"], 0.93)
         self.assertTrue(parsed["has_format"])
 
+    def test_parse_self_verification_output_extracts_bounded_thinking(self):
+        parsed = train_gspo.parse_self_verification_output(
+            "Analisis de traduccion: conserva el significado y evita copia del espanol. "
+            "Traduccion final: Mana allin qusachu. "
+            "Autoevaluacion: no veo errores. Puntaje: \\boxed{0.93}"
+        )
+
+        self.assertEqual(parsed["translation"], "Mana allin qusachu.")
+        self.assertIn("conserva el significado", parsed["thinking"])
+        self.assertIn("no veo errores", parsed["self_evaluation"])
+        self.assertTrue(parsed["has_thinking_format"])
+
     def test_meta_verifier_prompt_includes_candidate_and_analysis(self):
         class Tokenizer:
             def apply_chat_template(self, messages, **kwargs):
@@ -368,6 +391,7 @@ suffix"""
             "learned_verifier_bleu_margin_vibe_2511",
             "reference_rerank_vibe_v1",
             "self_verifiable_translation_2511",
+            "self_verifiable_thinking_translation_2511",
         }
 
         self.assertTrue(expected.issubset(set(train_gspo.REWARD_PROFILES)))

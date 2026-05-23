@@ -57,7 +57,7 @@ Behavior:
 2. Train a meta-verifier.
 3. Run self-verifiable GSPO with `--meta-verifier-adapter-path`.
 
-`scripts/evaluate_gspo_checkpoint.py --self-verification-output` can now prompt a model for structured self-verifying translations, score only the parsed final translation, and write both `prediction` and `raw_prediction` plus the parsed `self_verification` object to JSONL.
+`scripts/evaluate_gspo_checkpoint.py --self-verification-output` can now prompt a model for structured self-verifying translations, score only the parsed final translation, and write both `prediction` and `raw_prediction` plus the parsed `self_verification` object to JSONL. Use `--self-verification-thinking-output` to mine the bounded `Analisis de traduccion` variant; this implies self-verification parsing and keeps metrics on `Traduccion final`.
 
 `scripts/build_meta_verifier_from_self_outputs.py` converts those real model outputs into meta-verifier training rows. It compares the model's boxed self-score against the hidden-reference translation score, labels false confidence, underconfidence/hallucinated issues, missing scores, and well-calibrated analyses, and writes JSONL usable by `scripts/train_meta_verifier_chanka_unsloth.py`.
 
@@ -69,6 +69,13 @@ Behavior:
 4. Train meta-verifier v2 on cold-start + real self-output rows.
 5. Run self-verifiable GSPO with meta-verifier v2.
 
+`experiments/gspo/queue_meta_verifier_v3_from_thinking_outputs.sh` repeats the same loop for bounded-thinking outputs:
+
+1. Wait for a `self_verifiable_thinking_translation_2511` adapter.
+2. Mine real outputs with `--self-verification-thinking-output`.
+3. Train meta-verifier v3 on cold-start plus real bounded-thinking failures.
+4. Run another bounded-thinking GSPO pass with the v3 meta-verifier.
+
 ## Thinking vs. Self-Verification
 
 We should use the DeepSeekMath-V2 idea of thinking, but not as an uncontrolled open `<think>` trace during GSPO. In the failed first canary, Qwen used the entire completion budget on generic English "Thinking Process" boilerplate and never reached a usable Chanka translation. That is not the DeepSeekMath mechanism we want.
@@ -78,13 +85,15 @@ For this project, the useful reasoning signal is the explicit, rewardable `Autoe
 Later, if we want a true long-thinking variant, use a separate profile with a larger completion budget and a parser that requires:
 
 ```text
-<think>...bounded translation analysis...</think>
+Analisis de traduccion: ...bounded translation analysis...
 Traduccion final: ...
 Autoevaluacion: ...
 Puntaje: \boxed{...}
 ```
 
-Do not scale that variant until it proves it terminates and improves final translations. The current canary intentionally trains structured self-verification first.
+That variant now exists as `self_verifiable_thinking_translation_2511` and is launched by `experiments/gspo/run_2511_self_verifiable_thinking_translation.sh`. It deliberately does **not** use the tokenizer's raw `<think>` mode. Instead, it asks for a short, parseable `Analisis de traduccion` field before the final translation and rewards it only when it is bounded and translation-specific. This is closer to the DeepSeekMath/R1 idea than plain `Autoevaluacion`, while still keeping external metrics on `Traduccion final` only.
+
+Do not scale that variant until it proves it terminates and improves final translations. The first target is a canary against the meta-verifier-v2 run, not a replacement for the current deployable model.
 
 ## Why This Fits Chanka Better Than Plain BLEU RL
 
@@ -142,6 +151,22 @@ To mine real self-analysis failures and train meta-verifier v2:
 ```bash
 cd /root/rosettia-chanka
 experiments/gspo/queue_meta_verifier_v2_from_self_outputs.sh
+```
+
+To test the bounded-thinking variant:
+
+```bash
+cd /root/rosettia-chanka
+META_VERIFIER_ADAPTER=outputs/chanka_translation_meta_verifier_v2_20260523-meta-v2-self/final_meta_verifier_lora \
+MAX_STEPS=8 EVAL_STEPS=4 SAVE_STEPS=4 \
+experiments/gspo/run_2511_self_verifiable_thinking_translation.sh
+```
+
+To mine bounded-thinking failures and close the next loop:
+
+```bash
+cd /root/rosettia-chanka
+experiments/gspo/queue_meta_verifier_v3_from_thinking_outputs.sh
 ```
 
 For a faster smoke:

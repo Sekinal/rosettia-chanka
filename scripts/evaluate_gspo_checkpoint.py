@@ -52,6 +52,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Prompt for structured self-verifying translations and score metrics on Traduccion final only.",
     )
     parser.add_argument(
+        "--self-verification-thinking-output",
+        action="store_true",
+        help="Include the bounded Analisis de traduccion field in the self-verifying output prompt.",
+    )
+    parser.add_argument(
         "--terminology-file",
         default=None,
         help="Optional dataset-repo parquet file with glossary entries for terminology-conditioned prompting.",
@@ -199,6 +204,7 @@ def generate_predictions_with_progress(
     few_shot_top_k: int = 0,
     few_shot_max_candidates: int = 128,
     self_verification_output: bool = False,
+    self_verification_thinking_output: bool = False,
 ) -> tuple[list[dict[str, str]], list[str], list[str], list[list[tuple[str, str]]], list[list[tuple[str, str]]]]:
     import torch
 
@@ -238,6 +244,7 @@ def generate_predictions_with_progress(
                         terms,
                         few_shots,
                         self_verification=self_verification_output,
+                        self_verification_thinking=self_verification_thinking_output,
                     ),
                     tokenize=False,
                     add_generation_prompt=True,
@@ -281,6 +288,7 @@ def generate_predictions_with_progress(
 
 def main() -> None:
     args = parse_args()
+    self_verification_output = bool(args.self_verification_output or args.self_verification_thinking_output)
 
     from unsloth import FastLanguageModel
 
@@ -337,7 +345,8 @@ def main() -> None:
         train_rows,
         args.few_shot_top_k,
         args.few_shot_max_candidates,
-        args.self_verification_output,
+        self_verification_output,
+        args.self_verification_thinking_output,
     )
     references = [row["target"] for row in generated_rows]
     sources = [row["source"] for row in generated_rows]
@@ -347,7 +356,8 @@ def main() -> None:
     metrics["split"] = args.split
     metrics["num_return_sequences"] = args.num_return_sequences
     metrics["adapter_path"] = str(args.adapter_path)
-    metrics["self_verification_output"] = bool(args.self_verification_output)
+    metrics["self_verification_output"] = self_verification_output
+    metrics["self_verification_thinking_output"] = bool(args.self_verification_thinking_output)
     if args.terminology_file:
         matched_rows = sum(1 for terms in generated_terms if terms)
         metrics["terminology_file"] = args.terminology_file
@@ -377,7 +387,7 @@ def main() -> None:
                 generated_few_shots,
                 strict=True,
             ):
-                parsed = gspo.parse_self_verification_output(raw_prediction) if args.self_verification_output else None
+                parsed = gspo.parse_self_verification_output(raw_prediction) if self_verification_output else None
                 handle.write(
                     json.dumps(
                         {
