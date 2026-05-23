@@ -369,6 +369,41 @@ Purpose: test whether the largest currently available Hy-MT2 checkpoint can at l
 
 The queue waits behind the current contextual terminology canary by default so it does not compete with the 9B Qwen evaluation/rerank chain. If the L40S cannot load the MoE checkpoint or Unsloth does not support this variant, it writes `smoke_failed.txt` and exits cleanly. Keep this recipe for the RTX PRO 6000 even if it fails on the current server.
 
+Result on 2026-05-23:
+
+- Output: `outputs/hymt2_30b_a3b_canaries/20260523-hymt2-30b-a3b-smoke`
+- The checkpoint metadata reports `model_type: hy_v3`.
+- `transformers==5.5.0` plus Unsloth `2026.5.5` does not recognize `hy_v3`, so the smoke failed before downloading the 60 GB model weights.
+- Failure mode:
+  - `ValueError: The checkpoint you are trying to load has model type hy_v3 but Transformers does not recognize this architecture.`
+  - Unsloth then reports `tencent/Hy-MT2-30B-A3B is not supported yet in transformers==5.5.0`.
+
+Decision:
+
+- This is a compatibility blocker, not a translation-quality result.
+- Do not retry Hy-MT2 30B-A3B through the current Unsloth/Transformers stack until `hy_v3` is supported or the official Tencent code path is integrated.
+- The Hugging Face model file inventory is about `60.15 GB` total / `60.13 GB` safetensors, so any future retry needs at least that much download space before quantization even starts.
+
+## Gemma 4 26B-A4B Smoke Queue
+
+Added `experiments/sft/queue_gemma4_26b_a4b_smoke.sh`.
+
+Purpose: test whether the larger Gemma 4 SLM/MoE path can at least load and train a tiny Chanka LoRA through Unsloth. It uses `google/gemma-4-26B-A4B-it`, `--load-in-4bit`, LoRA rank `16`, 16 train rows, 4 eval rows, and 2 optimizer steps.
+
+Result on 2026-05-23:
+
+- Output: `outputs/gemma4_26b_a4b_canaries/20260523-gemma4-26b-a4b-smoke`
+- The model downloaded through Unsloth's Gemma4 path as `unsloth/gemma-4-26b-a4b-it`, so this did pass the architecture compatibility gate.
+- It failed during 4-bit loading on the L40S because some modules would be dispatched to CPU/disk:
+  - `ValueError: Some modules are dispatched on the CPU or the disk. Make sure you have enough GPU RAM to fit the quantized model.`
+- The Hugging Face file inventory is about `51.64 GB` total / `51.61 GB` safetensors.
+
+Decision:
+
+- This is a memory blocker on the 44 GB L40S, not a translation-quality result.
+- Do not retry Gemma 4 26B-A4B on this host without an explicit CPU-offload/device-map implementation. Prefer the RTX PRO 6000 or a smaller Gemma 4 checkpoint.
+- The temporary 49 GB cache entry was deleted after the smoke to restore disk space.
+
 ## Decision
 
 Gemma 4 E4B and Hy-MT2 can both be used with Unsloth after chat-marker fixes, but Gemma 4 E4B clean-only SFT, Gemma 4 E4B broad-to-Chanka SFT, and the tiny Hy-MT2 7B broad-to-Chanka run are not competitive with the current Qwen3.5 adapter. Neither family justifies replacing the Qwen base from current results. If these families are revisited, they need much larger broad Quechua SFT before clean Chanka SFT/GSPO, with generation evals at checkpoints rather than relying on trainer loss.
