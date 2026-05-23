@@ -35,6 +35,8 @@ fi
   --terminology-top-k "${TERMINOLOGY_TOP_K:-1}" \
   --learning-rate "${LEARNING_RATE:-2e-7}" \
   --warmup-ratio "${WARMUP_RATIO:-0.0}" \
+  --max-prompt-length "${MAX_PROMPT_LENGTH:-96}" \
+  --max-completion-length "${MAX_COMPLETION_LENGTH:-80}" \
   --max-steps "${MAX_STEPS:-16}" \
   --max-train-samples "${MAX_TRAIN_SAMPLES:-256}" \
   --max-eval-samples "${MAX_EVAL_SAMPLES:-64}" \
@@ -44,6 +46,9 @@ fi
   --num-generations "${NUM_GENERATIONS:-4}" \
   --temperature "${TEMPERATURE:-0.70}" \
   --top-p "${TOP_P:-0.90}" \
+  --overlong-max-words "${OVERLONG_MAX_WORDS:-48}" \
+  --overlong-ratio-threshold "${OVERLONG_RATIO_THRESHOLD:-2.75}" \
+  --overlong-penalty-weight "${OVERLONG_PENALTY_WEIGHT:-1.0}" \
   --eval-steps "${EVAL_STEPS:-8}" \
   --save-steps "${SAVE_STEPS:-8}" \
   --save-total-limit "${SAVE_TOTAL_LIMIT:-0}" \

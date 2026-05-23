@@ -146,6 +146,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--verifier-max-new-tokens", type=int, default=96)
     parser.add_argument("--verifier-batch-size", type=int, default=4)
     parser.add_argument(
+        "--overlong-max-words",
+        type=int,
+        default=None,
+        help="Optional hard word-count guard for GSPO rewards. Penalizes completions at or above this many words.",
+    )
+    parser.add_argument(
+        "--overlong-ratio-threshold",
+        type=float,
+        default=0.0,
+        help="Optional hypothesis/reference word-count ratio guard. Disabled at 0.",
+    )
+    parser.add_argument(
+        "--overlong-penalty-weight",
+        type=float,
+        default=1.0,
+        help="Multiplier for the optional overlong completion penalty.",
+    )
+    parser.add_argument(
         "--secondary-verifier-adapter-path",
         type=Path,
         default=None,
@@ -455,6 +473,35 @@ def length_ratio_score(hypothesis: str, reference: str) -> float:
     return max(0.0, 1.0 - abs(math.log(ratio)))
 
 
+def overlong_completion_penalty(
+    hypothesis: str,
+    reference: str,
+    max_words: int | None = None,
+    ratio_threshold: float = 0.0,
+) -> float:
+    """Penalize cap-hitting or very verbose RL completions.
+
+    `max_completion_length` is token-based, but the reward function only sees
+    decoded text. A word-count guard is an intentionally simple proxy that
+    catches the failure mode observed in GSPO canaries: long, still-plausible
+    completions that run to the generation cap and receive decent semantic
+    reward anyway.
+    """
+    words = normalize_text(hypothesis).split()
+    if not words:
+        return 0.0
+    penalty = 0.0
+    hyp_len = len(words)
+    ref_len = max(1, len(normalize_text(reference).split()))
+    if max_words is not None and max_words > 0 and hyp_len >= max_words:
+        penalty += min(0.45, 0.25 + (0.02 * (hyp_len - max_words)))
+    if ratio_threshold and ratio_threshold > 0:
+        ratio = hyp_len / ref_len
+        if ratio >= ratio_threshold:
+            penalty += min(0.45, 0.12 * (ratio - ratio_threshold + 1.0))
+    return min(0.70, penalty)
+
+
 def spanish_leakage_penalty(hypothesis: str) -> float:
     tokens = word_tokens(hypothesis)
     if not tokens:
@@ -633,6 +680,9 @@ def reward_score(
     reference: str,
     source: str | None,
     profile: str,
+    overlong_max_words: int | None = None,
+    overlong_ratio_threshold: float = 0.0,
+    overlong_penalty_weight: float = 1.0,
 ) -> float:
     chrf = sentence_chrfpp(hypothesis, reference)
     bleu = sentence_bleu(hypothesis, reference)
@@ -644,6 +694,12 @@ def reward_score(
     leakage = spanish_leakage_penalty(hypothesis)
     repetition = repetition_penalty(hypothesis)
     artifacts = chat_artifact_penalty(hypothesis)
+    overlong = overlong_penalty_weight * overlong_completion_penalty(
+        hypothesis,
+        reference,
+        max_words=overlong_max_words,
+        ratio_threshold=overlong_ratio_threshold,
+    )
     anti_copy = 1.0 - min(1.0, copy_ratio * 1.8)
     anti_leakage = 1.0 - min(1.0, leakage * 4.0)
 
@@ -673,21 +729,21 @@ def reward_score(
 
     if profile == "fg_severity_2411":
         # 2411.05986: densify sparse sentence rewards with severity-weighted token/error signals.
-        return fg_score
+        return fg_score - overlong
     if profile == "severity_proxy_2310":
         # 2310.10482 motivation only: sentence score plus transparent error severity.
         # This is not xCOMET; it is a cheap ablation for severity-weighted rewards.
-        return severity_score
+        return severity_score - overlong
     if profile == "self_verifier_2511":
         # 2511.22570: verifier-style rubric; reward faithful translation plus explicit failure detection proxies.
-        return verifier_score
+        return verifier_score - overlong
     if profile == "vibethinker_2511":
         # 2511.06221: keep a broad candidate spectrum, then amplify the best signal.
-        return vibe_score
+        return vibe_score - overlong
     if profile == "mix_severity_verifier":
-        return (0.45 * fg_score) + (0.25 * severity_score) + (0.30 * verifier_score)
+        return (0.45 * fg_score) + (0.25 * severity_score) + (0.30 * verifier_score) - overlong
     if profile == "mix_verifier_vibe":
-        return (0.58 * verifier_score) + (0.42 * vibe_score)
+        return (0.58 * verifier_score) + (0.42 * vibe_score) - overlong
     if profile == "mix_all_strict":
         return (
             (0.22 * baseline_score)
@@ -698,18 +754,19 @@ def reward_score(
             - (0.15 * copy_ratio)
             - (0.25 * leakage)
             - (0.30 * artifacts)
+            - overlong
         )
     if profile == "rosettia_guard_v1":
         quality = (0.45 * chrf) + (0.25 * f1) + (0.10 * bleu)
         guards = (0.08 * length_score) + (0.06 * entity_score) + (0.06 * anti_copy) + (0.06 * anti_leakage)
-        return quality + guards - (0.45 * severity) - (0.15 * repetition) - (0.20 * artifacts)
+        return quality + guards - (0.45 * severity) - (0.15 * repetition) - (0.20 * artifacts) - overlong
     if profile == "rosettia_guard_v2":
         quality = (0.34 * chrf) + (0.24 * f1) + (0.08 * bleu)
         guards = (0.12 * length_score) + (0.08 * entity_score) + (0.10 * anti_copy) + (0.08 * anti_leakage)
-        return quality + guards - (0.30 * severity) - (0.20 * repetition) - (0.25 * artifacts)
+        return quality + guards - (0.30 * severity) - (0.20 * repetition) - (0.25 * artifacts) - overlong
     if profile == "reference_rerank_vibe_v1":
-        return reference_rerank_metric_score(hypothesis, reference, source, chrf, bleu, f1, length_score)
-    return baseline_score
+        return reference_rerank_metric_score(hypothesis, reference, source, chrf, bleu, f1, length_score) - overlong
+    return baseline_score - overlong
 
 
 def verifier_prompt_text(tokenizer, source: str, reference: str, candidate: str) -> str:
@@ -804,6 +861,9 @@ def learned_verifier_rewards(
     hypotheses: list[str],
     references: list[str],
     sources: list[str | None],
+    overlong_max_words: int | None = None,
+    overlong_ratio_threshold: float = 0.0,
+    overlong_penalty_weight: float = 1.0,
 ) -> list[float]:
     verifier_scores = scorer.score_many(sources, references, hypotheses)
     rewards: list[float] = []
@@ -818,6 +878,13 @@ def learned_verifier_rewards(
             + 0.45 * spanish_leakage_penalty(hypothesis)
             + 0.20 * repetition_penalty(hypothesis)
             + 0.60 * chat_artifact_penalty(hypothesis)
+            + overlong_penalty_weight
+            * overlong_completion_penalty(
+                hypothesis,
+                reference,
+                max_words=overlong_max_words,
+                ratio_threshold=overlong_ratio_threshold,
+            )
         )
         if exact_source_copy(hypothesis, source):
             guard_penalty += 0.50
@@ -830,6 +897,9 @@ def learned_verifier_bleu_margin_rewards(
     hypotheses: list[str],
     references: list[str],
     sources: list[str | None],
+    overlong_max_words: int | None = None,
+    overlong_ratio_threshold: float = 0.0,
+    overlong_penalty_weight: float = 1.0,
 ) -> list[float]:
     verifier_scores = scorer.score_many(sources, references, hypotheses)
     rewards: list[float] = []
@@ -846,6 +916,13 @@ def learned_verifier_bleu_margin_rewards(
             + 0.55 * spanish_leakage_penalty(hypothesis)
             + 0.18 * repetition_penalty(hypothesis)
             + 0.70 * chat_artifact_penalty(hypothesis)
+            + overlong_penalty_weight
+            * overlong_completion_penalty(
+                hypothesis,
+                reference,
+                max_words=overlong_max_words,
+                ratio_threshold=overlong_ratio_threshold,
+            )
         )
         if exact_source_copy(hypothesis, source):
             guard_penalty += 0.55
@@ -859,6 +936,9 @@ def learned_verifier_ensemble_rewards(
     hypotheses: list[str],
     references: list[str],
     sources: list[str | None],
+    overlong_max_words: int | None = None,
+    overlong_ratio_threshold: float = 0.0,
+    overlong_penalty_weight: float = 1.0,
 ) -> list[float]:
     primary_scores = primary_scorer.score_many(sources, references, hypotheses)
     secondary_scores = secondary_scorer.score_many(sources, references, hypotheses)
@@ -881,6 +961,13 @@ def learned_verifier_ensemble_rewards(
             + 0.45 * spanish_leakage_penalty(hypothesis)
             + 0.20 * repetition_penalty(hypothesis)
             + 0.60 * chat_artifact_penalty(hypothesis)
+            + overlong_penalty_weight
+            * overlong_completion_penalty(
+                hypothesis,
+                reference,
+                max_words=overlong_max_words,
+                ratio_threshold=overlong_ratio_threshold,
+            )
         )
         if exact_source_copy(hypothesis, source):
             guard_penalty += 0.50
@@ -910,6 +997,9 @@ def chanka_reward(
     target: list[str],
     source: list[str] | None = None,
     profile: str | None = None,
+    overlong_max_words: int | None = None,
+    overlong_ratio_threshold: float = 0.0,
+    overlong_penalty_weight: float = 1.0,
     **_: object,
 ) -> list[float]:
     active_profile = profile or REWARD_PROFILE
@@ -919,7 +1009,17 @@ def chanka_reward(
     for completion, reference, source_text in zip(completions, target, sources, strict=True):
         hypothesis = completion_text(completion)
         hypotheses.append(hypothesis)
-        rewards.append(reward_score(hypothesis, reference, source_text, active_profile))
+        rewards.append(
+            reward_score(
+                hypothesis,
+                reference,
+                source_text,
+                active_profile,
+                overlong_max_words=overlong_max_words,
+                overlong_ratio_threshold=overlong_ratio_threshold,
+                overlong_penalty_weight=overlong_penalty_weight,
+            )
+        )
     if active_profile in {"vibethinker_2511", "mix_verifier_vibe", "reference_rerank_vibe_v1"}:
         rewards = add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
     return rewards
@@ -932,6 +1032,9 @@ def make_reward_fn(
     verifier_max_seq_length: int = 512,
     verifier_max_new_tokens: int = 96,
     verifier_batch_size: int = 4,
+    overlong_max_words: int | None = None,
+    overlong_ratio_threshold: float = 0.0,
+    overlong_penalty_weight: float = 1.0,
 ):
     verifier_scorer = None
     secondary_verifier_scorer = None
@@ -969,7 +1072,15 @@ def make_reward_fn(
             assert verifier_scorer is not None
             sources = list(source) if source is not None else [None] * len(target)
             hypotheses = [completion_text(completion) for completion in completions]
-            rewards = learned_verifier_rewards(verifier_scorer, hypotheses, list(target), sources)
+            rewards = learned_verifier_rewards(
+                verifier_scorer,
+                hypotheses,
+                list(target),
+                sources,
+                overlong_max_words=overlong_max_words,
+                overlong_ratio_threshold=overlong_ratio_threshold,
+                overlong_penalty_weight=overlong_penalty_weight,
+            )
             if profile == "learned_verifier_vibe_2511":
                 rewards = add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
             return rewards
@@ -977,7 +1088,15 @@ def make_reward_fn(
             assert verifier_scorer is not None
             sources = list(source) if source is not None else [None] * len(target)
             hypotheses = [completion_text(completion) for completion in completions]
-            rewards = learned_verifier_bleu_margin_rewards(verifier_scorer, hypotheses, list(target), sources)
+            rewards = learned_verifier_bleu_margin_rewards(
+                verifier_scorer,
+                hypotheses,
+                list(target),
+                sources,
+                overlong_max_words=overlong_max_words,
+                overlong_ratio_threshold=overlong_ratio_threshold,
+                overlong_penalty_weight=overlong_penalty_weight,
+            )
             return add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
         if profile == "learned_verifier_ensemble_vibe_2511":
             assert verifier_scorer is not None
@@ -990,9 +1109,21 @@ def make_reward_fn(
                 hypotheses,
                 list(target),
                 sources,
+                overlong_max_words=overlong_max_words,
+                overlong_ratio_threshold=overlong_ratio_threshold,
+                overlong_penalty_weight=overlong_penalty_weight,
             )
             return add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
-        return chanka_reward(completions, target, source=source, profile=profile, **kwargs)
+        return chanka_reward(
+            completions,
+            target,
+            source=source,
+            profile=profile,
+            overlong_max_words=overlong_max_words,
+            overlong_ratio_threshold=overlong_ratio_threshold,
+            overlong_penalty_weight=overlong_penalty_weight,
+            **kwargs,
+        )
 
     reward_fn.__name__ = f"chanka_reward_{profile}"
     return reward_fn
@@ -1028,6 +1159,10 @@ def corpus_metrics(predictions: list[str], references: list[str], sources: list[
         "chat_artifact_penalty": 100.0
         * sum(chat_artifact_penalty(prediction) for prediction in cleaned_predictions)
         / max(1, len(cleaned_predictions)),
+        "avg_prediction_words": sum(len(prediction.split()) for prediction in cleaned_predictions)
+        / max(1, len(cleaned_predictions)),
+        "avg_reference_words": sum(len(reference.split()) for reference in cleaned_references)
+        / max(1, len(cleaned_references)),
     }
     if sources:
         copied = 0
@@ -1230,6 +1365,9 @@ def main() -> None:
             verifier_max_seq_length=args.verifier_max_seq_length,
             verifier_max_new_tokens=args.verifier_max_new_tokens,
             verifier_batch_size=args.verifier_batch_size,
+            overlong_max_words=args.overlong_max_words,
+            overlong_ratio_threshold=args.overlong_ratio_threshold,
+            overlong_penalty_weight=args.overlong_penalty_weight,
         ),
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
@@ -1258,6 +1396,10 @@ def main() -> None:
             top_p=args.top_p,
             top_k=args.top_k,
             repetition_penalty=args.repetition_penalty,
+            generation_kwargs={
+                "eos_token_id": tokenizer.eos_token_id,
+                "pad_token_id": tokenizer.eos_token_id,
+            },
             loss_type=args.loss_type,
             scale_rewards=args.scale_rewards,
             importance_sampling_level="sequence",
@@ -1299,6 +1441,19 @@ def main() -> None:
     metrics["trainer_eval_reward"] = float(trainer_metrics.get("eval_reward", 0.0))
     metrics["final_adapter"] = str(final_dir)
     metrics["reward_profile"] = args.reward_profile
+    metrics["overlong_max_words"] = args.overlong_max_words
+    metrics["overlong_ratio_threshold"] = args.overlong_ratio_threshold
+    metrics["overlong_penalty_weight"] = args.overlong_penalty_weight
+    if args.overlong_max_words or args.overlong_ratio_threshold > 0:
+        metrics["overlong_completion_penalty"] = 100.0 * sum(
+            overlong_completion_penalty(
+                prediction,
+                reference,
+                max_words=args.overlong_max_words,
+                ratio_threshold=args.overlong_ratio_threshold,
+            )
+            for prediction, reference in zip(predictions, references, strict=True)
+        ) / max(1, len(predictions))
     if args.terminology_file:
         metrics["terminology_file"] = args.terminology_file
         metrics["terminology_entries"] = len(terminology_entries)
