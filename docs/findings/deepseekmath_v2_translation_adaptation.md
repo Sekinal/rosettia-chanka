@@ -46,8 +46,11 @@ Behavior:
 - `translation_verifier_cold_start.jsonl`: candidate translation scoring examples, using existing clean references plus synthetic corruptions.
 - `translation_meta_verifier_cold_start.jsonl`: faithful and deliberately flawed verifier analyses for meta-verifier training.
 - `self_verifiable_generator_sft.jsonl`: generator examples in the final/self-analysis/boxed-score format.
+- `self_verifiable_thinking_generator_sft.jsonl`: generator examples with a bounded `Analisis de traduccion` field before the final translation.
 
 `scripts/train_meta_verifier_chanka_unsloth.py` trains the meta-verifier LoRA. It can either consume the generated `translation_meta_verifier_cold_start.jsonl` or build the same rows directly from the clean corpus. It saves `final_meta_verifier_lora`.
+
+For the thinking variant, the better cold-start path is now explicit: build `self_verifiable_thinking_generator_sft.jsonl`, SFT it with `scripts/train_jsonl_sft_unsloth.py --prompt-self-verification-thinking --target-field target`, then run `self_verifiable_thinking_translation_2511` GSPO. The wrapper `experiments/gspo/run_2511_train_thinking_generator_then_gspo.sh` performs that chain. This teaches the response structure before RL, which is closer to DeepSeekMath than asking a normal translator adapter to discover the reasoning format during GSPO.
 
 `experiments/gspo/run_2511_self_verifiable_translation.sh` launches a small GSPO canary from the current best standalone 4B full-SFT checkpoint with a fresh LoRA adapter.
 

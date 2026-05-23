@@ -131,6 +131,27 @@ class TrainJsonlSftUnslothTests(unittest.TestCase):
         self.assertIn("- Casado = Warmiyuq", formatted["text"])
         self.assertIn("¿Warmiyuqchu kanki?", formatted["text"])
 
+    def test_format_example_can_use_bounded_thinking_prompt(self):
+        tokenizer = DummyTokenizer()
+        row = {
+            "source": "Buenos dias.",
+            "target": "Analisis de traduccion: conserva el significado.\nTraduccion final: Allin punchaw.\nAutoevaluacion: no veo errores.\nPuntaje: \\boxed{0.98}",
+            "reference": "",
+            "source_name": "self",
+            "variant": "quy/chanka_self",
+            "target_field": "target",
+        }
+
+        formatted = train_jsonl_sft.format_example(
+            tokenizer,
+            row,
+            prompt_self_verification_thinking=True,
+        )
+
+        self.assertIn("Analisis de traduccion:", formatted["text"])
+        self.assertIn("maximo 35 palabras", formatted["text"])
+        self.assertIn("Allin punchaw.", formatted["text"])
+
     def test_build_dataset_can_count_terminology_matches(self):
         row = {
             "source": "La madre abandonada llego.",

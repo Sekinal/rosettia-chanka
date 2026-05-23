@@ -39,7 +39,7 @@ done
   --max-eval-samples "${MINE_MAX_EVAL_SAMPLES:-64}" \
   --batch-size "${MINE_BATCH_SIZE:-1}" \
   --max-seq-length "${MINE_MAX_SEQ_LENGTH:-256}" \
-  --max-completion-length "${MINE_MAX_COMPLETION_LENGTH:-144}" \
+  --max-completion-length "${MINE_MAX_COMPLETION_LENGTH:-112}" \
   --self-verification-thinking-output \
   --strip-chat-artifacts \
   --terminology-file "${TERMINOLOGY_FILE:-clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet}" \

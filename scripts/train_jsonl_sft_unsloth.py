@@ -43,6 +43,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--terminology-top-k", type=int, default=6)
     parser.add_argument("--terminology-min-source-chars", type=int, default=3)
+    parser.add_argument(
+        "--prompt-self-verification",
+        action="store_true",
+        help="Use the structured self-verification prompt for JSONL targets.",
+    )
+    parser.add_argument(
+        "--prompt-self-verification-thinking",
+        action="store_true",
+        help="Use the bounded-thinking self-verification prompt for JSONL targets.",
+    )
     parser.add_argument("--model-id", default=train_sft.DEFAULT_MODEL_ID)
     parser.add_argument(
         "--load-in-4bit",
@@ -268,9 +278,16 @@ def format_example(
     row: dict[str, str],
     terminology_entries: Sequence[tuple[str, str]] | None = None,
     terminology_top_k: int = 0,
+    prompt_self_verification: bool = False,
+    prompt_self_verification_thinking: bool = False,
 ) -> dict[str, str]:
     messages = [
-        *gspo.prompt_messages(row["source"], terminology_for_row(row, terminology_entries, terminology_top_k)),
+        *gspo.prompt_messages(
+            row["source"],
+            terminology_for_row(row, terminology_entries, terminology_top_k),
+            self_verification=prompt_self_verification or prompt_self_verification_thinking,
+            self_verification_thinking=prompt_self_verification_thinking,
+        ),
         {"role": "assistant", "content": row["target"]},
     ]
     return {
@@ -291,9 +308,21 @@ def build_dataset(
     rows: Iterable[dict[str, str]],
     terminology_entries: Sequence[tuple[str, str]] | None = None,
     terminology_top_k: int = 0,
+    prompt_self_verification: bool = False,
+    prompt_self_verification_thinking: bool = False,
 ) -> Dataset:
     return Dataset.from_list(
-        [format_example(tokenizer, row, terminology_entries, terminology_top_k) for row in rows]
+        [
+            format_example(
+                tokenizer,
+                row,
+                terminology_entries,
+                terminology_top_k,
+                prompt_self_verification,
+                prompt_self_verification_thinking,
+            )
+            for row in rows
+        ]
     )
 
 
@@ -365,8 +394,22 @@ def main() -> None:
             **train_sft.adapter_flags(args.adapter_method),
         )
 
-    train_dataset = build_dataset(tokenizer, train_rows, terminology_entries, args.terminology_top_k)
-    eval_dataset = build_dataset(tokenizer, eval_rows, terminology_entries, args.terminology_top_k)
+    train_dataset = build_dataset(
+        tokenizer,
+        train_rows,
+        terminology_entries,
+        args.terminology_top_k,
+        args.prompt_self_verification,
+        args.prompt_self_verification_thinking,
+    )
+    eval_dataset = build_dataset(
+        tokenizer,
+        eval_rows,
+        terminology_entries,
+        args.terminology_top_k,
+        args.prompt_self_verification,
+        args.prompt_self_verification_thinking,
+    )
     configure_step_schedule(args, len(train_dataset))
 
     trainer = SFTTrainer(
@@ -420,6 +463,11 @@ def main() -> None:
     print(f"Train rows: {len(train_dataset):,}")
     print(f"Validation rows: {len(eval_dataset):,}")
     print(f"Target field: {args.target_field}")
+    print(
+        "Prompt self-verification: "
+        f"{args.prompt_self_verification or args.prompt_self_verification_thinking}"
+    )
+    print(f"Prompt bounded thinking: {args.prompt_self_verification_thinking}")
     if args.terminology_file:
         print(f"Terminology file: {args.terminology_file}")
         print(f"Terminology entries: {len(terminology_entries):,}")

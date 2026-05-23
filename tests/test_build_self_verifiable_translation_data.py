@@ -24,6 +24,10 @@ class BuildSelfVerifiableTranslationDataTests(unittest.TestCase):
         self.assertIn("Traduccion final:", generator_records[0]["target"])
         self.assertIn("Autoevaluacion:", generator_records[0]["target"])
         self.assertIn("Puntaje:", generator_records[0]["target"])
+        thinking_target = builder.thinking_generator_target(rows[0]["target"])
+        self.assertIn("Analisis de traduccion:", thinking_target)
+        self.assertIn("Traduccion final:", thinking_target)
+        self.assertIn("Puntaje:", thinking_target)
         self.assertEqual(len(meta_records), len(verifier_records) * 2)
         labels = [json.loads(record["label"]) for record in meta_records]
         self.assertGreater(max(label["score"] for label in labels), 0.9)

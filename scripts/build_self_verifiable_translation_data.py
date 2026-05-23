@@ -92,6 +92,15 @@ def generator_target(reference: str) -> str:
     )
 
 
+def thinking_generator_target(reference: str) -> str:
+    return (
+        "Analisis de traduccion: conserva el significado y evita copia del espanol; la respuesta final usa quechua chanka natural.\n"
+        f"Traduccion final: {gspo.normalize_text(reference)}\n"
+        "Autoevaluacion: No veo errores importantes; conserva el significado, no copia el espanol y usa quechua chanka natural.\n"
+        "Puntaje: \\boxed{0.98}"
+    )
+
+
 def build_records(rows: Iterable[dict[str, str]], seed: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     rng = random.Random(seed)
     base_rows = list(rows)
@@ -148,11 +157,21 @@ def main() -> None:
     write_jsonl(args.output_dir / "translation_verifier_cold_start.jsonl", verifier_records)
     write_jsonl(args.output_dir / "translation_meta_verifier_cold_start.jsonl", meta_records)
     write_jsonl(args.output_dir / "self_verifiable_generator_sft.jsonl", generator_records)
+    thinking_generator_records = [
+        {
+            **record,
+            "target": thinking_generator_target(record["reference"]),
+            "task": "self_verifiable_thinking_translation_generation",
+        }
+        for record in generator_records
+    ]
+    write_jsonl(args.output_dir / "self_verifiable_thinking_generator_sft.jsonl", thinking_generator_records)
     summary = {
         "source_rows": len(rows),
         "verifier_records": len(verifier_records),
         "meta_verifier_records": len(meta_records),
         "generator_records": len(generator_records),
+        "thinking_generator_records": len(thinking_generator_records),
     }
     (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     print(json.dumps(summary, indent=2, sort_keys=True))
