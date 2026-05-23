@@ -61,6 +61,8 @@ Behavior:
 
 Both `scripts/evaluate_gspo_checkpoint.py` and final GSPO metrics now include self-verification diagnostics when structured output is enabled: format adherence, required-format adherence, missing-score rate, average self-score, hidden-reference true score, score gap, false-confidence rate, underconfidence rate, and bounded-thinking length/quality summaries. These diagnostics are required for the DeepSeekMath loop because reward alone can rise while the model remains badly calibrated.
 
+Final GSPO held-out generation is batched through `generate_predictions(..., batch_size=...)` using `--per-device-eval-batch-size`. This matters for the self-verification experiments because row-by-row final decoding was a large source of queue latency after the trainer finished.
+
 `scripts/build_meta_verifier_from_self_outputs.py` converts those real model outputs into meta-verifier training rows. It compares the model's boxed self-score against the hidden-reference translation score, labels false confidence, underconfidence/hallucinated issues, missing scores, and well-calibrated analyses, and writes JSONL usable by `scripts/train_meta_verifier_chanka_unsloth.py`.
 
 `experiments/gspo/queue_meta_verifier_v2_from_self_outputs.sh` is the first rollout-to-meta-verifier loop:

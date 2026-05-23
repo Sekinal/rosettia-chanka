@@ -1635,30 +1635,42 @@ def generate_predictions(
     self_verification: bool = False,
     self_verification_thinking: bool = False,
     return_raw: bool = False,
+    batch_size: int = 1,
 ) -> list[str] | tuple[list[str], list[str]]:
     import torch
 
     predictions: list[str] = []
     raw_predictions: list[str] = []
     model.eval()
-    for row in rows:
-        terminology = (
-            select_terminology(row["source"], terminology_entries or [], terminology_top_k)
-            if terminology_entries and terminology_top_k > 0
-            else None
-        )
-        prompt = apply_chat_template_no_thinking(
-            tokenizer,
-            prompt_messages(
-                row["source"],
-                terminology,
-                self_verification=self_verification,
-                self_verification_thinking=self_verification_thinking,
-            ),
-            tokenize=False,
-            add_generation_prompt=True,
-        )
-        inputs = tokenizer(text=prompt, return_tensors="pt").to(model.device)
+    batch_size = max(1, batch_size)
+    if getattr(tokenizer, "pad_token", None) is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    if hasattr(tokenizer, "padding_side"):
+        tokenizer.padding_side = "left"
+    for start in range(0, len(rows), batch_size):
+        batch_rows = rows[start : start + batch_size]
+        prompts: list[str] = []
+        for row in batch_rows:
+            terminology = (
+                select_terminology(row["source"], terminology_entries or [], terminology_top_k)
+                if terminology_entries and terminology_top_k > 0
+                else None
+            )
+            prompts.append(
+                apply_chat_template_no_thinking(
+                    tokenizer,
+                    prompt_messages(
+                        row["source"],
+                        terminology,
+                        self_verification=self_verification,
+                        self_verification_thinking=self_verification_thinking,
+                    ),
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+            )
+        inputs = tokenizer(text=prompts, return_tensors="pt", padding=True).to(model.device)
+        prompt_length = inputs["input_ids"].shape[1]
         with torch.inference_mode():
             output_ids = model.generate(
                 **inputs,
@@ -1669,12 +1681,16 @@ def generate_predictions(
                 eos_token_id=tokenizer.eos_token_id,
                 pad_token_id=tokenizer.eos_token_id,
             )
-        completion_ids = output_ids[0, inputs["input_ids"].shape[1] :]
-        raw_prediction = normalize_text(tokenizer.decode(completion_ids, skip_special_tokens=True))
-        raw_predictions.append(raw_prediction)
-        predictions.append(raw_prediction)
-        if self_verification:
-            predictions[-1] = extract_translation_from_structured_output(predictions[-1])
+        for output_index in range(output_ids.shape[0]):
+            completion_ids = output_ids[output_index, prompt_length:]
+            raw_prediction = normalize_text(tokenizer.decode(completion_ids, skip_special_tokens=True))
+            raw_predictions.append(raw_prediction)
+            prediction = (
+                extract_translation_from_structured_output(raw_prediction)
+                if self_verification
+                else raw_prediction
+            )
+            predictions.append(prediction)
     if return_raw:
         return predictions, raw_predictions
     return predictions
@@ -1924,6 +1940,7 @@ def main() -> None:
         self_verification=use_self_verification_prompt,
         self_verification_thinking=use_self_verification_thinking,
         return_raw=use_self_verification_prompt,
+        batch_size=args.per_device_eval_batch_size,
     )
     if use_self_verification_prompt:
         predictions, raw_predictions = generated
