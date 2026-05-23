@@ -194,6 +194,26 @@ The reward rose, but corpus translation metrics collapsed. That makes this a use
 
 Speed note: `scripts/train_gspo_chanka_unsloth.py` now supports `--no-trainer-eval`, `--final-metrics-max-samples`, and `--final-generation-batch-size`. For exploratory structured-output canaries, disable trainer eval and score only 16-32 final rows; reserve full trainer eval/full final metrics for runs that already show format adherence and non-collapsed translation quality.
 
+## Frontier Thinking Data
+
+The strongest cold-start path is synthetic primitive thinking from a stronger reasoning model, but the synthetic part should be the audit trace, not unreviewed Chanka labels. `scripts/build_frontier_thinking_sft_jsonl.py` implements this:
+
+- defaults to `deepseek-v4-pro` through `https://api.deepseek.com`;
+- reads the API key only from `DEEPSEEK_API_KEY`;
+- asks for short JSON outputs with 2-4 primitive tags;
+- writes `source`, `reference`, and `target` rows compatible with `scripts/train_jsonl_sft_unsloth.py --target-field target`;
+- keeps the reviewed reference as `Traduccion final` unless `--allow-model-translation` is explicitly set.
+
+This is the safer DeepSeekMath analogue: use a frontier model to teach the student what to check (`[SIGNIFICADO]`, `[GRAMATICA]`, `[ENTIDADES]`, `[TERMINOLOGIA]`, `[ANTI_COPIA]`) while keeping the final translation anchored to our clean bilingual data. The chain script is:
+
+```bash
+cd /root/rosettia-chanka
+export DEEPSEEK_API_KEY=...
+FRONTIER_MAX_ROWS=128 experiments/gspo/run_deepseek_v4_pro_thinking_sft_then_gspo.sh
+```
+
+Use small batches first. Generated frontier JSONL should remain an artifact, not a committed repo file.
+
 ## Why This Fits Chanka Better Than Plain BLEU RL
 
 BLEU/chrF rewards are useful but too shallow for the user's goal of learning grammar structures. A translation can gain n-gram overlap while still copying Spanish structure, omitting agglutinative morphology, or choosing a misleading Chanka term. The DeepSeekMath-V2 adaptation makes the model expose its own quality judgement, then rewards calibration. This creates pressure toward internal checks like:
