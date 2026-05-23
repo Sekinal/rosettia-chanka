@@ -248,6 +248,13 @@ suffix"""
         self.assertEqual(parsed["self_score"], 0.93)
         self.assertTrue(parsed["has_format"])
 
+    def test_extract_translation_strips_self_evaluation_without_final_marker(self):
+        translation = train_gspo.extract_translation_from_structured_output(
+            "¿Ima kallpim tiyanki? Autoevaluacion: Manam error kanchu Puntaje: \\boxed{1.0}"
+        )
+
+        self.assertEqual(translation, "¿Ima kallpim tiyanki?")
+
     def test_parse_self_verification_output_extracts_bounded_thinking(self):
         parsed = train_gspo.parse_self_verification_output(
             "Analisis de traduccion: conserva el significado y evita copia del espanol. "

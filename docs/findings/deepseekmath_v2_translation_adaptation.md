@@ -63,6 +63,31 @@ Both `scripts/evaluate_gspo_checkpoint.py` and final GSPO metrics now include se
 
 Final GSPO held-out generation is batched through `generate_predictions(..., batch_size=...)` using `--per-device-eval-batch-size`. This matters for the self-verification experiments because row-by-row final decoding was a large source of queue latency after the trainer finished.
 
+Structured-output parsing strips trailing `Autoevaluacion` and `Puntaje` even when the model omits the `Traduccion final:` marker. This is necessary because early self-verification adapters often emitted partial structure such as `Quechua sentence Autoevaluacion: ... Puntaje: ...`; metrics and verifier mining should score only the Quechua sentence.
+
+## Meta-Verifier V2 Result
+
+The first real-output meta-verifier v2 run did not improve translator quality. The original process was stopped after it had already saved `final_gspo_lora` because it was stuck in the pre-batched final metric pass. The saved adapter was evaluated with the updated batched evaluator:
+
+```text
+outputs/gspo_paper_profiles/2511_self_verifiable_translation_meta_v2_20260523-meta-v2-self/chanka_gspo/final_gspo_lora
+```
+
+Held-out metrics:
+
+- chrF++ `38.8286`
+- BLEU `5.7896`
+- TER `138.2488`
+- token F1 `23.2703`
+- self-verification format rate `46.20%`
+- missing self-score rate `53.80%`
+- average self-score `1.0`
+- average true score `0.2900`
+- average self/true score gap `0.7687`
+- false-confidence rate `97.26%`
+
+Interpretation: the model mostly either skipped the required format or claimed perfect translations for weak outputs. This is not a usable self-verifying translator. The bounded-thinking profile plus meta-verifier-v3 mining is the next live canary because it attacks the real failure mode: absent/empty analysis and uncalibrated confidence.
+
 `scripts/build_meta_verifier_from_self_outputs.py` converts those real model outputs into meta-verifier training rows. It compares the model's boxed self-score against the hidden-reference translation score, labels false confidence, underconfidence/hallucinated issues, missing scores, and well-calibrated analyses, and writes JSONL usable by `scripts/train_meta_verifier_chanka_unsloth.py`.
 
 `experiments/gspo/queue_meta_verifier_v2_from_self_outputs.sh` is the first rollout-to-meta-verifier loop:

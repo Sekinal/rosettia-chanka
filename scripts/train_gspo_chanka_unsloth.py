@@ -490,6 +490,12 @@ def extract_translation_from_structured_output(text: str) -> str:
     )
     if match:
         return normalize_text(match.group(1))
+    fallback = re.search(
+        r"(?is)^(.*?)(?:\s+autoevaluaci[oó]n\s*:|\s+self[- ]?evaluation\s*:|\s+puntaje\s*:|\s+score\s*:)",
+        normalized,
+    )
+    if fallback:
+        return normalize_text(fallback.group(1))
     return normalized
 
 
