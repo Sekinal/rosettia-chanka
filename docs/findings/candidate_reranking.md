@@ -489,6 +489,25 @@ Decision:
 - The existing listwise text selector does not transfer to the 9B-augmented distribution; it drops below the non-9B listwise profile.
 - Wait for the 9B train pool and train a matched listwise text selector before deciding whether 9B improves deployable quality.
 
+Matched-selector update:
+
+- Train pool: `outputs/qwen35_9b_candidate_rerank/20260523-qwen35-9b-candidate-rerank/train_current_k32_4b_k16_9b_k16.jsonl`
+- Eval pool: `outputs/qwen35_9b_candidate_rerank/20260523-qwen35-9b-candidate-rerank/eval_current_k32_4b_k16_9b_k16.jsonl`
+- Text output: `outputs/qwen35_9b_candidate_rerank/20260523-qwen35-9b-candidate-rerank/text_ranker_listwise/text_current_4b_9b_model.json`
+- Feature output: `outputs/qwen35_9b_candidate_rerank/20260523-qwen35-9b-candidate-rerank/feature_listwise/feature_current_4b_9b_weights.json`
+
+| Matched 9B-augmented method | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| matched listwise text | 38.1557 | 51.2895 | 23.4968 | 39.9106 | 2.0992 | 0.0000 | 67.9724 |
+| matched listwise feature | 31.8334 | 44.8211 | 13.6102 | 33.4293 | 2.3101 | 0.0000 | 74.1935 |
+| 9B-augmented oracle | 51.6170 | 64.8936 | 37.1419 | 56.9913 | 2.0992 | 0.0000 | 48.3871 |
+
+Decision:
+
+- The matched text selector recovers most of the transfer loss but still trails the current K32+4B listwise text profile (`38.9423` selection, chrF++ `51.8586`, BLEU `26.0207`).
+- The feature selector is not competitive on this pool.
+- 9B remains useful as evidence of extra oracle headroom, but it is not a deployable win until the selector improves or the 9B base checkpoint is improved through better SFT.
+
 ## 2026-05-23 Tuned MBR Consensus Selector
 
 Purpose: adapt the Kaggle Deep Past MBR idea more directly for our candidate pools: select the candidate with highest consensus against other candidates, then tune the reference-free signal weights on a train candidate pool.
