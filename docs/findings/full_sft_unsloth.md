@@ -178,3 +178,33 @@ New controls:
 The implementation mirrors the existing eval/JSONL logic: longest source-term matches first, dedupe by target term, and include the glossary block only when a row has a relevant match.
 
 Queued follow-up: `experiments/sft/queue_qwen35_9b_terminology_chanka_sft.sh` waits for the active 9B rerank/full-SFT chain, then reruns the clean Chanka continuation from the 9B broad checkpoint with terminology top-1 prompts and evaluates all checkpoints with terminology top-1 prompting.
+
+## 2026-05-23 Focus Back On Base-Model SFT
+
+The base-model improvement path is now prioritized over more reranking-only plumbing.
+
+Actions:
+
+- Paused the downstream waiting queue wrappers on the L40S host so they do not automatically take the GPU after the 9B selector-recovery marker appears.
+- Kept the 9B selector recovery running because it reuses already-generated candidate pools and records a clean result.
+- Launched the focused 4B merged-model full-SFT LR sweep immediately by pointing both wait markers at `outputs/logs/manual_start_marker`.
+
+Active run:
+
+- Script: `experiments/sft/queue_qwen35_4b_full_sft_lr_sweep.sh`
+- Log: `outputs/logs/qwen35_4b_full_sft_lr_sweep_focus_20260523.log`
+- Output root: `outputs/full_sft_sweeps/20260523-qwen35-4b-full-sft-lr-sweep-focus`
+- Starting model: `outputs/merged_full_models/20260522-qwen35-4b-broad512-chanka224-merged16`
+- Training mode: Unsloth full fine-tuning, bf16, `4,539,265,536` trainable parameters.
+- Data: clean Chanka stage, 897 train rows, 158 validation rows.
+- Prompting: terminology-conditioned top-1 training prompts from `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet`.
+- LR sweep: `5e-7 1e-6 2e-6`, `96` optimizer steps each, eval/save every `12` steps.
+
+Early signal:
+
+- The `5e-7` run fits on the L40S and started normally.
+- First checkpoint eval at step 12: `eval_loss = 0.9906`.
+
+Caveat:
+
+- Loading the merged local model emitted a Transformers tokenizer warning suggesting `fix_mistral_regex=True`. Do not overinterpret one canary if generation metrics look strange; the next script hardening pass should test passing that tokenizer fix flag through Unsloth when loading merged full models.
