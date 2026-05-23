@@ -47,6 +47,8 @@ class TrainTextCandidateRerankerTests(unittest.TestCase):
             epochs=4,
             learning_rate=0.2,
             l2=0.0,
+            training_objective="pairwise",
+            listwise_temperature=0.08,
             margin=0.0,
             max_negatives_per_group=8,
             char_ngram_min=3,
@@ -63,6 +65,44 @@ class TrainTextCandidateRerankerTests(unittest.TestCase):
         selected = text_reranker.select_sparse(sparse_groups, model)
 
         self.assertEqual(diagnostics["training_objective"], "pairwise_hashed_text_logistic")
+        self.assertGreater(diagnostics["updates"], 0)
+        self.assertEqual(selected[0].row.candidate.prediction, "Raymipim")
+
+    def test_listwise_text_ranker_can_learn_oracle_winner(self):
+        group = [
+            oracle_rerank.Candidate("En la fiesta", "Raymipim", "Fiestapi", candidate_index=0),
+            oracle_rerank.Candidate("En la fiesta", "Raymipim", "Raymipim", candidate_index=1),
+            oracle_rerank.Candidate("En la fiesta", "Raymipim", "Raymikunapi", candidate_index=2),
+        ]
+        with mock.patch.object(
+            feature_reranker.oracle_rerank,
+            "candidate_oracle_score",
+            side_effect=lambda candidate: 1.0 if candidate.prediction == "Raymipim" else 0.0,
+        ):
+            rows = feature_reranker.featurize_groups([group])
+        args = Namespace(
+            hash_size=4096,
+            epochs=12,
+            learning_rate=0.3,
+            l2=0.0,
+            training_objective="listwise",
+            listwise_temperature=0.05,
+            margin=0.0,
+            max_negatives_per_group=8,
+            char_ngram_min=3,
+            char_ngram_max=5,
+            word_ngram_max=2,
+            max_source_tokens=4,
+            max_candidate_tokens=6,
+            include_manual_features=True,
+            seed=1,
+        )
+
+        model, diagnostics = text_reranker.train_text_ranker(rows, args)
+        sparse_groups = text_reranker.sparse_groups_for_model(rows, model)
+        selected = text_reranker.select_sparse(sparse_groups, model)
+
+        self.assertEqual(diagnostics["training_objective"], "listwise_hashed_text_logistic")
         self.assertGreater(diagnostics["updates"], 0)
         self.assertEqual(selected[0].row.candidate.prediction, "Raymipim")
 

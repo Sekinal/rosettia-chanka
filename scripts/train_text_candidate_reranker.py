@@ -62,6 +62,18 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=4)
     parser.add_argument("--learning-rate", type=float, default=0.08)
     parser.add_argument("--l2", type=float, default=1e-6)
+    parser.add_argument(
+        "--training-objective",
+        choices=["pairwise", "listwise"],
+        default="pairwise",
+        help="Pairwise logistic against oracle winners, or listwise softmax over each candidate group.",
+    )
+    parser.add_argument(
+        "--listwise-temperature",
+        type=float,
+        default=0.08,
+        help="Temperature for oracle-score soft labels when --training-objective=listwise.",
+    )
     parser.add_argument("--margin", type=float, default=0.05, help="Skip negatives too close to the oracle winner.")
     parser.add_argument("--max-negatives-per-group", type=int, default=12)
     parser.add_argument("--char-ngram-min", type=int, default=3)
@@ -181,6 +193,19 @@ def sigmoid(value: float) -> float:
     return 1.0 / (1.0 + math.exp(-value))
 
 
+def stable_softmax(values: Sequence[float], temperature: float) -> list[float]:
+    if not values:
+        return []
+    temp = max(1e-6, temperature)
+    scaled = [value / temp for value in values]
+    offset = max(scaled)
+    exps = [math.exp(max(-60.0, min(60.0, value - offset))) for value in scaled]
+    total = sum(exps)
+    if total <= 0.0:
+        return [1.0 / len(values)] * len(values)
+    return [value / total for value in exps]
+
+
 def load_feature_groups(paths: Sequence[Path]) -> list[list[feature_reranker.CandidateFeatures]]:
     groups = feature_reranker.load_groups(paths)
     return feature_reranker.featurize_groups(groups)
@@ -267,28 +292,48 @@ def train_text_ranker(
     for _epoch in range(max(0, args.epochs)):
         rng.shuffle(sparse_groups)
         for group in sparse_groups:
-            best_index = oracle_best_index(group)
-            for negative_index in negative_indices(
-                group,
-                best_index,
-                args.margin,
-                args.max_negatives_per_group,
-                rng,
-            ):
-                diff = subtract_features(group[best_index].features, group[negative_index].features)
-                score = model_score(diff, weights)
-                gradient_scale = 1.0 - sigmoid(score)
-                if gradient_scale < 1e-5:
-                    skipped_pairs += 1
-                    continue
-                touched = list(diff)
+            if args.training_objective == "listwise":
+                scores = [model_score(sparse_row.features, weights) for sparse_row in group]
+                model_probs = stable_softmax(scores, 1.0)
+                target_probs = stable_softmax(
+                    [sparse_row.row.oracle_score for sparse_row in group],
+                    args.listwise_temperature,
+                )
+                touched = {index for sparse_row in group for index in sparse_row.features}
                 for index in touched:
                     weights[index] = weights.get(index, 0.0) * (1.0 - args.learning_rate * args.l2)
-                for index, value in diff.items():
-                    weights[index] = weights.get(index, 0.0) + args.learning_rate * gradient_scale * value
-                    if abs(weights[index]) < 1e-10:
-                        del weights[index]
+                for sparse_row, target_prob, model_prob in zip(group, target_probs, model_probs, strict=True):
+                    gradient_scale = target_prob - model_prob
+                    if abs(gradient_scale) < 1e-8:
+                        continue
+                    for index, value in sparse_row.features.items():
+                        weights[index] = weights.get(index, 0.0) + args.learning_rate * gradient_scale * value
+                        if abs(weights[index]) < 1e-10:
+                            del weights[index]
                 updates += 1
+            else:
+                best_index = oracle_best_index(group)
+                for negative_index in negative_indices(
+                    group,
+                    best_index,
+                    args.margin,
+                    args.max_negatives_per_group,
+                    rng,
+                ):
+                    diff = subtract_features(group[best_index].features, group[negative_index].features)
+                    score = model_score(diff, weights)
+                    gradient_scale = 1.0 - sigmoid(score)
+                    if gradient_scale < 1e-5:
+                        skipped_pairs += 1
+                        continue
+                    touched = list(diff)
+                    for index in touched:
+                        weights[index] = weights.get(index, 0.0) * (1.0 - args.learning_rate * args.l2)
+                    for index, value in diff.items():
+                        weights[index] = weights.get(index, 0.0) + args.learning_rate * gradient_scale * value
+                        if abs(weights[index]) < 1e-10:
+                            del weights[index]
+                    updates += 1
 
     trained = TextRankerModel(
         hash_size=model.hash_size,
@@ -299,12 +344,13 @@ def train_text_ranker(
         config=model.config,
     )
     diagnostics = {
-        "training_objective": "pairwise_hashed_text_logistic",
+        "training_objective": f"{args.training_objective}_hashed_text_logistic",
         "train_groups": len(sparse_groups),
         "train_candidates": sum(len(group) for group in sparse_groups),
         "epochs": args.epochs,
         "learning_rate": args.learning_rate,
         "l2": args.l2,
+        "listwise_temperature": args.listwise_temperature,
         "margin": args.margin,
         "max_negatives_per_group": args.max_negatives_per_group,
         "updates": updates,
