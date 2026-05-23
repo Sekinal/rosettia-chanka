@@ -86,7 +86,9 @@ if [[ ! -f "${SMOKE_DIR}/chanka/final_full_model/config.json" ]]; then
     --per-device-eval-batch-size 1 \
     --gradient-accumulation-steps "$GRADIENT_ACCUMULATION_STEPS" \
     --learning-rate "$LEARNING_RATE" \
-    --warmup-ratio 0.05; then
+    --warmup-ratio 0.05 \
+    --terminology-file "$TERMINOLOGY_FILE" \
+    --terminology-top-k "$TERMINOLOGY_TOP_K"; then
     echo "$(date -u +%FT%TZ) 9B full-SFT smoke failed; likely memory-bound on this GPU" | tee "${WORK_DIR}/full_sft_smoke_failed.txt"
     exit 0
   fi
@@ -107,7 +109,9 @@ if [[ ! -f "${FULL_RUN_DIR}/chanka/final_full_model/config.json" ]]; then
     --per-device-eval-batch-size 1 \
     --gradient-accumulation-steps "$GRADIENT_ACCUMULATION_STEPS" \
     --learning-rate "$LEARNING_RATE" \
-    --warmup-ratio 0.05
+    --warmup-ratio 0.05 \
+    --terminology-file "$TERMINOLOGY_FILE" \
+    --terminology-top-k "$TERMINOLOGY_TOP_K"
 fi
 
 mapfile -t CHECKPOINTS < <(
