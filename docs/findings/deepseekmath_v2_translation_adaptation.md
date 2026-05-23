@@ -59,6 +59,8 @@ Behavior:
 
 `scripts/evaluate_gspo_checkpoint.py --self-verification-output` can now prompt a model for structured self-verifying translations, score only the parsed final translation, and write both `prediction` and `raw_prediction` plus the parsed `self_verification` object to JSONL. Use `--self-verification-thinking-output` to mine the bounded `Analisis de traduccion` variant; this implies self-verification parsing and keeps metrics on `Traduccion final`.
 
+Both `scripts/evaluate_gspo_checkpoint.py` and final GSPO metrics now include self-verification diagnostics when structured output is enabled: format adherence, required-format adherence, missing-score rate, average self-score, hidden-reference true score, score gap, false-confidence rate, underconfidence rate, and bounded-thinking length/quality summaries. These diagnostics are required for the DeepSeekMath loop because reward alone can rise while the model remains badly calibrated.
+
 `scripts/build_meta_verifier_from_self_outputs.py` converts those real model outputs into meta-verifier training rows. It compares the model's boxed self-score against the hidden-reference translation score, labels false confidence, underconfidence/hallucinated issues, missing scores, and well-calibrated analyses, and writes JSONL usable by `scripts/train_meta_verifier_chanka_unsloth.py`.
 
 `experiments/gspo/queue_meta_verifier_v2_from_self_outputs.sh` is the first rollout-to-meta-verifier loop:

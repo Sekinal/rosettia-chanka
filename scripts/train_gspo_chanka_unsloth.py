@@ -1568,6 +1568,63 @@ def corpus_metrics(predictions: list[str], references: list[str], sources: list[
     return metrics
 
 
+def self_verification_diagnostics(
+    raw_predictions: Sequence[str],
+    references: Sequence[str],
+    sources: Sequence[str | None],
+    require_thinking: bool = False,
+) -> dict[str, float]:
+    parsed_outputs = [parse_self_verification_output(prediction) for prediction in raw_predictions]
+    true_scores = [
+        bounded_translation_quality_score(str(parsed["translation"]), reference, source)
+        for parsed, reference, source in zip(parsed_outputs, references, sources, strict=True)
+    ]
+    self_scores = [
+        float(parsed["self_score"])
+        for parsed in parsed_outputs
+        if isinstance(parsed.get("self_score"), int | float)
+    ]
+    paired_scores = [
+        (float(parsed["self_score"]), true_score)
+        for parsed, true_score in zip(parsed_outputs, true_scores, strict=True)
+        if isinstance(parsed.get("self_score"), int | float)
+    ]
+    gaps = [abs(self_score - true_score) for self_score, true_score in paired_scores]
+    false_confidence = [
+        1.0
+        for self_score, true_score in paired_scores
+        if self_score - true_score >= 0.20
+    ]
+    underconfidence = [
+        1.0
+        for self_score, true_score in paired_scores
+        if true_score - self_score >= 0.20
+    ]
+    format_key = "has_thinking_format" if require_thinking else "has_format"
+    thinking_scores = [translation_thinking_score(str(parsed.get("thinking", ""))) for parsed in parsed_outputs]
+    analysis_word_counts = [len(word_tokens(str(parsed.get("analysis", "")))) for parsed in parsed_outputs]
+    thinking_word_counts = [len(word_tokens(str(parsed.get("thinking", "")))) for parsed in parsed_outputs]
+    total = max(1, len(parsed_outputs))
+    return {
+        "self_verification_format_rate": 100.0 * sum(1 for parsed in parsed_outputs if parsed["has_format"]) / total,
+        "self_verification_required_format_rate": 100.0 * sum(1 for parsed in parsed_outputs if parsed[format_key]) / total,
+        "self_verification_thinking_format_rate": 100.0
+        * sum(1 for parsed in parsed_outputs if parsed["has_thinking_format"])
+        / total,
+        "self_verification_missing_score_rate": 100.0
+        * sum(1 for parsed in parsed_outputs if parsed.get("self_score") is None)
+        / total,
+        "self_verification_avg_self_score": sum(self_scores) / max(1, len(self_scores)),
+        "self_verification_avg_true_score": sum(true_scores) / max(1, len(true_scores)),
+        "self_verification_avg_score_gap": sum(gaps) / max(1, len(gaps)),
+        "self_verification_false_confidence_rate": 100.0 * sum(false_confidence) / max(1, len(paired_scores)),
+        "self_verification_underconfidence_rate": 100.0 * sum(underconfidence) / max(1, len(paired_scores)),
+        "self_verification_avg_thinking_score": sum(thinking_scores) / total,
+        "self_verification_avg_analysis_words": sum(analysis_word_counts) / total,
+        "self_verification_avg_thinking_words": sum(thinking_word_counts) / total,
+    }
+
+
 def generate_predictions(
     model,
     tokenizer,
@@ -1577,10 +1634,12 @@ def generate_predictions(
     terminology_top_k: int = 0,
     self_verification: bool = False,
     self_verification_thinking: bool = False,
-) -> list[str]:
+    return_raw: bool = False,
+) -> list[str] | tuple[list[str], list[str]]:
     import torch
 
     predictions: list[str] = []
+    raw_predictions: list[str] = []
     model.eval()
     for row in rows:
         terminology = (
@@ -1611,9 +1670,13 @@ def generate_predictions(
                 pad_token_id=tokenizer.eos_token_id,
             )
         completion_ids = output_ids[0, inputs["input_ids"].shape[1] :]
-        predictions.append(normalize_text(tokenizer.decode(completion_ids, skip_special_tokens=True)))
+        raw_prediction = normalize_text(tokenizer.decode(completion_ids, skip_special_tokens=True))
+        raw_predictions.append(raw_prediction)
+        predictions.append(raw_prediction)
         if self_verification:
             predictions[-1] = extract_translation_from_structured_output(predictions[-1])
+    if return_raw:
+        return predictions, raw_predictions
     return predictions
 
 
@@ -1851,7 +1914,7 @@ def main() -> None:
     model.save_pretrained(str(final_dir))
     tokenizer.save_pretrained(str(final_dir))
 
-    predictions = generate_predictions(
+    generated = generate_predictions(
         model,
         tokenizer,
         eval_rows,
@@ -1860,10 +1923,25 @@ def main() -> None:
         args.terminology_top_k,
         self_verification=use_self_verification_prompt,
         self_verification_thinking=use_self_verification_thinking,
+        return_raw=use_self_verification_prompt,
     )
+    if use_self_verification_prompt:
+        predictions, raw_predictions = generated
+    else:
+        predictions = generated
+        raw_predictions = []
     references = [row["target"] for row in eval_rows]
     sources = [row["source"] for row in eval_rows]
     metrics = corpus_metrics(predictions, references, sources)
+    if use_self_verification_prompt:
+        metrics.update(
+            self_verification_diagnostics(
+                raw_predictions,
+                references,
+                sources,
+                require_thinking=use_self_verification_thinking,
+            )
+        )
     metrics["eval_rows"] = len(eval_rows)
     metrics["trainer_eval_reward"] = float(trainer_metrics.get("eval_reward", 0.0))
     metrics["final_adapter"] = str(final_dir)

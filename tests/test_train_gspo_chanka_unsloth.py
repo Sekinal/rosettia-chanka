@@ -466,6 +466,32 @@ suffix"""
 
         self.assertGreater(high_meta, low_meta)
 
+    def test_self_verification_diagnostics_tracks_format_and_calibration(self):
+        raw_predictions = [
+            "Analisis de traduccion: conserva el significado y evita copia del espanol. "
+            "Traduccion final: Allin punchaw kamachiq. "
+            "Autoevaluacion: no veo errores importantes. "
+            "Puntaje: \\boxed{0.90}",
+            "Traduccion final: Buenos dias autoridad. Autoevaluacion: no veo errores.",
+        ]
+
+        with mock.patch.object(
+            train_gspo,
+            "bounded_translation_quality_score",
+            side_effect=[0.70, 0.10],
+        ):
+            diagnostics = train_gspo.self_verification_diagnostics(
+                raw_predictions,
+                ["Allin punchaw kamachiq.", "Allin punchaw kamachiq."],
+                ["Buenos dias autoridad.", "Buenos dias autoridad."],
+                require_thinking=True,
+            )
+
+        self.assertEqual(diagnostics["self_verification_format_rate"], 50.0)
+        self.assertEqual(diagnostics["self_verification_required_format_rate"], 50.0)
+        self.assertEqual(diagnostics["self_verification_missing_score_rate"], 50.0)
+        self.assertGreater(diagnostics["self_verification_avg_thinking_score"], 0.0)
+
     def test_reference_rerank_metric_profile_penalizes_source_copy(self):
         with mock.patch.object(train_gspo, "sentence_chrfpp", return_value=0.7), mock.patch.object(
             train_gspo, "sentence_bleu", return_value=0.3

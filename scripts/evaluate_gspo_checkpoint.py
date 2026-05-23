@@ -351,6 +351,15 @@ def main() -> None:
     references = [row["target"] for row in generated_rows]
     sources = [row["source"] for row in generated_rows]
     metrics = gspo.corpus_metrics(predictions, references, sources)
+    if self_verification_output:
+        metrics.update(
+            gspo.self_verification_diagnostics(
+                raw_predictions,
+                references,
+                sources,
+                require_thinking=args.self_verification_thinking_output,
+            )
+        )
     metrics["eval_rows"] = len(generated_rows)
     metrics["source_rows"] = len(generation_rows)
     metrics["split"] = args.split
