@@ -15,6 +15,7 @@ LR_LIST="${LR_LIST:-5e-7 1e-6 2e-6}"
 MAX_STEPS="${MAX_STEPS:-96}"
 EVAL_STEPS="${EVAL_STEPS:-12}"
 SAVE_STEPS="${SAVE_STEPS:-12}"
+SAVE_TOTAL_LIMIT="${SAVE_TOTAL_LIMIT:-0}"
 GRADIENT_ACCUMULATION_STEPS="${GRADIENT_ACCUMULATION_STEPS:-8}"
 MAX_SEQ_LENGTH="${MAX_SEQ_LENGTH:-128}"
 
@@ -65,6 +66,7 @@ for lr in $LR_LIST; do
       --max-steps "$MAX_STEPS" \
       --eval-steps "$EVAL_STEPS" \
       --save-steps "$SAVE_STEPS" \
+      --save-total-limit "$SAVE_TOTAL_LIMIT" \
       --logging-steps 4 \
       --per-device-train-batch-size 1 \
       --per-device-eval-batch-size 1 \

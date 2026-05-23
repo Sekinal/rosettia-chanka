@@ -226,3 +226,40 @@ Caveat:
 
 - Loading the merged local model emitted a Transformers tokenizer warning suggesting `fix_mistral_regex=True`. Do not overinterpret one canary if generation metrics look strange; the next script hardening pass should test passing that tokenizer fix flag through Unsloth when loading merged full models.
 - Directly passing `fix_mistral_regex=True` to this Transformers/Unsloth tokenizer path currently crashes on the merged tokenizer, so this is not safe to patch blindly.
+
+## 2026-05-23 Follow-Up 4B Full-SFT LR Sweep
+
+The focused follow-up found a real base-model improvement.
+
+Setup:
+
+- Output root: `outputs/full_sft_sweeps/20260523-qwen35-4b-full-sft-lr-followups`
+- Starting model: `outputs/merged_full_models/20260522-qwen35-4b-broad512-chanka224-merged16`
+- Data: clean Chanka SFT with terminology top-1 prompts.
+- LRs: `1e-6` and `2e-6`, `48` optimizer steps each, eval/save every `12` steps.
+- Important caveat: this active run started before `--save-total-limit 0` was added, so trainer checkpoint pruning deleted some intermediate checkpoints, including `1e-6/checkpoint-24`.
+
+Held-out generation metrics:
+
+| LR/checkpoint | Selection | chrF++ | BLEU | token F1 | TER |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `1e-6/checkpoint-12` | 30.1318 | 42.8587 | 15.1295 | 30.6646 | 85.0230 |
+| `1e-6/checkpoint-36` | 30.0566 | 42.9153 | 15.4865 | 30.4838 | 87.5576 |
+| `1e-6/checkpoint-48` | 29.8359 | 42.7666 | 15.5218 | 30.0332 | 88.4793 |
+| `2e-6/checkpoint-12` | 29.9115 | 42.9988 | 14.6143 | 30.3467 | 88.2488 |
+| `2e-6/checkpoint-36` | 31.1999 | 44.4295 | 18.0014 | 29.9850 | 81.5668 |
+| `2e-6/checkpoint-48` | 30.6535 | 43.8315 | 15.9186 | 30.4944 | 84.1014 |
+| `2e-6/final_full_model` | 30.6535 | 43.8315 | 15.9186 | 30.4944 | 84.1014 |
+
+Decision:
+
+- `outputs/full_sft_sweeps/20260523-qwen35-4b-full-sft-lr-followups/lr_2em6_48steps/chanka/checkpoint-36` is now the best standalone 4B full-SFT checkpoint by selection, chrF++, BLEU, and TER.
+- This improves over the previous 4B full-SFT best (`30.4393` selection, chrF++ `43.3102`, BLEU `16.2178`, token F1 `30.6209`, TER `85.2535`) and over the recovered `5e-7/checkpoint-24` on selection/chrF++/BLEU/TER, though `5e-7/checkpoint-24` still had higher token F1.
+- Full fine-tuning is useful, but only as a short late-stage refinement after a strong broad Quechua -> clean Chanka LoRA curriculum is merged. Direct raw-base full SFT and JSONL-only full SFT remain negative.
+- A candidate-pool harvest is running from `2e-6/checkpoint-36`: log `outputs/logs/qwen35_4b_fft2e6ckpt36_candidate_rerank_20260523.log`, output root `outputs/qwen35_4b_full_sft_candidate_rerank/20260523-qwen35-4b-fft2e6ckpt36-candidate-rerank`.
+
+Code hygiene:
+
+- `scripts/train_sft_unsloth.py` and `scripts/train_jsonl_sft_unsloth.py` now expose `--save-total-limit`; use `--save-total-limit 0` for full-SFT sweeps when model-only checkpointing is enabled.
+- `experiments/sft/queue_qwen35_4b_full_sft_lr_sweep.sh` defaults `SAVE_TOTAL_LIMIT=0` so future full-SFT sweeps do not silently prune early checkpoints before external generation eval.
+- `experiments/sft/queue_qwen35_4b_full_sft_candidate_rerank.sh` can take `FULL_SFT_CHECKPOINT=...` to harvest candidates from a known best checkpoint directly instead of selecting from one sweep summary.

@@ -90,6 +90,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "because optimizer states can exceed model checkpoint size."
         ),
     )
+    parser.add_argument(
+        "--save-total-limit",
+        type=int,
+        default=3,
+        help="Maximum number of checkpoints to keep. Use 0 to disable checkpoint pruning.",
+    )
     parser.add_argument("--evals-per-epoch", type=int, default=8)
     parser.add_argument("--logging-steps", type=int, default=10)
     parser.add_argument("--dataset-num-proc", type=int, default=2)
@@ -372,7 +378,7 @@ def main() -> None:
             eval_steps=args.eval_steps,
             save_strategy="steps",
             save_steps=args.save_steps,
-            save_total_limit=3,
+            save_total_limit=args.save_total_limit or None,
             save_only_model=args.save_only_model,
             load_best_model_at_end=True,
             metric_for_best_model="eval_loss",
