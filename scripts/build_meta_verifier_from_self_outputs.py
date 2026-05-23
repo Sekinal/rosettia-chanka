@@ -9,6 +9,7 @@ real self-analysis failures into meta-verifier training examples.
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import sys
 from pathlib import Path
@@ -155,7 +156,19 @@ def build_records(paths: Sequence[Path], min_quality_gap: float, max_records: in
         "records": len(records),
         "missing_or_incomplete_self_verification": missing_format,
         "min_quality_gap": min_quality_gap,
+        "label_rationales": dict(
+            collections.Counter(json.loads(record["label"])["rationale"] for record in records)
+        ),
+        "label_severities": dict(
+            collections.Counter(json.loads(record["label"])["severity"] for record in records)
+        ),
     }
+    if records:
+        gaps = [float(record["diagnostics"]["self_score_gap"]) for record in records]
+        true_scores = [float(record["diagnostics"]["true_score"]) for record in records]
+        summary["avg_self_score_gap"] = sum(gaps) / len(gaps)
+        summary["max_self_score_gap"] = max(gaps)
+        summary["avg_true_score"] = sum(true_scores) / len(true_scores)
     return records, summary
 
 

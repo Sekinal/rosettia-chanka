@@ -36,6 +36,9 @@ class BuildMetaVerifierFromSelfOutputsTests(unittest.TestCase):
                 records, summary = builder.build_records([path], min_quality_gap=0.2)
 
         self.assertEqual(summary["records"], 1)
+        self.assertEqual(summary["label_rationales"]["false_confidence_self_score_too_high"], 1)
+        self.assertEqual(summary["label_severities"]["critical"], 1)
+        self.assertGreater(summary["avg_self_score_gap"], 0.2)
         label = json.loads(records[0]["label"])
         self.assertLess(label["score"], 0.25)
         self.assertEqual(label["rationale"], "false_confidence_self_score_too_high")
