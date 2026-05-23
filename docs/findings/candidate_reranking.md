@@ -462,6 +462,33 @@ Deployment shape:
   --output-jsonl predictions.jsonl
 ```
 
+## 2026-05-23 9B Eval-Only Candidate Complement
+
+Purpose: check whether Qwen3.5 9B adds useful candidate diversity before waiting for the full train candidate pool and matched selector training.
+
+Inputs:
+
+- Base eval pool: `outputs/rerank_candidate_evals/20260522-current-k32-plus-qwen35-4b-full-k16-term/candidates_predictions.jsonl`
+- 9B eval pool: `outputs/qwen35_9b_candidate_rerank/20260523-qwen35-9b-candidate-rerank/eval_qwen35_9b_k16_predictions.jsonl`
+- Merged eval-only pool: `outputs/qwen35_9b_candidate_rerank/20260523-qwen35-9b-candidate-rerank/eval_only_diagnostics/eval_current_4b_9b_k16.jsonl`
+- Records after dedupe: `5,963`, mean candidates/group `37.74`, max candidates/group `64`.
+
+Eval-only diagnostics:
+
+| Method | Selection | chrF++ | BLEU | token F1 | source copy % | leakage % | TER |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| current K32+4B listwise text | 38.9423 | 51.8586 | 26.0207 | 40.3340 | 1.9409 | 0.0000 | 67.7419 |
+| 9B-augmented transfer text | 37.6669 | 50.6379 | 24.9145 | 38.5393 | 2.2574 | 0.0000 | 68.2028 |
+| 9B-augmented MBR | 32.1510 | 46.3562 | 11.3516 | 33.3208 | 1.7827 | 0.0000 | 80.8756 |
+| current K32+4B oracle | 50.0788 | 63.5158 | 35.7333 | 54.9308 | 2.0992 | 0.0000 | 51.3825 |
+| 9B-augmented oracle | 51.6170 | 64.8936 | 37.1419 | 56.9913 | 2.0992 | 0.0000 | 48.3871 |
+
+Decision:
+
+- 9B adds real candidate diversity: oracle improves by `+1.3778` chrF++, `+1.4086` BLEU, and `-2.9954` TER over the current K32+4B pool.
+- The existing listwise text selector does not transfer to the 9B-augmented distribution; it drops below the non-9B listwise profile.
+- Wait for the 9B train pool and train a matched listwise text selector before deciding whether 9B improves deployable quality.
+
 ## 2026-05-23 Tuned MBR Consensus Selector
 
 Purpose: adapt the Kaggle Deep Past MBR idea more directly for our candidate pools: select the candidate with highest consensus against other candidates, then tune the reference-free signal weights on a train candidate pool.
