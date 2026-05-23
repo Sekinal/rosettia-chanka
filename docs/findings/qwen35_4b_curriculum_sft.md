@@ -165,6 +165,7 @@ Automation:
 - `experiments/sft/queue_qwen35_9b_candidate_rerank.sh` waits for that checkpoint-eval summary, selects the best 9B Chanka checkpoint, generates train/eval K16 candidate pools, merges them with the current K32 + 4B-full K16 pools, then trains matching feature/text/ensemble selectors.
 - The 9B candidate queue supports retrieval-augmented prompts through `FEW_SHOT_TOP_K` / `FEW_SHOT_MAX_CANDIDATES`, but defaults to no few-shot examples so the first 9B pass isolates model-scale candidate diversity.
 - `experiments/sft/queue_qwen35_9b_fewshot_candidate_rerank.sh` chains after the no-few-shot 9B rerank summary and reruns the candidate-rerank pipeline with `FEW_SHOT_TOP_K=2` by default. This gives a sequential scale-only vs retrieval-augmented comparison without concurrent GPU contention.
+- `experiments/sft/queue_qwen35_9b_full_sft_after_rerank.sh` chains after the few-shot rerank summary, merges the best 9B LoRA checkpoint to a 16-bit full model, runs a 2-step FFT smoke, then runs a 32-step Chanka full-SFT canary if memory permits. This keeps full fine-tuning behind the current scale/retrieval experiments and avoids GPU contention.
 
 Decision so far:
 

@@ -128,3 +128,20 @@ Next best SFT path:
 4. Evaluate larger full-SFT checkpoints both greedily and as candidate generators. The 4B result shows the reranked candidate pool can improve even when the single-model greedy metrics only move slightly.
 
 Details: `docs/findings/qwen35_4b_curriculum_sft.md`.
+
+## Queued 9B Merge -> Full SFT
+
+Added `experiments/sft/queue_qwen35_9b_full_sft_after_rerank.sh`.
+
+Purpose: test whether the same merge -> full-SFT refinement that slightly helped the 4B model is useful after the 9B broad -> clean Chanka LoRA curriculum.
+
+Design:
+
+- Wait for the 9B checkpoint eval summary and the few-shot 9B rerank summary so this does not compete with active GPU candidate-generation jobs.
+- Select the best 9B Chanka LoRA checkpoint by held-out external `selection_score`.
+- Merge the selected LoRA to a 16-bit full model using `scripts/export_unsloth_merged_model.py`.
+- Run a tiny full-SFT memory smoke before spending GPU on the real canary. If 9B full fine-tuning does not fit on the L40S, the script writes `full_sft_smoke_failed.txt` and exits cleanly.
+- If the smoke passes, run a 32-step Chanka full-SFT canary at LR `5e-7`, with validation/checkpointing every 8 steps.
+- Evaluate every full-SFT checkpoint and `final_full_model` with terminology top-1 prompting.
+
+Caveat: 9B FFT may be memory-bound on the current L40S despite Unsloth support. If it fails here, keep the recipe for the larger RTX PRO 6000 and do not treat the failure as evidence against full fine-tuning itself.
