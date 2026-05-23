@@ -104,6 +104,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--per-device-train-batch-size", type=int, default=2)
     parser.add_argument("--per-device-eval-batch-size", type=int, default=4)
     parser.add_argument("--gradient-accumulation-steps", type=int, default=2)
+    parser.add_argument(
+        "--attach-lora",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Attach a fresh LoRA adapter after loading the model. Useful for RL from a merged/full checkpoint.",
+    )
+    parser.add_argument("--lora-r", type=int, default=32)
+    parser.add_argument("--lora-alpha", type=int, default=64)
+    parser.add_argument("--lora-dropout", type=float, default=0.0)
     parser.add_argument("--num-generations", type=int, default=4)
     parser.add_argument("--temperature", type=float, default=0.7)
     parser.add_argument("--top-p", type=float, default=0.9)
@@ -115,6 +124,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--scale-rewards", choices=["group", "batch", "none"], default="group")
     parser.add_argument("--eval-steps", type=int, default=None)
     parser.add_argument("--save-steps", type=int, default=None)
+    parser.add_argument("--save-total-limit", type=int, default=3)
     parser.add_argument("--evals-per-epoch", type=int, default=8)
     parser.add_argument("--logging-steps", type=int, default=5)
     parser.add_argument("--log-completions", action=argparse.BooleanOptionalAction, default=True)
@@ -1164,6 +1174,28 @@ def main() -> None:
         load_in_16bit=True,
         full_finetuning=False,
     )
+    if args.attach_lora:
+        if hasattr(model, "peft_config"):
+            raise ValueError("--attach-lora expects a base/full model, but the loaded model already has PEFT config")
+        model = FastLanguageModel.get_peft_model(
+            model,
+            r=args.lora_r,
+            target_modules=[
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+                "gate_proj",
+                "up_proj",
+                "down_proj",
+            ],
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            bias="none",
+            use_gradient_checkpointing="unsloth",
+            random_state=args.seed,
+            max_seq_length=args.max_seq_length,
+        )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model.generation_config.eos_token_id = tokenizer.eos_token_id
@@ -1181,6 +1213,8 @@ def main() -> None:
         print(f"Terminology-matched train rows: {train_term_rows:,}")
         print(f"Terminology-matched validation rows: {eval_term_rows:,}")
     print(f"Model or adapter: {model_name_or_adapter}")
+    if args.attach_lora:
+        print(f"Attached fresh LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")
     print('GSPO mode: GRPO with importance_sampling_level=\"sequence\"')
     print(f"Reward profile: {args.reward_profile}")
     print(f"Validation: every {args.eval_steps} steps")
@@ -1216,7 +1250,7 @@ def main() -> None:
             eval_steps=args.eval_steps,
             save_strategy="steps",
             save_steps=args.save_steps,
-            save_total_limit=3,
+            save_total_limit=args.save_total_limit or None,
             beta=args.beta,
             epsilon=args.epsilon,
             num_generations=args.num_generations,

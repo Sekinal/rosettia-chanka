@@ -264,3 +264,9 @@ Code hygiene:
 - `scripts/train_sft_unsloth.py` and `scripts/train_jsonl_sft_unsloth.py` now expose `--save-total-limit`; use `--save-total-limit 0` for full-SFT sweeps when model-only checkpointing is enabled.
 - `experiments/sft/queue_qwen35_4b_full_sft_lr_sweep.sh` defaults `SAVE_TOTAL_LIMIT=0` so future full-SFT sweeps do not silently prune early checkpoints before external generation eval.
 - `experiments/sft/queue_qwen35_4b_full_sft_candidate_rerank.sh` can take `FULL_SFT_CHECKPOINT=...` to harvest candidates from a known best checkpoint directly instead of selecting from one sweep summary.
+
+GSPO follow-up:
+
+- `scripts/train_gspo_chanka_unsloth.py` now supports `--attach-lora`, `--lora-r`, `--lora-alpha`, and `--lora-dropout`. This is intended for RL from a merged/full checkpoint without full-parameter RL.
+- `experiments/gspo/queue_qwen35_4b_full_sft_gspo_canary.sh` queues a small LoRA-on-full-checkpoint GSPO canary from `2e-6/checkpoint-36`, using the current learned-verifier-vibe reward profile and terminology top-1 prompts.
+- Remote queued log: `outputs/logs/qwen35_4b_fft2e6ckpt36_lora_gspo_20260523.log`. It waits for the active K16 candidate-rerank job before using the GPU.
