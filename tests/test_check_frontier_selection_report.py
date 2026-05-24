@@ -14,6 +14,7 @@ class CheckFrontierSelectionReportTests(unittest.TestCase):
             "selected_rows": 128,
             "distinct_expected_primitives": 5,
             "avg_expected_primitives_per_row": 3.0,
+            "estimated_max_frontier_requests": 128,
             "expected_primitive_counts": {
                 "[SIGNIFICADO]": 128,
                 "[GRAMATICA]": 128,
@@ -39,6 +40,7 @@ class CheckFrontierSelectionReportTests(unittest.TestCase):
             "selected_rows": 12,
             "distinct_expected_primitives": 3,
             "avg_expected_primitives_per_row": 1.5,
+            "estimated_max_frontier_requests": 24,
             "expected_primitive_counts": {
                 "[SIGNIFICADO]": 12,
                 "[GRAMATICA]": 12,
@@ -59,6 +61,32 @@ class CheckFrontierSelectionReportTests(unittest.TestCase):
         self.assertIn("expected_primitive_counts[[ENTIDADES]] 0 < 1", reasons)
         self.assertIn("expected_primitive_counts[[TERMINOLOGIA]] 0 < 1", reasons)
 
+    def test_gate_can_cap_estimated_frontier_requests(self):
+        report = {
+            "selected_rows": 64,
+            "distinct_expected_primitives": 5,
+            "avg_expected_primitives_per_row": 3.0,
+            "estimated_max_frontier_requests": 128,
+            "expected_primitive_counts": {
+                "[SIGNIFICADO]": 64,
+                "[GRAMATICA]": 64,
+                "[ENTIDADES]": 5,
+                "[TERMINOLOGIA]": 5,
+                "[ANTI_COPIA]": 54,
+            },
+        }
+
+        _, passed, reasons = checker.gate_selection(
+            report,
+            min_selected_rows=64,
+            min_distinct_expected_primitives=5,
+            min_avg_expected_primitives=2.5,
+            max_estimated_frontier_requests=100,
+        )
+
+        self.assertFalse(passed)
+        self.assertIn("estimated_max_frontier_requests 128 > 100", reasons)
+
     def test_main_writes_gate_report(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -70,6 +98,7 @@ class CheckFrontierSelectionReportTests(unittest.TestCase):
                         "selected_rows": 2,
                         "distinct_expected_primitives": 2,
                         "avg_expected_primitives_per_row": 3.0,
+                        "estimated_max_frontier_requests": 2,
                         "expected_primitive_counts": {
                             "[SIGNIFICADO]": 2,
                             "[GRAMATICA]": 2,

@@ -24,6 +24,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--min-distinct-expected-primitives", type=int, default=5)
     parser.add_argument("--min-avg-expected-primitives", type=float, default=2.0)
     parser.add_argument(
+        "--max-estimated-frontier-requests",
+        type=int,
+        default=0,
+        help="Fail if estimated_max_frontier_requests is greater than this value. Disabled at 0.",
+    )
+    parser.add_argument(
         "--required-primitive",
         action="append",
         default=[],
@@ -44,11 +50,13 @@ def gate_selection(
     min_avg_expected_primitives: float,
     required_primitives: Sequence[str] | None = None,
     min_count_per_required_primitive: int = 1,
+    max_estimated_frontier_requests: int = 0,
 ) -> tuple[dict[str, Any], bool, list[str]]:
     counts = dict(report.get("expected_primitive_counts") or {})
     selected_rows = int(report.get("selected_rows", 0))
     distinct = int(report.get("distinct_expected_primitives", 0))
     avg = float(report.get("avg_expected_primitives_per_row", 0.0))
+    estimated_requests = int(report.get("estimated_max_frontier_requests", selected_rows))
     required = list(required_primitives or PRIMITIVES)
 
     metrics = {
@@ -61,6 +69,8 @@ def gate_selection(
         "min_distinct_expected_primitives": min_distinct_expected_primitives,
         "min_avg_expected_primitives": min_avg_expected_primitives,
         "min_count_per_required_primitive": min_count_per_required_primitive,
+        "estimated_max_frontier_requests": estimated_requests,
+        "max_estimated_frontier_requests": max_estimated_frontier_requests,
     }
     reasons: list[str] = []
     if selected_rows < min_selected_rows:
@@ -73,6 +83,8 @@ def gate_selection(
         count = int(counts.get(tag, 0))
         if count < min_count_per_required_primitive:
             reasons.append(f"expected_primitive_counts[{tag}] {count} < {min_count_per_required_primitive}")
+    if max_estimated_frontier_requests > 0 and estimated_requests > max_estimated_frontier_requests:
+        reasons.append(f"estimated_max_frontier_requests {estimated_requests} > {max_estimated_frontier_requests}")
     return metrics, not reasons, reasons
 
 
@@ -86,6 +98,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.min_avg_expected_primitives,
         required,
         args.min_count_per_required_primitive,
+        args.max_estimated_frontier_requests,
     )
     payload = {
         **metrics,

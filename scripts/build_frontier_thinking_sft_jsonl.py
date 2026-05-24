@@ -602,6 +602,44 @@ def failure_record(index: int, row: dict[str, str], reason: str, **extra: Any) -
     }
 
 
+def selected_row_resume_accounting(
+    rows: Sequence[dict[str, str]],
+    output_jsonl: Path,
+    failures_jsonl: Path,
+    resume: bool,
+    retry_failures: bool,
+    audit: bool,
+    max_retries: int,
+) -> dict[str, Any]:
+    selected_keys = [row_key(row["source"], row["target"]) for row in rows]
+    if not resume:
+        accepted_keys: set[str] = set()
+        failed_keys: set[str] = set()
+    else:
+        accepted_keys = existing_keys(output_jsonl)
+        failed_keys = set() if retry_failures else existing_keys(failures_jsonl)
+    completed = accepted_keys.union(failed_keys)
+    selected_accepted = sum(1 for key in selected_keys if key in accepted_keys)
+    selected_failed = sum(1 for key in selected_keys if key in failed_keys)
+    pending = sum(1 for key in selected_keys if key not in completed)
+    generation_requests = pending
+    max_audit_requests = pending if audit else 0
+    max_frontier_requests = generation_requests + max_audit_requests
+    return {
+        "resume": resume,
+        "retry_failures": retry_failures,
+        "existing_accepted_rows": len(accepted_keys),
+        "existing_failed_rows": len(failed_keys),
+        "selected_existing_accepted_rows": selected_accepted,
+        "selected_existing_failed_rows": selected_failed,
+        "pending_rows": pending,
+        "estimated_generation_requests": generation_requests,
+        "estimated_max_audit_requests": max_audit_requests,
+        "estimated_max_frontier_requests": max_frontier_requests,
+        "estimated_max_http_attempts": max_frontier_requests * max(1, max_retries),
+    }
+
+
 def selection_report(
     rows: Sequence[dict[str, str]],
     args: argparse.Namespace,
@@ -609,6 +647,16 @@ def selection_report(
 ) -> dict[str, Any]:
     raw_rows = list(input_rows) if input_rows is not None else load_rows(args)
     _, duplicate_input_rows = dedupe_rows(raw_rows)
+    failures_path = args.failures_jsonl or args.output_jsonl.with_suffix(".failures.jsonl")
+    resume_accounting = selected_row_resume_accounting(
+        rows,
+        args.output_jsonl,
+        failures_path,
+        args.resume,
+        args.retry_failures,
+        args.audit,
+        args.max_retries,
+    )
     primitive_counts = {tag: 0 for tag in PRIMITIVES}
     row_tag_counts: list[int] = []
     samples: list[dict[str, Any]] = []
@@ -640,6 +688,7 @@ def selection_report(
         "expected_primitive_counts": primitive_counts,
         "distinct_expected_primitives": distinct,
         "avg_expected_primitives_per_row": sum(row_tag_counts) / max(1, len(row_tag_counts)),
+        **resume_accounting,
         "samples": samples,
     }
 
@@ -656,6 +705,8 @@ def write_selection_report(report: dict[str, Any], json_path: Path | None, md_pa
             f"- input rows: {report['input_rows']}",
             f"- duplicate input rows skipped: {report['duplicate_input_rows']}",
             f"- selected rows: {report['selected_rows']}",
+            f"- pending rows: {report['pending_rows']}",
+            f"- estimated max frontier requests: {report['estimated_max_frontier_requests']}",
             f"- stratify primitives: {report['stratify_primitives']}",
             f"- distinct expected primitives: {report['distinct_expected_primitives']}",
             f"- avg expected primitives per row: {report['avg_expected_primitives_per_row']:.4f}",

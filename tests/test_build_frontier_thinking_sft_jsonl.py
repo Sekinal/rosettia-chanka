@@ -175,20 +175,75 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         self.assertEqual(selected, builder.select_rows(rows, offset=0, max_rows=2, seed=1, stratify_primitives=False))
 
     def test_selection_report_summarizes_expected_primitive_curriculum(self):
-        rows = [
-            {"source": "Hola.", "target": "Rimaykullayki."},
-            {"source": "Hay 3 documentos.", "target": "Kimsa qillqakuna kan."},
-        ]
-        args = builder.parse_args(["--output-jsonl", "out.jsonl", "--max-rows", "2"])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rows = [
+                {"source": "Hola.", "target": "Rimaykullayki."},
+                {"source": "Hay 3 documentos.", "target": "Kimsa qillqakuna kan."},
+            ]
+            args = builder.parse_args(["--output-jsonl", str(Path(tmpdir) / "out.jsonl"), "--max-rows", "2"])
 
-        payload = builder.selection_report(rows, args, input_rows=rows + [rows[0]])
+            payload = builder.selection_report(rows, args, input_rows=rows + [rows[0]])
 
         self.assertEqual(payload["selected_rows"], 2)
         self.assertEqual(payload["input_rows"], 3)
         self.assertEqual(payload["duplicate_input_rows"], 1)
+        self.assertEqual(payload["pending_rows"], 2)
+        self.assertEqual(payload["estimated_generation_requests"], 2)
         self.assertGreaterEqual(payload["expected_primitive_counts"]["[SIGNIFICADO]"], 2)
         self.assertGreaterEqual(payload["expected_primitive_counts"]["[ENTIDADES]"], 1)
         self.assertEqual(len(payload["samples"]), 2)
+
+    def test_selection_report_counts_resume_pending_requests(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            output = tmp / "out.jsonl"
+            failures = tmp / "failures.jsonl"
+            rows = [
+                {"source": "Hola.", "target": "Rimaykullayki."},
+                {"source": "Hay 3 documentos.", "target": "Kimsa qillqakuna kan."},
+                {"source": "Gracias.", "target": "Anay."},
+            ]
+            output.write_text(
+                json.dumps(
+                    {
+                        "row_key": builder.row_key("Hola.", "Rimaykullayki."),
+                        "source": "Hola.",
+                        "reference": "Rimaykullayki.",
+                    }
+                )
+                + "\n"
+            )
+            failures.write_text(
+                json.dumps(
+                    {
+                        "row_key": builder.row_key("Gracias.", "Anay."),
+                        "source": "Gracias.",
+                        "reference": "Anay.",
+                    }
+                )
+                + "\n"
+            )
+            args = builder.parse_args(
+                [
+                    "--output-jsonl",
+                    str(output),
+                    "--failures-jsonl",
+                    str(failures),
+                    "--audit",
+                    "--max-retries",
+                    "4",
+                ]
+            )
+
+            payload = builder.selection_report(rows, args, input_rows=rows)
+
+        self.assertEqual(payload["selected_existing_accepted_rows"], 1)
+        self.assertEqual(payload["selected_existing_failed_rows"], 1)
+        self.assertEqual(payload["pending_rows"], 1)
+        self.assertEqual(payload["estimated_generation_requests"], 1)
+        self.assertEqual(payload["estimated_max_audit_requests"], 1)
+        self.assertEqual(payload["estimated_max_frontier_requests"], 2)
+        self.assertEqual(payload["estimated_max_http_attempts"], 8)
 
     def test_selection_only_writes_reports_without_api_key(self):
         with tempfile.TemporaryDirectory() as tmpdir:

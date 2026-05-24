@@ -438,6 +438,8 @@ Default gate values require enough rows for SFT, all five expected primitive fam
 
 The builder also dedupes exact source/reference pairs after the seeded shuffle and before primitive-balanced row selection. The selection report records `input_rows` and `duplicate_input_rows`, so repeated augmented examples do not waste DeepSeek calls or make the primitive curriculum look more diverse than it is.
 
+The selection report is resume-aware too. It records already accepted rows, already failed rows, pending rows, and estimated frontier requests. With audit enabled, `estimated_max_frontier_requests` is at most `pending_rows * 2`, because each accepted generation can trigger a second audit call. The selection gate can enforce a hard cap through `--max-estimated-frontier-requests`; the chain exposes this as `MAX_FRONTIER_SELECTION_REQUESTS` and leaves it disabled by default (`0`). Use it for small paid smokes or when resuming partial frontier batches.
+
 This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
 
 For a faster smoke:

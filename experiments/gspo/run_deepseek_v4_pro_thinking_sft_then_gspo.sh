@@ -54,6 +54,7 @@ MIN_FRONTIER_SELECTION_ROWS="${MIN_FRONTIER_SELECTION_ROWS:-$MIN_FRONTIER_ROWS_F
 MIN_FRONTIER_SELECTION_DISTINCT_PRIMITIVES="${MIN_FRONTIER_SELECTION_DISTINCT_PRIMITIVES:-5}"
 MIN_FRONTIER_SELECTION_AVG_PRIMITIVES="${MIN_FRONTIER_SELECTION_AVG_PRIMITIVES:-2.5}"
 MIN_FRONTIER_SELECTION_COUNT_PER_REQUIRED="${MIN_FRONTIER_SELECTION_COUNT_PER_REQUIRED:-1}"
+MAX_FRONTIER_SELECTION_REQUESTS="${MAX_FRONTIER_SELECTION_REQUESTS:-0}"
 RUN_PREFLIGHT="${RUN_PREFLIGHT:-true}"
 PREFLIGHT_REQUIRE_API_KEY="${PREFLIGHT_REQUIRE_API_KEY:-true}"
 PREFLIGHT_MIN_FREE_GB="${PREFLIGHT_MIN_FREE_GB:-20}"
@@ -74,16 +75,29 @@ if is_falsey "${FRONTIER_STRATIFY_PRIMITIVES:-true}"; then
 fi
 
 if is_truthy "${RUN_FRONTIER_SELECTION_REPORT:-true}"; then
+  FRONTIER_SELECTION_ARGS=()
+  if is_truthy "${FRONTIER_AUDIT:-true}"; then
+    FRONTIER_SELECTION_ARGS+=(--audit)
+  fi
+  if is_falsey "${FRONTIER_RESUME:-true}"; then
+    FRONTIER_SELECTION_ARGS+=(--no-resume)
+  fi
+  if is_truthy "${FRONTIER_RETRY_FAILURES:-false}"; then
+    FRONTIER_SELECTION_ARGS+=(--retry-failures)
+  fi
   "$PYTHON" scripts/build_frontier_thinking_sft_jsonl.py \
     --output-jsonl "$FRONTIER_JSONL" \
+    --failures-jsonl "$FRONTIER_FAILURES_JSONL" \
     --selection-report-json "$FRONTIER_SELECTION_REPORT_JSON" \
     --selection-report-md "$FRONTIER_SELECTION_REPORT_MD" \
     --api-key-env "${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}" \
     --model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
     --max-rows "${FRONTIER_MAX_ROWS:-128}" \
     --offset "${FRONTIER_OFFSET:-0}" \
+    --max-retries "${FRONTIER_MAX_RETRIES:-3}" \
     --selection-only \
-    "${FRONTIER_STRATIFY_ARGS[@]}"
+    "${FRONTIER_STRATIFY_ARGS[@]}" \
+    "${FRONTIER_SELECTION_ARGS[@]}"
 
   if is_truthy "$RUN_FRONTIER_SELECTION_GATE"; then
     "$PYTHON" scripts/check_frontier_selection_report.py \
@@ -92,7 +106,8 @@ if is_truthy "${RUN_FRONTIER_SELECTION_REPORT:-true}"; then
       --min-selected-rows "$MIN_FRONTIER_SELECTION_ROWS" \
       --min-distinct-expected-primitives "$MIN_FRONTIER_SELECTION_DISTINCT_PRIMITIVES" \
       --min-avg-expected-primitives "$MIN_FRONTIER_SELECTION_AVG_PRIMITIVES" \
-      --min-count-per-required-primitive "$MIN_FRONTIER_SELECTION_COUNT_PER_REQUIRED"
+      --min-count-per-required-primitive "$MIN_FRONTIER_SELECTION_COUNT_PER_REQUIRED" \
+      --max-estimated-frontier-requests "$MAX_FRONTIER_SELECTION_REQUESTS"
   fi
 fi
 
