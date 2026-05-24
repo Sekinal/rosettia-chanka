@@ -227,6 +227,8 @@ python scripts/build_frontier_thinking_sft_jsonl.py \
 
 The audit pass returns `pass`, `score`, and `reason`, and rejects rows below `--audit-min-score`. This matters because the deterministic seed showed that primitive tags alone are not enough: the trace must make reliable, translation-grounded checks.
 
+The main DeepSeek V4 Pro chain now runs `scripts/preflight_deepseekmath_language_loop.py` before the first API call. It writes `${DATA_DIR}/preflight_report.json` and checks API key presence, base adapter existence, required scripts, and free disk. The report records only `api_key_set`, never the secret value. Set `RUN_PREFLIGHT=false` only for debugging the shell wrapper itself.
+
 The builder writes incrementally now: accepted rows are appended directly to the output JSONL, rejected/error rows go to a failures JSONL, and `--resume` is enabled by default. This is important for API work because a timeout halfway through should not waste already-paid frontier calls. Use `--retry-failures` only after changing the prompt/model or when the failures were transient API errors.
 
 Before SFT, `scripts/check_frontier_thinking_data.py` now gates on accepted-row count, accept rate, and primitive coverage. The chain defaults to `MIN_FRONTIER_ROWS_FOR_SFT=64`, `MIN_FRONTIER_ACCEPT_RATE=0.50`, `MIN_FRONTIER_PRIMITIVE_TAGS_PER_ROW=2`, `MIN_FRONTIER_PRIMITIVE_ROW_RATE=0.90`, and `MIN_FRONTIER_DISTINCT_PRIMITIVES=4`; lower those only for smoke tests. This prevents training the student on a tiny, mostly rejected, or one-note frontier batch, which would make the next RL result uninterpretable.

@@ -10,6 +10,7 @@ DATA_DIR="${DATA_DIR:-outputs/frontier_thinking_data_${STAMP}}"
 FRONTIER_JSONL="${FRONTIER_JSONL:-${DATA_DIR}/deepseek_v4_pro_thinking_sft.jsonl}"
 FRONTIER_FAILURES_JSONL="${FRONTIER_FAILURES_JSONL:-${DATA_DIR}/deepseek_v4_pro_thinking_failures.jsonl}"
 FRONTIER_SUMMARY_JSON="${FRONTIER_SUMMARY_JSON:-${DATA_DIR}/deepseek_v4_pro_thinking_sft.summary.json}"
+PREFLIGHT_REPORT_JSON="${PREFLIGHT_REPORT_JSON:-${DATA_DIR}/preflight_report.json}"
 THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/deepseek_v4_pro_thinking_sft_${STAMP}}"
 THINKING_SFT_ADAPTER="${THINKING_SFT_ADAPTER:-${THINKING_SFT_OUTPUT_DIR}/final_lora}"
 GSPO_OUTPUT_DIR="${GSPO_OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_deepseek_seeded_${STAMP}}"
@@ -37,6 +38,9 @@ MIN_FRONTIER_ACCEPT_RATE="${MIN_FRONTIER_ACCEPT_RATE:-0.50}"
 MIN_FRONTIER_PRIMITIVE_TAGS_PER_ROW="${MIN_FRONTIER_PRIMITIVE_TAGS_PER_ROW:-2}"
 MIN_FRONTIER_PRIMITIVE_ROW_RATE="${MIN_FRONTIER_PRIMITIVE_ROW_RATE:-0.90}"
 MIN_FRONTIER_DISTINCT_PRIMITIVES="${MIN_FRONTIER_DISTINCT_PRIMITIVES:-4}"
+RUN_PREFLIGHT="${RUN_PREFLIGHT:-true}"
+PREFLIGHT_REQUIRE_API_KEY="${PREFLIGHT_REQUIRE_API_KEY:-true}"
+PREFLIGHT_MIN_FREE_GB="${PREFLIGHT_MIN_FREE_GB:-20}"
 
 cd "$ROOT_DIR"
 
@@ -47,6 +51,20 @@ is_truthy() {
 is_falsey() {
   [[ "$1" == "false" || "$1" == "0" || "$1" == "no" ]]
 }
+
+if is_truthy "$RUN_PREFLIGHT"; then
+  PREFLIGHT_ARGS=()
+  if is_falsey "$PREFLIGHT_REQUIRE_API_KEY"; then
+    PREFLIGHT_ARGS+=(--no-require-api-key)
+  fi
+  "$PYTHON" scripts/preflight_deepseekmath_language_loop.py \
+    --base-adapter "$BASE_ADAPTER" \
+    --output-root outputs \
+    --report-json "$PREFLIGHT_REPORT_JSON" \
+    --api-key-env "${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}" \
+    --min-free-gb "$PREFLIGHT_MIN_FREE_GB" \
+    "${PREFLIGHT_ARGS[@]}"
+fi
 
 if [[ -z "${META_VERIFIER_ADAPTER:-}" ]]; then
   META_VERIFIER_V3="outputs/chanka_translation_meta_verifier_v3_thinking_20260523-meta-v3-thinking/final_meta_verifier_lora"
@@ -79,6 +97,7 @@ fi
   --output-jsonl "$FRONTIER_JSONL" \
   --failures-jsonl "$FRONTIER_FAILURES_JSONL" \
   --summary-json "$FRONTIER_SUMMARY_JSON" \
+  --api-key-env "${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}" \
   --model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
   --reasoning-effort "${FRONTIER_REASONING_EFFORT:-max}" \
   --max-rows "${FRONTIER_MAX_ROWS:-128}" \
