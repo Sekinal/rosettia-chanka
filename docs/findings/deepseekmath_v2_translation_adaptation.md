@@ -292,6 +292,14 @@ This wrapper trains the next meta-verifier and immediately runs the follow-up GS
 
 The wrapper also writes `cycle_manifest.json` in the follow-up output directory. That manifest records the base policy, refreshed meta-verifier adapter, promotion gate, final metrics, input hardcase counts, and newly mined hardcase counts. Treat this manifest as the audit record for the iteration; shell logs are secondary.
 
+To compare several iterations:
+
+```bash
+python scripts/summarize_deepseekmath_cycles.py outputs/gspo_paper_profiles
+```
+
+This writes `cycle_summary.jsonl` and `cycle_summary.md`, ranking promoted cycles before failed cycles and including calibration plus hardcase counts. Failed cycles should be read as data-mining events unless the promotion gate passes.
+
 ## SFT-Seeded GSPO Negative Result
 
 The deterministic primitive-thinking SFT seed did not fix the RL collapse:
