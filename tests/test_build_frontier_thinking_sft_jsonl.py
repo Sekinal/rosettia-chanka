@@ -162,6 +162,53 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
 
         self.assertEqual(selected, builder.select_rows(rows, offset=0, max_rows=2, seed=1, stratify_primitives=False))
 
+    def test_selection_report_summarizes_expected_primitive_curriculum(self):
+        rows = [
+            {"source": "Hola.", "target": "Rimaykullayki."},
+            {"source": "Hay 3 documentos.", "target": "Kimsa qillqakuna kan."},
+        ]
+        args = builder.parse_args(["--output-jsonl", "out.jsonl", "--max-rows", "2"])
+
+        payload = builder.selection_report(rows, args)
+
+        self.assertEqual(payload["selected_rows"], 2)
+        self.assertGreaterEqual(payload["expected_primitive_counts"]["[SIGNIFICADO]"], 2)
+        self.assertGreaterEqual(payload["expected_primitive_counts"]["[ENTIDADES]"], 1)
+        self.assertEqual(len(payload["samples"]), 2)
+
+    def test_selection_only_writes_reports_without_api_key(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            source_jsonl = tmp / "rows.jsonl"
+            report_json = tmp / "selection.json"
+            report_md = tmp / "selection.md"
+            source_jsonl.write_text(
+                '{"source":"Hola.","reference":"Rimaykullayki."}\n'
+                '{"source":"Hay 3 documentos.","reference":"Kimsa qillqakuna kan."}\n'
+            )
+
+            with mock.patch.dict("os.environ", {}, clear=True):
+                builder.main_from_args(
+                    [
+                        "--source-jsonl",
+                        str(source_jsonl),
+                        "--output-jsonl",
+                        str(tmp / "out.jsonl"),
+                        "--selection-report-json",
+                        str(report_json),
+                        "--selection-report-md",
+                        str(report_md),
+                        "--selection-only",
+                    ]
+                )
+
+            payload = json.loads(report_json.read_text())
+            markdown = report_md.read_text()
+
+        self.assertEqual(payload["selected_rows"], 2)
+        self.assertIn("[ENTIDADES]", payload["expected_primitive_counts"])
+        self.assertIn("Frontier Source Selection Report", markdown)
+
     def test_parse_and_gate_audit_json(self):
         audit = builder.parse_audit_json('{"pass": true, "score": 0.82, "reason": "concise"}')
 

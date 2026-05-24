@@ -12,6 +12,8 @@ FRONTIER_FAILURES_JSONL="${FRONTIER_FAILURES_JSONL:-${DATA_DIR}/deepseek_v4_pro_
 FRONTIER_SUMMARY_JSON="${FRONTIER_SUMMARY_JSON:-${DATA_DIR}/deepseek_v4_pro_thinking_sft.summary.json}"
 FRONTIER_REPORT_JSON="${FRONTIER_REPORT_JSON:-${DATA_DIR}/deepseek_v4_pro_thinking_report.json}"
 FRONTIER_REPORT_MD="${FRONTIER_REPORT_MD:-${DATA_DIR}/deepseek_v4_pro_thinking_report.md}"
+FRONTIER_SELECTION_REPORT_JSON="${FRONTIER_SELECTION_REPORT_JSON:-${DATA_DIR}/deepseek_v4_pro_source_selection_report.json}"
+FRONTIER_SELECTION_REPORT_MD="${FRONTIER_SELECTION_REPORT_MD:-${DATA_DIR}/deepseek_v4_pro_source_selection_report.md}"
 PREFLIGHT_REPORT_JSON="${PREFLIGHT_REPORT_JSON:-${DATA_DIR}/preflight_report.json}"
 THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/deepseek_v4_pro_thinking_sft_${STAMP}}"
 THINKING_SFT_ADAPTER="${THINKING_SFT_ADAPTER:-${THINKING_SFT_OUTPUT_DIR}/final_lora}"
@@ -60,6 +62,24 @@ is_falsey() {
   [[ "$1" == "false" || "$1" == "0" || "$1" == "no" ]]
 }
 
+FRONTIER_STRATIFY_ARGS=()
+if is_falsey "${FRONTIER_STRATIFY_PRIMITIVES:-true}"; then
+  FRONTIER_STRATIFY_ARGS+=(--no-stratify-primitives)
+fi
+
+if is_truthy "${RUN_FRONTIER_SELECTION_REPORT:-true}"; then
+  "$PYTHON" scripts/build_frontier_thinking_sft_jsonl.py \
+    --output-jsonl "$FRONTIER_JSONL" \
+    --selection-report-json "$FRONTIER_SELECTION_REPORT_JSON" \
+    --selection-report-md "$FRONTIER_SELECTION_REPORT_MD" \
+    --api-key-env "${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}" \
+    --model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
+    --max-rows "${FRONTIER_MAX_ROWS:-128}" \
+    --offset "${FRONTIER_OFFSET:-0}" \
+    --selection-only \
+    "${FRONTIER_STRATIFY_ARGS[@]}"
+fi
+
 if is_truthy "$RUN_PREFLIGHT"; then
   PREFLIGHT_ARGS=()
   if is_falsey "$PREFLIGHT_REQUIRE_API_KEY"; then
@@ -100,14 +120,14 @@ fi
 if is_truthy "${FRONTIER_RETRY_FAILURES:-false}"; then
   FRONTIER_ARGS+=(--retry-failures)
 fi
-if is_falsey "${FRONTIER_STRATIFY_PRIMITIVES:-true}"; then
-  FRONTIER_ARGS+=(--no-stratify-primitives)
-fi
+FRONTIER_ARGS+=("${FRONTIER_STRATIFY_ARGS[@]}")
 
 "$PYTHON" scripts/build_frontier_thinking_sft_jsonl.py \
   --output-jsonl "$FRONTIER_JSONL" \
   --failures-jsonl "$FRONTIER_FAILURES_JSONL" \
   --summary-json "$FRONTIER_SUMMARY_JSON" \
+  --selection-report-json "$FRONTIER_SELECTION_REPORT_JSON" \
+  --selection-report-md "$FRONTIER_SELECTION_REPORT_MD" \
   --api-key-env "${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}" \
   --model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
   --reasoning-effort "${FRONTIER_REASONING_EFFORT:-max}" \

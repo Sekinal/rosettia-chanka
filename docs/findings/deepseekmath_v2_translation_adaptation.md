@@ -419,6 +419,15 @@ The builder passes those expected tags in the DeepSeek prompt and rejects rows t
 
 The same builder also stratifies the selected source rows by expected primitives before any API call. After the seeded shuffle, `--stratify-primitives` greedily chooses rows that cover currently underrepresented tags, which gives small DeepSeek batches a better chance of including entity, terminology, grammar, meaning, and anti-copy cases. The chain leaves this on by default and exposes `FRONTIER_STRATIFY_PRIMITIVES=false` only for exact random-slice debugging.
 
+The chain writes a pre-API source-selection report before preflight and before any DeepSeek request:
+
+```text
+${DATA_DIR}/deepseek_v4_pro_source_selection_report.json
+${DATA_DIR}/deepseek_v4_pro_source_selection_report.md
+```
+
+This is produced through the builder's `--selection-only` mode, so it still works when `DEEPSEEK_API_KEY` is absent. Use it to inspect selected Spanish/Chanka rows and expected primitive counts before approving a paid frontier generation run.
+
 This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
 
 For a faster smoke:

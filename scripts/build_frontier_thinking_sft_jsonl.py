@@ -43,6 +43,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-jsonl", type=Path, required=True)
     parser.add_argument("--failures-jsonl", type=Path, default=None)
     parser.add_argument("--summary-json", type=Path, default=None)
+    parser.add_argument("--selection-report-json", type=Path, default=None)
+    parser.add_argument("--selection-report-md", type=Path, default=None)
     parser.add_argument("--api-key-env", default="DEEPSEEK_API_KEY")
     parser.add_argument("--base-url", default="https://api.deepseek.com")
     parser.add_argument("--model", default="deepseek-v4-pro")
@@ -101,6 +103,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="Print the first prompt payload shape without calling the API.",
+    )
+    parser.add_argument(
+        "--selection-only",
+        action="store_true",
+        help="Write the selected source-row report and exit without requiring an API key.",
     )
     return parser.parse_args(argv)
 
@@ -580,9 +587,74 @@ def failure_record(index: int, row: dict[str, str], reason: str, **extra: Any) -
     }
 
 
+def selection_report(rows: Sequence[dict[str, str]], args: argparse.Namespace) -> dict[str, Any]:
+    primitive_counts = {tag: 0 for tag in PRIMITIVES}
+    row_tag_counts: list[int] = []
+    samples: list[dict[str, Any]] = []
+    for row in rows:
+        expected = expected_primitives_for_row(row["source"], row["target"])
+        row_tag_counts.append(len(expected))
+        for tag in expected:
+            primitive_counts[tag] += 1
+        if len(samples) < 10:
+            samples.append(
+                {
+                    "source": row["source"],
+                    "reference": row["target"],
+                    "expected_primitives": expected,
+                    "source_name": row.get("source_name"),
+                    "variant": row.get("variant"),
+                }
+            )
+    distinct = sum(1 for count in primitive_counts.values() if count > 0)
+    return {
+        "model": args.model,
+        "selected_rows": len(rows),
+        "max_rows": args.max_rows,
+        "offset": args.offset,
+        "seed": args.seed,
+        "stratify_primitives": args.stratify_primitives,
+        "expected_primitive_counts": primitive_counts,
+        "distinct_expected_primitives": distinct,
+        "avg_expected_primitives_per_row": sum(row_tag_counts) / max(1, len(row_tag_counts)),
+        "samples": samples,
+    }
+
+
+def write_selection_report(report: dict[str, Any], json_path: Path | None, md_path: Path | None) -> None:
+    if json_path is not None:
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
+    if md_path is not None:
+        md_path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [
+            "# Frontier Source Selection Report",
+            "",
+            f"- selected rows: {report['selected_rows']}",
+            f"- stratify primitives: {report['stratify_primitives']}",
+            f"- distinct expected primitives: {report['distinct_expected_primitives']}",
+            f"- avg expected primitives per row: {report['avg_expected_primitives_per_row']:.4f}",
+            "",
+            "## Expected Primitive Counts",
+            "",
+        ]
+        for tag, count in sorted(report["expected_primitive_counts"].items()):
+            lines.append(f"- `{tag}`: {count}")
+        lines.extend(["", "## Sample Rows", ""])
+        for sample in report["samples"]:
+            tags = ", ".join(sample["expected_primitives"])
+            lines.append(f"- `{sample['source']}` -> `{tags}`")
+        md_path.write_text("\n".join(lines) + "\n")
+
+
 def main_from_args(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     rows = select_rows(load_rows(args), args.offset, args.max_rows, args.seed, args.stratify_primitives)
+    selected_report = selection_report(rows, args)
+    write_selection_report(selected_report, args.selection_report_json, args.selection_report_md)
+    if args.selection_only:
+        print(json.dumps(selected_report, indent=2, ensure_ascii=False, sort_keys=True))
+        return
     if args.dry_run:
         expected_primitives = expected_primitives_for_row(rows[0]["source"], rows[0]["target"])
         dry_payload = request_payload_with_few_shots(
