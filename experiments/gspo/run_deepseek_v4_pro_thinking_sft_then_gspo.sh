@@ -45,6 +45,7 @@ SFT_META_ADAPTER="${SFT_META_ADAPTER:-${SFT_META_OUTPUT_DIR}/final_meta_verifier
 MIN_SFT_META_RECORDS_FOR_TRAIN="${MIN_SFT_META_RECORDS_FOR_TRAIN:-32}"
 RUN_GSPO="${RUN_GSPO:-true}"
 RUN_FRONTIER_GENERATION="${RUN_FRONTIER_GENERATION:-true}"
+RUN_THINKING_SFT="${RUN_THINKING_SFT:-true}"
 RUN_GSPO_PROMOTION_GATE="${RUN_GSPO_PROMOTION_GATE:-true}"
 REQUIRE_GSPO_PROMOTION="${REQUIRE_GSPO_PROMOTION:-false}"
 MIN_SFT_CHRF_FOR_GSPO="${MIN_SFT_CHRF_FOR_GSPO:-35}"
@@ -229,6 +230,22 @@ FRONTIER_ARGS+=("${FRONTIER_STRATIFY_ARGS[@]}")
   --few-shot-count "${FRONTIER_FEW_SHOT_COUNT:-2}" \
   "${FRONTIER_ARGS[@]}"
 
+"$PYTHON" scripts/report_frontier_thinking_data.py \
+  --output-jsonl "$FRONTIER_JSONL" \
+  --failures-jsonl "$FRONTIER_FAILURES_JSONL" \
+  --summary-json "$FRONTIER_SUMMARY_JSON" \
+  --report-json "$FRONTIER_REPORT_JSON" \
+  --report-md "$FRONTIER_REPORT_MD"
+
+if is_falsey "$RUN_THINKING_SFT"; then
+  echo "RUN_THINKING_SFT=$RUN_THINKING_SFT; stopping after frontier generation and data report."
+  echo "Frontier JSONL: $FRONTIER_JSONL"
+  echo "Frontier failures: $FRONTIER_FAILURES_JSONL"
+  echo "Frontier summary: $FRONTIER_SUMMARY_JSON"
+  echo "Frontier report: $FRONTIER_REPORT_MD"
+  exit 0
+fi
+
 "$PYTHON" scripts/check_frontier_thinking_data.py \
   --summary-json "$FRONTIER_SUMMARY_JSON" \
   --output-jsonl "$FRONTIER_JSONL" \
@@ -239,13 +256,6 @@ FRONTIER_ARGS+=("${FRONTIER_STRATIFY_ARGS[@]}")
   --min-primitive-row-rate "$MIN_FRONTIER_PRIMITIVE_ROW_RATE" \
   --min-distinct-primitives "$MIN_FRONTIER_DISTINCT_PRIMITIVES" \
   --min-expected-primitive-coverage "$MIN_FRONTIER_EXPECTED_PRIMITIVE_COVERAGE"
-
-"$PYTHON" scripts/report_frontier_thinking_data.py \
-  --output-jsonl "$FRONTIER_JSONL" \
-  --failures-jsonl "$FRONTIER_FAILURES_JSONL" \
-  --summary-json "$FRONTIER_SUMMARY_JSON" \
-  --report-json "$FRONTIER_REPORT_JSON" \
-  --report-md "$FRONTIER_REPORT_MD"
 
 "$PYTHON" scripts/train_jsonl_sft_unsloth.py \
   --jsonl "$FRONTIER_JSONL" \

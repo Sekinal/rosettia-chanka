@@ -491,6 +491,14 @@ FRONTIER_MAX_API_REQUESTS=16
 
 This is enforced inside `scripts/build_frontier_thinking_sft_jsonl.py`, not just by the pre-API estimate. It records `api_requests_used`, `max_api_requests`, and `stopped_by_api_request_budget` in the frontier summary. With audit enabled, the builder reserves two calls before starting a row, so a budget too small for generation plus audit stops cleanly instead of accepting unaudited rows.
 
+For the first paid smoke, stop before SFT:
+
+```bash
+FRONTIER_MAX_ROWS=8 FRONTIER_MAX_API_REQUESTS=16 RUN_THINKING_SFT=false
+```
+
+The chain writes `deepseek_v4_pro_thinking_report.json` and `.md` immediately after generation and before the SFT data gate. This means a small smoke still leaves an inspectable report even though it is intentionally too small for SFT. Only turn `RUN_THINKING_SFT=true` once the generated/audited traces look useful.
+
 This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
 
 For a faster smoke:
