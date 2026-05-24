@@ -101,6 +101,7 @@ if is_truthy "${RUN_FRONTIER_SELECTION_REPORT:-true}"; then
     --prompt-preview-jsonl "$FRONTIER_PROMPT_PREVIEW_JSONL" \
     --prompt-preview-limit "${FRONTIER_PROMPT_PREVIEW_LIMIT:-0}" \
     --api-key-env "${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}" \
+    --base-url "${FRONTIER_BASE_URL:-https://api.deepseek.com}" \
     --model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
     --reasoning-effort "${FRONTIER_REASONING_EFFORT:-max}" \
     --max-rows "${FRONTIER_MAX_ROWS:-128}" \
@@ -219,6 +220,7 @@ FRONTIER_ARGS+=("${FRONTIER_STRATIFY_ARGS[@]}")
   --prompt-preview-jsonl "$FRONTIER_PROMPT_PREVIEW_JSONL" \
   --prompt-preview-limit "${FRONTIER_PROMPT_PREVIEW_LIMIT:-0}" \
   --api-key-env "${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}" \
+  --base-url "${FRONTIER_BASE_URL:-https://api.deepseek.com}" \
   --model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
   --reasoning-effort "${FRONTIER_REASONING_EFFORT:-max}" \
   --max-rows "${FRONTIER_MAX_ROWS:-128}" \

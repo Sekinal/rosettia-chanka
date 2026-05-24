@@ -818,6 +818,7 @@ def prompt_preview_records(
                 ],
                 "few_shot_sources": [example["source"] for example in few_shots],
                 "frontier_model": args.model,
+                "base_url": args.base_url,
                 "audit_enabled": args.audit,
                 "audit_model": (args.audit_model or args.model) if args.audit else None,
                 "resume_status": status_by_key.get(key, "pending"),
@@ -976,6 +977,7 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
 
     summary = {
         "model": args.model,
+        "base_url": args.base_url,
         "requested_rows": len(rows),
         "new_written_rows": len(records),
         "new_failed_rows": len(failures),

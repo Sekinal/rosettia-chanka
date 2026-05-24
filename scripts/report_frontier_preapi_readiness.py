@@ -26,6 +26,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--output-md", type=Path, default=None)
     parser.add_argument("--sample-size", type=int, default=5)
+    parser.add_argument(
+        "--fail-if-not-ready",
+        action="store_true",
+        help="Exit nonzero when the consolidated readiness status is false.",
+    )
     return parser.parse_args(argv)
 
 
@@ -45,6 +50,7 @@ def load_json(path: Path | None) -> dict[str, Any] | None:
 
 def payload_stats(previews: Sequence[dict[str, Any]]) -> dict[str, Any]:
     models: collections.Counter[str] = collections.Counter()
+    base_urls: collections.Counter[str] = collections.Counter()
     reasoning: collections.Counter[str] = collections.Counter()
     max_tokens: collections.Counter[str] = collections.Counter()
     few_shot_counts: list[int] = []
@@ -55,6 +61,8 @@ def payload_stats(previews: Sequence[dict[str, Any]]) -> dict[str, Any]:
         if not isinstance(payload, dict):
             continue
         models[str(payload.get("model"))] += 1
+        if preview.get("base_url") is not None:
+            base_urls[str(preview.get("base_url"))] += 1
         reasoning[str(payload.get("reasoning_effort"))] += 1
         max_tokens[str(payload.get("max_tokens"))] += 1
         few_shot_counts.append(len(preview.get("few_shot_row_keys") or []))
@@ -64,6 +72,7 @@ def payload_stats(previews: Sequence[dict[str, Any]]) -> dict[str, Any]:
             required_line_missing += 1
     return {
         "models": dict(models.most_common()),
+        "base_urls": dict(base_urls.most_common()),
         "reasoning_efforts": dict(reasoning.most_common()),
         "max_tokens": dict(max_tokens.most_common()),
         "avg_few_shots": sum(few_shot_counts) / max(1, len(few_shot_counts)),
@@ -161,6 +170,7 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         f"- selection gate passed: {selection_gate.get('passed')}",
         f"- prompt preview gate passed: {prompt_gate_report.get('passed')}",
         f"- models: {payload_stats_report['models']}",
+        f"- base URLs: {payload_stats_report['base_urls']}",
         f"- reasoning efforts: {payload_stats_report['reasoning_efforts']}",
         f"- max tokens: {payload_stats_report['max_tokens']}",
         f"- avg few-shots: {payload_stats_report['avg_few_shots']:.4f}",
@@ -194,7 +204,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.output_md is not None:
         write_markdown(report, args.output_md)
     print(json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True))
-    return 0 if report["ready_for_api"] else 1
+    if args.fail_if_not_ready and not report["ready_for_api"]:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

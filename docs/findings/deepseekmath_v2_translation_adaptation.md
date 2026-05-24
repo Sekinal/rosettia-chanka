@@ -499,6 +499,14 @@ FRONTIER_MAX_ROWS=8 FRONTIER_MAX_API_REQUESTS=16 RUN_THINKING_SFT=false
 
 The chain writes `deepseek_v4_pro_thinking_report.json` and `.md` immediately after generation and before the SFT data gate. This means a small smoke still leaves an inspectable report even though it is intentionally too small for SFT. Only turn `RUN_THINKING_SFT=true` once the generated/audited traces look useful.
 
+For endpoint testing or API-gateway switching, set:
+
+```bash
+FRONTIER_BASE_URL=http://127.0.0.1:8765
+```
+
+The chain passes this to both prompt-preview payloads and real generation. The readiness and frontier data reports show the base URL, so a test run against a local OpenAI-compatible stub is auditable. A local stub smoke on 2026-05-24 validated the full generation -> audit -> report -> stop-before-SFT path without spending real DeepSeek calls: 2 accepted rows, 0 failures, `api_requests_used=4`, and expected primitive coverage `1.0`.
+
 This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
 
 For a faster smoke:

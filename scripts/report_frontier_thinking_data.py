@@ -5,8 +5,13 @@ from __future__ import annotations
 import argparse
 import collections
 import json
+import sys
 from pathlib import Path
 from typing import Any, Iterable, Sequence
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from scripts import check_frontier_thinking_data as gate
 
@@ -134,12 +139,18 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
 def write_markdown(report: dict[str, Any], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     metrics = report["gate_metrics"]
+    summary = report.get("summary") or {}
     lines = [
         "# Frontier Thinking Data Report",
         "",
+        f"- model: {summary.get('model')}",
+        f"- base URL: {summary.get('base_url')}",
         f"- accepted rows: {metrics['written_rows']:.0f}",
         f"- failed rows: {metrics['failed_rows']:.0f}",
         f"- accept rate: {metrics['accept_rate']:.4f}",
+        f"- API requests used: {summary.get('api_requests_used')}",
+        f"- max API requests: {summary.get('max_api_requests')}",
+        f"- stopped by API request budget: {summary.get('stopped_by_api_request_budget')}",
         f"- avg primitive tags: {metrics['avg_primitive_tags']:.4f}",
         f"- distinct primitives: {metrics['distinct_primitives']:.0f}",
         f"- expected primitive coverage: {metrics.get('expected_primitive_coverage', 0.0):.4f}",

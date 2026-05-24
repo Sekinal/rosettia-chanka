@@ -11,6 +11,7 @@ from scripts import report_frontier_preapi_readiness as reporter
 def preview_record(row_key: str = "hola\trimaykullayki") -> dict:
     return {
         "row_key": row_key,
+        "base_url": "https://api.deepseek.com",
         "source": "Hola.",
         "reference": "Rimaykullayki.",
         "expected_primitives": ["[SIGNIFICADO]", "[GRAMATICA]", "[ANTI_COPIA]"],
@@ -119,8 +120,10 @@ class ReportFrontierPreapiReadinessTests(unittest.TestCase):
         self.assertTrue(report["ready_for_api"])
         self.assertEqual(status, 0)
         self.assertEqual(report["payload_stats"]["models"], {"deepseek-v4-pro": 1})
+        self.assertEqual(report["payload_stats"]["base_urls"], {"https://api.deepseek.com": 1})
         self.assertEqual(report["payload_stats"]["reasoning_efforts"], {"max": 1})
         self.assertIn("ready for API: True", markdown)
+        self.assertIn("base URLs", markdown)
         self.assertIn("Required primitive tags for this row", markdown)
 
     def test_report_not_ready_when_preview_count_mismatches_selection(self):
@@ -149,6 +152,33 @@ class ReportFrontierPreapiReadinessTests(unittest.TestCase):
 
         self.assertFalse(report["ready_for_api"])
         self.assertEqual(report["prompt_preview_rows"], 1)
+
+    def test_main_only_fails_when_requested(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            selection_report = root / "selection_report.json"
+            selection_jsonl = root / "selection.jsonl"
+            preview_jsonl = root / "preview.jsonl"
+            output_json = root / "report.json"
+            selection_report.write_text(json.dumps({"selected_rows": 2}))
+            selection_jsonl.write_text(json.dumps({"row_key": "a\tb"}) + "\n" + json.dumps({"row_key": "c\td"}) + "\n")
+            preview_jsonl.write_text(json.dumps(preview_record("a\tb"), ensure_ascii=False) + "\n")
+            argv = [
+                "--selection-report-json",
+                str(selection_report),
+                "--selection-jsonl",
+                str(selection_jsonl),
+                "--prompt-preview-jsonl",
+                str(preview_jsonl),
+                "--output-json",
+                str(output_json),
+            ]
+
+            default_status = reporter.main(argv)
+            strict_status = reporter.main([*argv, "--fail-if-not-ready"])
+
+        self.assertEqual(default_status, 0)
+        self.assertEqual(strict_status, 1)
 
 
 if __name__ == "__main__":

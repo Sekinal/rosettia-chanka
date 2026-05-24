@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -51,7 +53,21 @@ class ReportFrontierThinkingDataTests(unittest.TestCase):
                 )
                 + "\n"
             )
-            summary.write_text(json.dumps({"summary": {"total_written_rows": 2, "total_failed_rows": 1}}))
+            summary.write_text(
+                json.dumps(
+                    {
+                        "summary": {
+                            "model": "deepseek-v4-pro",
+                            "base_url": "https://api.deepseek.com",
+                            "api_requests_used": 3,
+                            "max_api_requests": 16,
+                            "stopped_by_api_request_budget": False,
+                            "total_written_rows": 2,
+                            "total_failed_rows": 1,
+                        }
+                    }
+                )
+            )
             args = report.parse_args(
                 [
                     "--output-jsonl",
@@ -92,6 +108,13 @@ class ReportFrontierThinkingDataTests(unittest.TestCase):
                         "distinct_primitives": 4.0,
                         "expected_primitive_coverage": 1.0,
                     },
+                    "summary": {
+                        "model": "deepseek-v4-pro",
+                        "base_url": "https://api.deepseek.com",
+                        "api_requests_used": 3,
+                        "max_api_requests": 16,
+                        "stopped_by_api_request_budget": False,
+                    },
                     "primitive_tag_counts": {"[SIGNIFICADO]": 2},
                     "expected_primitives": {"missing_counts": {}},
                     "failures": {"failure_reasons": {"failed_quality_filter": 1}},
@@ -103,9 +126,74 @@ class ReportFrontierThinkingDataTests(unittest.TestCase):
             content = path.read_text()
 
         self.assertIn("Frontier Thinking Data Report", content)
+        self.assertIn("deepseek-v4-pro", content)
+        self.assertIn("API requests used: 3", content)
         self.assertIn("Primitive Tags", content)
         self.assertIn("Missing Expected Primitives", content)
         self.assertIn("failed_quality_filter", content)
+
+    def test_script_mode_writes_report(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            accepted = root / "accepted.jsonl"
+            failures = root / "failures.jsonl"
+            summary = root / "summary.json"
+            output_json = root / "report.json"
+            output_md = root / "report.md"
+            accepted.write_text(
+                json.dumps(
+                    {
+                        "source": "Hola.",
+                        "reference": "Rimaykullayki.",
+                        "frontier_analysis": "[SIGNIFICADO] conserva; [GRAMATICA] natural.",
+                        "expected_primitives": ["[SIGNIFICADO]", "[GRAMATICA]"],
+                    }
+                )
+                + "\n"
+            )
+            failures.write_text("")
+            summary.write_text(
+                json.dumps(
+                    {
+                        "summary": {
+                            "model": "deepseek-v4-pro",
+                            "base_url": "http://127.0.0.1:8765",
+                            "api_requests_used": 1,
+                            "max_api_requests": 4,
+                            "stopped_by_api_request_budget": False,
+                            "total_written_rows": 1,
+                            "total_failed_rows": 0,
+                        }
+                    }
+                )
+            )
+
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "scripts/report_frontier_thinking_data.py",
+                    "--output-jsonl",
+                    str(accepted),
+                    "--failures-jsonl",
+                    str(failures),
+                    "--summary-json",
+                    str(summary),
+                    "--report-json",
+                    str(output_json),
+                    "--report-md",
+                    str(output_md),
+                ],
+                check=False,
+                cwd=Path(__file__).resolve().parents[1],
+                text=True,
+                capture_output=True,
+            )
+            output_exists = output_json.exists()
+            markdown = output_md.read_text() if output_md.exists() else ""
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertTrue(output_exists)
+        self.assertIn("Frontier Thinking Data Report", markdown)
 
 
 if __name__ == "__main__":
