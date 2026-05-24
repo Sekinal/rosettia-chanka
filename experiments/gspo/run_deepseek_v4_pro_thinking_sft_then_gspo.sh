@@ -38,6 +38,9 @@ SFT_META_JSONL="${SFT_META_JSONL:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.j
 SFT_META_SUMMARY_JSON="${SFT_META_SUMMARY_JSON:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.summary.json}"
 SFT_PROMOTION_JSON="${SFT_PROMOTION_JSON:-${SFT_EVAL_DIR}/promotion_gate.json}"
 SFT_CYCLE_MANIFEST_JSON="${SFT_CYCLE_MANIFEST_JSON:-${THINKING_SFT_OUTPUT_DIR}/cycle_manifest.json}"
+SFT_BASELINE_EVAL_DIR="${SFT_BASELINE_EVAL_DIR:-${DATA_DIR}/base_adapter_thinking_eval}"
+SFT_BASELINE_METRICS_JSON="${SFT_BASELINE_METRICS_JSON:-${SFT_BASELINE_EVAL_DIR}/metrics.json}"
+SFT_BASELINE_PREDICTIONS="${SFT_BASELINE_PREDICTIONS:-${SFT_BASELINE_EVAL_DIR}/predictions.jsonl}"
 MINE_SFT_META="${MINE_SFT_META:-true}"
 MINE_GSPO_META="${MINE_GSPO_META:-true}"
 TRAIN_SFT_META_VERIFIER="${TRAIN_SFT_META_VERIFIER:-true}"
@@ -48,6 +51,7 @@ MIN_SFT_META_RECORDS_FOR_TRAIN="${MIN_SFT_META_RECORDS_FOR_TRAIN:-32}"
 RUN_GSPO="${RUN_GSPO:-true}"
 RUN_FRONTIER_GENERATION="${RUN_FRONTIER_GENERATION:-true}"
 RUN_THINKING_SFT="${RUN_THINKING_SFT:-true}"
+RUN_SFT_BASELINE_EVAL="${RUN_SFT_BASELINE_EVAL:-true}"
 RUN_SFT_PROMOTION_GATE="${RUN_SFT_PROMOTION_GATE:-true}"
 RUN_GSPO_PROMOTION_GATE="${RUN_GSPO_PROMOTION_GATE:-true}"
 REQUIRE_SFT_PROMOTION="${REQUIRE_SFT_PROMOTION:-false}"
@@ -82,7 +86,7 @@ is_falsey() {
 
 write_sft_seed_manifest() {
   SFT_MANIFEST_BASELINE_ARGS=()
-  if [[ -n "${SFT_BASELINE_METRICS_JSON:-}" ]]; then
+  if [[ -f "$SFT_BASELINE_METRICS_JSON" ]]; then
     SFT_MANIFEST_BASELINE_ARGS+=(--baseline-metrics-json "$SFT_BASELINE_METRICS_JSON")
   fi
 
@@ -284,6 +288,25 @@ fi
   --min-distinct-primitives "$MIN_FRONTIER_DISTINCT_PRIMITIVES" \
   --min-expected-primitive-coverage "$MIN_FRONTIER_EXPECTED_PRIMITIVE_COVERAGE"
 
+if is_truthy "$RUN_SFT_BASELINE_EVAL"; then
+  if [[ ! -f "$SFT_BASELINE_METRICS_JSON" ]] || is_truthy "${SFT_BASELINE_FORCE_EVAL:-false}"; then
+    "$PYTHON" scripts/evaluate_gspo_checkpoint.py \
+      --adapter-path "$BASE_ADAPTER" \
+      --output-json "$SFT_BASELINE_METRICS_JSON" \
+      --predictions-jsonl "$SFT_BASELINE_PREDICTIONS" \
+      --max-seq-length "${SFT_EVAL_MAX_SEQ_LENGTH:-384}" \
+      --max-completion-length "${SFT_EVAL_MAX_COMPLETION_LENGTH:-112}" \
+      --batch-size "${SFT_EVAL_BATCH_SIZE:-8}" \
+      --max-eval-samples "${SFT_EVAL_MAX_ROWS:-64}" \
+      --self-verification-thinking-output \
+      --terminology-file "$TERMINOLOGY_FILE" \
+      --terminology-top-k "${TERMINOLOGY_TOP_K:-1}" \
+      --progress-every "${SFT_EVAL_PROGRESS_EVERY:-16}"
+  else
+    echo "Reusing existing SFT baseline metrics: $SFT_BASELINE_METRICS_JSON"
+  fi
+fi
+
 "$PYTHON" scripts/train_jsonl_sft_unsloth.py \
   --jsonl "$FRONTIER_JSONL" \
   --source-field source \
@@ -337,7 +360,7 @@ fi
 SFT_PROMOTION_FAILED=0
 if is_truthy "$RUN_SFT_PROMOTION_GATE"; then
   SFT_PROMOTION_BASELINE_ARGS=()
-  if [[ -n "${SFT_BASELINE_METRICS_JSON:-}" ]]; then
+  if [[ -f "$SFT_BASELINE_METRICS_JSON" ]]; then
     SFT_PROMOTION_BASELINE_ARGS+=(--baseline-json "$SFT_BASELINE_METRICS_JSON")
   fi
   if "$PYTHON" scripts/check_policy_iteration_metrics.py \

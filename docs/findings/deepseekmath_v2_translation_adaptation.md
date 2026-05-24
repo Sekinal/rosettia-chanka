@@ -285,6 +285,8 @@ Promotion is now explicit. `scripts/check_policy_iteration_metrics.py` writes a 
 
 The first DeepSeek V4 Pro chain now follows the same evidence protocol at both training stages. After the frontier-thinking SFT head-start, it writes `${SFT_EVAL_DIR}/promotion_gate.json` when `RUN_SFT_PROMOTION_GATE=true`, optionally comparing against `SFT_BASELINE_METRICS_JSON`, then writes an `sft_seed` `cycle_manifest.json` under `${THINKING_SFT_OUTPUT_DIR}` with SFT-only metrics, predictions, promotion status, and mined hardcases. `REQUIRE_SFT_PROMOTION=false` by default, so a non-promotable seed can still be mined for the next verifier. If the SFT quality gate allows GSPO, the chain then writes GSPO `promotion_gate.json`, compares GSPO metrics against the SFT-only eval metrics, mines GSPO hardcases, and writes an `initial_gspo` `cycle_manifest.json`. `REQUIRE_GSPO_PROMOTION=false` by default, so a failed first policy still produces useful hardcase data and an audit manifest.
 
+The same chain now also creates the SFT baseline by default. With `RUN_SFT_BASELINE_EVAL=true`, it evaluates `BASE_ADAPTER` under the same bounded-thinking prompt/eval settings before training the frontier-thinking SFT adapter, writes `${DATA_DIR}/base_adapter_thinking_eval/metrics.json`, and uses that metrics file for the SFT promotion gate and manifest. This makes the frontier-thinking head-start a measurable policy iteration rather than an unanchored SFT run. Use `SFT_BASELINE_FORCE_EVAL=true` to refresh a stale baseline, or disable the step only when supplying a trusted `SFT_BASELINE_METRICS_JSON`.
+
 The two-step iteration can also be launched as one command:
 
 ```bash
