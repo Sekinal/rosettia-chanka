@@ -95,6 +95,7 @@ write_sft_seed_manifest() {
     --stamp "${STAMP}-sft-seed" \
     --stage sft_seed \
     --base-model "$BASE_ADAPTER" \
+    --policy-adapter "$THINKING_SFT_ADAPTER" \
     --meta-verifier-adapter "${META_VERIFIER_ADAPTER:-none}" \
     --meta-output-dir "$SFT_META_OUTPUT_DIR" \
     --followup-output-dir "$THINKING_SFT_OUTPUT_DIR" \
@@ -545,6 +546,7 @@ fi
   --stamp "$STAMP" \
   --stage initial_gspo \
   --base-model "$THINKING_SFT_ADAPTER" \
+  --policy-adapter "${GSPO_OUTPUT_DIR}/chanka_gspo/final_gspo_lora" \
   --meta-verifier-adapter "$META_VERIFIER_ADAPTER" \
   --meta-output-dir "$SFT_META_OUTPUT_DIR" \
   --followup-output-dir "$GSPO_OUTPUT_DIR" \

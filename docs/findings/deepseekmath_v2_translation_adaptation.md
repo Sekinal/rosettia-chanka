@@ -289,6 +289,10 @@ The same chain now also creates the SFT baseline by default. With `RUN_SFT_BASEL
 
 The manifest itself now checks directory artifacts as well as JSON files. It records existence and type for `meta_verifier_adapter`, `meta_output_dir`, and `followup_output_dir`, and the DeepSeek V4 Pro chain rewrites the `sft_seed` manifest after any SFT-hardcase meta-verifier refresh. That keeps the cycle ledger aligned with the verifier adapter actually handed to GSPO.
 
+Manifests also record the produced `policy_adapter`, so a promoted cycle has a direct, checked next-base path. For an `sft_seed` cycle this is `${THINKING_SFT_OUTPUT_DIR}/final_lora`; for GSPO cycles it is `${OUTPUT_DIR}/chanka_gspo/final_gspo_lora`. Do not promote from shell output alone: use the manifest `policy_adapter` artifact plus `promoted=true`.
+
+`scripts/check_deepseekmath_cycle_manifest.py` turns that rule into a gate. It loads a `cycle_manifest.json`, checks promotion status, artifact completeness, the existence of `policy_adapter`, and minimum headline metrics, then exits nonzero with reasons if the cycle should not be used as the next base policy.
+
 The two-step iteration can also be launched as one command:
 
 ```bash

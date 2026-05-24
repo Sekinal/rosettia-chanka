@@ -21,6 +21,9 @@ DEFAULT_REQUIRED_PATHS = (
     "scripts/build_meta_verifier_from_self_outputs.py",
     "scripts/train_meta_verifier_chanka_unsloth.py",
     "scripts/train_gspo_chanka_unsloth.py",
+    "scripts/write_deepseekmath_cycle_manifest.py",
+    "scripts/check_deepseekmath_cycle_manifest.py",
+    "scripts/summarize_deepseekmath_cycles.py",
     "experiments/gspo/run_2511_self_verifiable_thinking_translation.sh",
 )
 

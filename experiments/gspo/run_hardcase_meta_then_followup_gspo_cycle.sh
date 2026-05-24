@@ -56,6 +56,7 @@ fi
   --stamp "$STAMP" \
   --stage hardcase_followup_gspo \
   --base-model "$BASE_MODEL" \
+  --policy-adapter "${FOLLOWUP_OUTPUT_DIR}/chanka_gspo/final_gspo_lora" \
   --meta-verifier-adapter "$NEXT_META_VERIFIER_ADAPTER" \
   --meta-output-dir "$META_OUTPUT_DIR" \
   --followup-output-dir "$FOLLOWUP_OUTPUT_DIR" \

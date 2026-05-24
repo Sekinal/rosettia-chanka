@@ -22,6 +22,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--stamp", required=True)
     parser.add_argument("--stage", default="gspo")
     parser.add_argument("--base-model", required=True)
+    parser.add_argument("--policy-adapter", type=Path, default=None)
     parser.add_argument("--meta-verifier-adapter", required=True)
     parser.add_argument("--meta-output-dir", type=Path, required=True)
     parser.add_argument("--followup-output-dir", type=Path, required=True)
@@ -67,11 +68,13 @@ def manifest_for(args: argparse.Namespace) -> dict[str, Any]:
         "stamp": args.stamp,
         "stage": args.stage,
         "base_model": args.base_model,
+        "policy_adapter": str(args.policy_adapter) if args.policy_adapter else None,
         "meta_verifier_adapter": args.meta_verifier_adapter,
         "meta_output_dir": str(args.meta_output_dir),
         "followup_output_dir": str(args.followup_output_dir),
         "artifacts": {
             "baseline_metrics": file_record(args.baseline_metrics_json),
+            "policy_adapter": file_record(args.policy_adapter),
             "meta_verifier_adapter": file_record(Path(args.meta_verifier_adapter)),
             "meta_output_dir": file_record(args.meta_output_dir),
             "followup_output_dir": file_record(args.followup_output_dir),
