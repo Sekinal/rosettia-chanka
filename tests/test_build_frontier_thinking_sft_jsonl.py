@@ -113,6 +113,23 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         self.assertTrue(builder.record_passes(good, min_primitive_tags=2))
         self.assertFalse(builder.record_passes(bad, min_primitive_tags=2))
 
+    def test_expected_primitives_are_row_specific_and_enforced(self):
+        expected = builder.expected_primitives_for_row(
+            "El juez Juan aprobo 3 documentos.",
+            "Juan sutiyuq juezqa kimsa qillqata chaskirqan.",
+        )
+        parsed = {
+            "analysis": "[SIGNIFICADO] conserva; [GRAMATICA] revisa sufijo; [ENTIDADES] mantiene Juan y 3.",
+            "translation": "Juan sutiyuq juezqa kimsa qillqata chaskirqan.",
+            "self_evaluation": "Riesgo bajo.",
+            "score": 0.9,
+        }
+        missing = {**parsed, "analysis": "[SIGNIFICADO] conserva; [GRAMATICA] revisa sufijo."}
+
+        self.assertIn("[ENTIDADES]", expected)
+        self.assertTrue(builder.record_passes(parsed, min_primitive_tags=2, required_primitives=expected))
+        self.assertFalse(builder.record_passes(missing, min_primitive_tags=2, required_primitives=expected))
+
     def test_parse_and_gate_audit_json(self):
         audit = builder.parse_audit_json('{"pass": true, "score": 0.82, "reason": "concise"}')
 
@@ -156,7 +173,10 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
                         "message": {
                             "content": json.dumps(
                                 {
-                                    "analysis": "[SIGNIFICADO] conserva saludo; [ANTI_COPIA] evita copia.",
+                                    "analysis": (
+                                        "[SIGNIFICADO] conserva saludo; [GRAMATICA] forma natural; "
+                                        "[ANTI_COPIA] evita copia."
+                                    ),
                                     "translation": "Rimaykullayki",
                                     "self_evaluation": "Riesgo bajo.",
                                     "score": 0.94,

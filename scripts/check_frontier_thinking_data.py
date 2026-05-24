@@ -47,6 +47,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=0,
         help="Require at least this many distinct primitive tags across accepted rows. Disabled at 0.",
     )
+    parser.add_argument(
+        "--min-expected-primitive-coverage",
+        type=float,
+        default=0.0,
+        help="Require this fraction of rows with expected_primitives to include all expected tags. Disabled at 0.",
+    )
     return parser.parse_args(argv)
 
 
@@ -75,17 +81,31 @@ def primitive_counts(path: Path | None) -> dict[str, Any]:
             "primitive_row_tag_counts": [],
         }
     tag_counts: collections.Counter[str] = collections.Counter()
+    missing_expected_counts: collections.Counter[str] = collections.Counter()
     row_tag_counts: list[int] = []
+    expected_rows = 0
+    expected_covered_rows = 0
     for record in iter_jsonl(path):
         text = str(record.get("frontier_analysis") or record.get("target") or "")
         present = [tag for tag in PRIMITIVES if tag in text]
         row_tag_counts.append(len(present))
         tag_counts.update(present)
+        expected = record.get("expected_primitives")
+        if isinstance(expected, list) and expected:
+            expected_rows += 1
+            missing = [str(tag) for tag in expected if str(tag) not in text]
+            if missing:
+                missing_expected_counts.update(missing)
+            else:
+                expected_covered_rows += 1
     return {
         "primitive_rows": len(row_tag_counts),
         "primitive_tag_total": sum(row_tag_counts),
         "primitive_tag_counts": dict(tag_counts),
         "primitive_row_tag_counts": row_tag_counts,
+        "expected_primitive_rows": expected_rows,
+        "expected_primitive_covered_rows": expected_covered_rows,
+        "missing_expected_primitive_counts": dict(missing_expected_counts),
     }
 
 
@@ -110,6 +130,8 @@ def gate_metrics(counts: dict[str, int], primitives: dict[str, Any] | None = Non
     row_tag_counts = list(primitives.get("primitive_row_tag_counts", []))
     primitive_tag_total = int(primitives.get("primitive_tag_total", 0))
     primitive_tag_counts = dict(primitives.get("primitive_tag_counts", {}))
+    expected_rows = int(primitives.get("expected_primitive_rows", 0))
+    expected_covered_rows = int(primitives.get("expected_primitive_covered_rows", 0))
     metrics = {
         "written_rows": float(counts["written"]),
         "failed_rows": float(counts["failed"]),
@@ -119,6 +141,9 @@ def gate_metrics(counts: dict[str, int], primitives: dict[str, Any] | None = Non
         "primitive_rows": float(primitive_rows),
         "avg_primitive_tags": primitive_tag_total / max(1, primitive_rows),
         "distinct_primitives": float(len(primitive_tag_counts)),
+        "expected_primitive_rows": float(expected_rows),
+        "expected_primitive_covered_rows": float(expected_covered_rows),
+        "expected_primitive_coverage": expected_covered_rows / max(1, expected_rows),
     }
     if min_tags_per_row > 0:
         rows_with_min_tags = sum(1 for count in row_tag_counts if count >= min_tags_per_row)
@@ -137,6 +162,7 @@ def check_gate(
     min_primitive_tags_per_row: int = 0,
     min_primitive_row_rate: float = 0.0,
     min_distinct_primitives: int = 0,
+    min_expected_primitive_coverage: float = 0.0,
 ) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     if metrics["written_rows"] < min_written_rows:
@@ -151,6 +177,11 @@ def check_gate(
         reasons.append(f"primitive_row_rate {metrics['primitive_row_rate']:.4f} < {min_primitive_row_rate:.4f}")
     if min_distinct_primitives > 0 and metrics["distinct_primitives"] < min_distinct_primitives:
         reasons.append(f"distinct_primitives {metrics['distinct_primitives']:.0f} < {min_distinct_primitives}")
+    if min_expected_primitive_coverage > 0 and metrics["expected_primitive_coverage"] < min_expected_primitive_coverage:
+        reasons.append(
+            "expected_primitive_coverage "
+            f"{metrics['expected_primitive_coverage']:.4f} < {min_expected_primitive_coverage:.4f}"
+        )
     return not reasons, reasons
 
 
@@ -168,6 +199,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.min_primitive_tags_per_row,
         args.min_primitive_row_rate,
         args.min_distinct_primitives,
+        args.min_expected_primitive_coverage,
     )
     report = {
         **metrics,
@@ -176,6 +208,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "min_primitive_tags_per_row": args.min_primitive_tags_per_row,
         "min_primitive_row_rate": args.min_primitive_row_rate,
         "min_distinct_primitives": args.min_distinct_primitives,
+        "min_expected_primitive_coverage": args.min_expected_primitive_coverage,
         "passed": passed,
         "reasons": reasons,
     }

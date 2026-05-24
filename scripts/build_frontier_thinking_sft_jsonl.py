@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 import random
+import re
 import sys
 import time
 import urllib.error
@@ -61,6 +62,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=int,
         default=2,
         help="Include this many reviewed examples with synthetic primitive-check targets in the frontier prompt.",
+    )
+    parser.add_argument(
+        "--require-expected-primitives",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Require the generated analysis to include row-specific expected primitive tags.",
     )
     parser.add_argument(
         "--resume",
@@ -189,8 +196,79 @@ def render_few_shots(few_shots: Sequence[dict[str, Any]]) -> str:
     return "\n\n".join(blocks) + "\n\n"
 
 
-def prompt_messages(source: str, reference: str, few_shots: Sequence[dict[str, Any]] | None = None) -> list[dict[str, str]]:
+def has_entity_signal(text: str) -> bool:
+    if re.search(r"\d", text):
+        return True
+    tokens = re.findall(r"\b[^\W\d_][\wÁÉÍÓÚÜÑáéíóúüñ'-]*\b", text, flags=re.UNICODE)
+    for index, token in enumerate(tokens):
+        if index == 0:
+            continue
+        if token[:1].isupper() and token[1:].islower():
+            return True
+    return False
+
+
+def has_terminology_signal(source: str, reference: str) -> bool:
+    legal_or_domain_terms = {
+        "acta",
+        "articulo",
+        "artículo",
+        "autoridad",
+        "comunidad",
+        "constitucion",
+        "constitución",
+        "contrato",
+        "derecho",
+        "expediente",
+        "fiscal",
+        "juez",
+        "judicial",
+        "ley",
+        "ministerio",
+        "municipalidad",
+        "penal",
+        "proceso",
+        "resolucion",
+        "resolución",
+        "sentencia",
+        "tribunal",
+    }
+    combined = f"{source} {reference}".lower()
+    return any(term in combined for term in legal_or_domain_terms)
+
+
+def has_copy_risk_signal(source: str, reference: str) -> bool:
+    source_terms = {
+        token.lower()
+        for token in re.findall(r"\b[^\W\d_]{4,}\b", source, flags=re.UNICODE)
+        if token.lower() not in {"para", "como", "esta", "este", "estos", "estas", "donde", "cuando"}
+    }
+    reference_terms = {token.lower() for token in re.findall(r"\b[^\W\d_]{4,}\b", reference, flags=re.UNICODE)}
+    return bool(source_terms.intersection(reference_terms))
+
+
+def expected_primitives_for_row(source: str, reference: str, max_tags: int = 3) -> list[str]:
+    expected = ["[SIGNIFICADO]", "[GRAMATICA]"]
+    if has_entity_signal(source) or has_entity_signal(reference):
+        expected.append("[ENTIDADES]")
+    if len(expected) < max_tags and has_terminology_signal(source, reference):
+        expected.append("[TERMINOLOGIA]")
+    if len(expected) < max_tags and has_copy_risk_signal(source, reference):
+        expected.append("[ANTI_COPIA]")
+    if len(expected) < max_tags:
+        expected.append("[ANTI_COPIA]")
+    return expected[:max_tags]
+
+
+def prompt_messages(
+    source: str,
+    reference: str,
+    few_shots: Sequence[dict[str, Any]] | None = None,
+    expected_primitives: Sequence[str] | None = None,
+) -> list[dict[str, str]]:
     few_shot_block = render_few_shots(few_shots or [])
+    expected = list(expected_primitives or expected_primitives_for_row(source, reference))
+    expected_block = ", ".join(expected)
     return [
         {
             "role": "system",
@@ -207,6 +285,8 @@ def prompt_messages(source: str, reference: str, few_shots: Sequence[dict[str, A
                 f"{few_shot_block}"
                 f"Spanish source:\n{source}\n\n"
                 f"Reviewed Quechua Chanka reference:\n{reference}\n\n"
+                f"Required primitive tags for this row: {expected_block}.\n"
+                "The analysis must include every required primitive tag, and may add at most one extra useful tag.\n\n"
                 "Return a JSON object with exactly these keys:\n"
                 "- analysis: one sentence, maximum 35 words, using 2 to 4 tags from "
                 "[SIGNIFICADO], [GRAMATICA], [ENTIDADES], [TERMINOLOGIA], [ANTI_COPIA].\n"
@@ -220,6 +300,10 @@ def prompt_messages(source: str, reference: str, few_shots: Sequence[dict[str, A
 
 
 def audit_messages(source: str, reference: str, parsed: dict[str, Any]) -> list[dict[str, str]]:
+    expected = parsed.get("expected_primitives")
+    expected_line = ""
+    if isinstance(expected, list) and expected:
+        expected_line = f"\nRequired primitive tags: {', '.join(str(tag) for tag in expected)}\n"
     return [
         {
             "role": "system",
@@ -238,8 +322,10 @@ def audit_messages(source: str, reference: str, parsed: dict[str, Any]) -> list[
                 f"Proposed translation:\n{parsed['translation']}\n\n"
                 f"Self evaluation:\n{parsed['self_evaluation']}\n\n"
                 f"Score:\n{parsed['score']}\n\n"
+                f"{expected_line}"
                 "Accept only if the analysis is concise, uses the primitive tags correctly, "
-                "does not invent unsupported grammar claims, and the final translation is compatible with the reference.\n"
+                "includes the required primitive tags when provided, does not invent unsupported grammar claims, "
+                "and the final translation is compatible with the reference.\n"
                 "Return a JSON object with exactly: pass (boolean), score (0.0 to 1.0), reason (short sentence)."
             ),
         },
@@ -267,7 +353,12 @@ def chat_payload(
 
 
 def request_payload(args: argparse.Namespace, source: str, reference: str) -> dict[str, Any]:
-    return chat_payload(args, args.model, prompt_messages(source, reference), args.max_output_tokens)
+    return chat_payload(
+        args,
+        args.model,
+        prompt_messages(source, reference, expected_primitives=expected_primitives_for_row(source, reference)),
+        args.max_output_tokens,
+    )
 
 
 def request_payload_with_few_shots(
@@ -276,7 +367,12 @@ def request_payload_with_few_shots(
     reference: str,
     few_shots: Sequence[dict[str, Any]],
 ) -> dict[str, Any]:
-    return chat_payload(args, args.model, prompt_messages(source, reference, few_shots), args.max_output_tokens)
+    return chat_payload(
+        args,
+        args.model,
+        prompt_messages(source, reference, few_shots, expected_primitives_for_row(source, reference)),
+        args.max_output_tokens,
+    )
 
 
 def call_chat_payload(args: argparse.Namespace, api_key: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -378,10 +474,16 @@ def build_target(parsed: dict[str, Any], reference: str, allow_model_translation
     )
 
 
-def record_passes(parsed: dict[str, Any], min_primitive_tags: int) -> bool:
+def record_passes(
+    parsed: dict[str, Any],
+    min_primitive_tags: int,
+    required_primitives: Sequence[str] | None = None,
+) -> bool:
     if not parsed["analysis"] or not parsed["self_evaluation"]:
         return False
     if primitive_count(parsed["analysis"]) < min_primitive_tags:
+        return False
+    if required_primitives and any(tag not in parsed["analysis"] for tag in required_primitives):
         return False
     if len(parsed["analysis"].split()) > 45:
         return False
@@ -447,6 +549,7 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     rows = select_rows(load_rows(args), args.offset, args.max_rows, args.seed)
     if args.dry_run:
+        expected_primitives = expected_primitives_for_row(rows[0]["source"], rows[0]["target"])
         dry_payload = request_payload_with_few_shots(
             args,
             rows[0]["source"],
@@ -467,6 +570,7 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
                             "translation": rows[0]["target"],
                             "self_evaluation": "Riesgo bajo.",
                             "score": 0.95,
+                            "expected_primitives": expected_primitives,
                         },
                     ),
                     min(args.max_output_tokens, 256),
@@ -497,20 +601,36 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
             skipped_rows += 1
             continue
         try:
+            expected_primitives = expected_primitives_for_row(row["source"], row["target"])
             few_shots = select_few_shots(rows, row, args.few_shot_count)
             response = call_chat_completion(args, api_key, row["source"], row["target"], few_shots)
             parsed = parse_frontier_json(response_content(response))
-            if not record_passes(parsed, args.min_primitive_tags):
-                failure = failure_record(index, row, "failed_quality_filter", parsed=parsed)
+            required_primitives = expected_primitives if args.require_expected_primitives else []
+            if not record_passes(parsed, args.min_primitive_tags, required_primitives):
+                failure = failure_record(
+                    index,
+                    row,
+                    "failed_quality_filter",
+                    parsed=parsed,
+                    expected_primitives=expected_primitives,
+                )
                 failures.append(failure)
                 append_jsonl(failures_path, failure)
                 completed_keys.add(key)
                 continue
             audit: dict[str, Any] | None = None
             if args.audit:
-                audit = audit_record(args, api_key, row["source"], row["target"], parsed)
+                audit_payload = {**parsed, "expected_primitives": expected_primitives}
+                audit = audit_record(args, api_key, row["source"], row["target"], audit_payload)
                 if not audit_passes(audit, args.audit_min_score):
-                    failure = failure_record(index, row, "failed_frontier_audit", parsed=parsed, audit=audit)
+                    failure = failure_record(
+                        index,
+                        row,
+                        "failed_frontier_audit",
+                        parsed=parsed,
+                        audit=audit,
+                        expected_primitives=expected_primitives,
+                    )
                     failures.append(failure)
                     append_jsonl(failures_path, failure)
                     completed_keys.add(key)
@@ -525,6 +645,7 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
                 "frontier_translation": parsed["translation"],
                 "frontier_score": parsed["score"],
                 "frontier_audit": audit,
+                "expected_primitives": expected_primitives,
                 "source_name": row.get("source_name"),
                 "variant": row.get("variant"),
                 "task": "frontier_synthetic_thinking_translation_generation",
@@ -554,6 +675,7 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
         "audit_model": (args.audit_model or args.model) if args.audit else None,
         "audit_min_score": args.audit_min_score if args.audit else None,
         "allow_model_translation": args.allow_model_translation,
+        "require_expected_primitives": args.require_expected_primitives,
         "resume": args.resume,
         "retry_failures": args.retry_failures,
         "output_jsonl": str(args.output_jsonl),

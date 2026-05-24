@@ -56,6 +56,7 @@ class CheckFrontierThinkingDataTests(unittest.TestCase):
                 json.dumps(
                     {
                         "frontier_analysis": "[SIGNIFICADO] conserva; [GRAMATICA] revisa sufijo.",
+                        "expected_primitives": ["[SIGNIFICADO]", "[GRAMATICA]"],
                         "row_key": "a",
                     }
                 )
@@ -63,6 +64,7 @@ class CheckFrontierThinkingDataTests(unittest.TestCase):
                 + json.dumps(
                     {
                         "frontier_analysis": "[ENTIDADES] preserva nombre; [ANTI_COPIA] evita espanol.",
+                        "expected_primitives": ["[ENTIDADES]", "[ANTI_COPIA]"],
                         "row_key": "b",
                     }
                 )
@@ -82,6 +84,7 @@ class CheckFrontierThinkingDataTests(unittest.TestCase):
                 min_primitive_tags_per_row=2,
                 min_primitive_row_rate=1.0,
                 min_distinct_primitives=4,
+                min_expected_primitive_coverage=1.0,
             )
 
         self.assertTrue(passed)
@@ -89,6 +92,7 @@ class CheckFrontierThinkingDataTests(unittest.TestCase):
         self.assertEqual(metrics["avg_primitive_tags"], 2.0)
         self.assertEqual(metrics["distinct_primitives"], 4.0)
         self.assertEqual(metrics["primitive_row_rate"], 1.0)
+        self.assertEqual(metrics["expected_primitive_coverage"], 1.0)
 
     def test_primitive_coverage_gate_fails_on_one_note_tags(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -115,6 +119,33 @@ class CheckFrontierThinkingDataTests(unittest.TestCase):
         self.assertIn("avg_primitive_tags 1.0000 < 2.0000", reasons)
         self.assertIn("primitive_row_rate 0.0000 < 0.9000", reasons)
         self.assertIn("distinct_primitives 1 < 4", reasons)
+
+    def test_expected_primitive_coverage_gate_fails_when_required_tags_are_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "out.jsonl"
+            output.write_text(
+                json.dumps(
+                    {
+                        "target": "Analisis de traduccion: [SIGNIFICADO] conserva; [GRAMATICA] natural.",
+                        "expected_primitives": ["[SIGNIFICADO]", "[GRAMATICA]", "[ENTIDADES]"],
+                        "row_key": "a",
+                    }
+                )
+                + "\n"
+            )
+
+            primitives = checker.primitive_counts(output)
+            metrics = checker.gate_metrics({"written": 1, "failed": 0, "requested": 1}, primitives)
+            passed, reasons = checker.check_gate(
+                metrics,
+                min_written_rows=1,
+                min_accept_rate=0.5,
+                min_expected_primitive_coverage=1.0,
+            )
+
+        self.assertFalse(passed)
+        self.assertEqual(primitives["missing_expected_primitive_counts"]["[ENTIDADES]"], 1)
+        self.assertIn("expected_primitive_coverage 0.0000 < 1.0000", reasons)
 
 
 if __name__ == "__main__":

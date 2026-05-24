@@ -21,6 +21,7 @@ class ReportFrontierThinkingDataTests(unittest.TestCase):
                         "source": "Buenos dias.",
                         "reference": "Allin punchaw.",
                         "frontier_analysis": "[SIGNIFICADO] conserva; [ANTI_COPIA] evita copia.",
+                        "expected_primitives": ["[SIGNIFICADO]", "[ANTI_COPIA]"],
                         "frontier_score": 0.94,
                         "frontier_audit": {"pass": True, "score": 0.88, "reason": "concise"},
                     }
@@ -31,6 +32,7 @@ class ReportFrontierThinkingDataTests(unittest.TestCase):
                         "source": "Hola.",
                         "reference": "Rimaykullayki.",
                         "frontier_analysis": "[GRAMATICA] natural; [ENTIDADES] sin nombres.",
+                        "expected_primitives": ["[GRAMATICA]", "[ENTIDADES]", "[TERMINOLOGIA]"],
                         "frontier_score": 0.92,
                         "frontier_audit": {"pass": True, "score": 0.91, "reason": "grounded"},
                     }
@@ -70,6 +72,9 @@ class ReportFrontierThinkingDataTests(unittest.TestCase):
         self.assertEqual(payload["primitive_tag_counts"]["[SIGNIFICADO]"], 1)
         self.assertEqual(payload["primitive_tag_counts"]["[GRAMATICA]"], 1)
         self.assertEqual(payload["audit"]["audited_rows"], 2)
+        self.assertEqual(payload["expected_primitives"]["rows"], 2)
+        self.assertEqual(payload["expected_primitives"]["covered_rows"], 1)
+        self.assertEqual(payload["expected_primitives"]["missing_counts"]["[TERMINOLOGIA]"], 1)
         self.assertEqual(payload["failures"]["failure_reasons"]["failed_frontier_audit"], 1)
         self.assertEqual(payload["failures"]["audit_rejection_reasons"]["too vague"], 1)
         self.assertEqual(len(payload["accepted_samples"]), 2)
@@ -85,8 +90,10 @@ class ReportFrontierThinkingDataTests(unittest.TestCase):
                         "accept_rate": 0.6667,
                         "avg_primitive_tags": 2.0,
                         "distinct_primitives": 4.0,
+                        "expected_primitive_coverage": 1.0,
                     },
                     "primitive_tag_counts": {"[SIGNIFICADO]": 2},
+                    "expected_primitives": {"missing_counts": {}},
                     "failures": {"failure_reasons": {"failed_quality_filter": 1}},
                     "accepted_samples": [{"source": "Hola.", "frontier_analysis": "[SIGNIFICADO] conserva."}],
                 },
@@ -97,6 +104,7 @@ class ReportFrontierThinkingDataTests(unittest.TestCase):
 
         self.assertIn("Frontier Thinking Data Report", content)
         self.assertIn("Primitive Tags", content)
+        self.assertIn("Missing Expected Primitives", content)
         self.assertIn("failed_quality_filter", content)
 
 

@@ -82,6 +82,7 @@ def sample_record(record: dict[str, Any]) -> dict[str, Any]:
         "source": record.get("source"),
         "reference": record.get("reference"),
         "frontier_analysis": record.get("frontier_analysis"),
+        "expected_primitives": record.get("expected_primitives"),
         "frontier_score": record.get("frontier_score"),
         "audit": record.get("frontier_audit"),
     }
@@ -117,6 +118,12 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "gate_metrics": metrics,
         "primitive_tag_counts": primitives.get("primitive_tag_counts", {}),
         "primitive_row_tag_counts": primitives.get("primitive_row_tag_counts", []),
+        "expected_primitives": {
+            "rows": primitives.get("expected_primitive_rows", 0),
+            "covered_rows": primitives.get("expected_primitive_covered_rows", 0),
+            "coverage": metrics.get("expected_primitive_coverage", 0.0),
+            "missing_counts": primitives.get("missing_expected_primitive_counts", {}),
+        },
         "audit": audit_summary(accepted),
         "failures": failure_summary(failures),
         "accepted_samples": [sample_record(record) for record in accepted[: max(0, args.sample_size)]],
@@ -135,12 +142,20 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         f"- accept rate: {metrics['accept_rate']:.4f}",
         f"- avg primitive tags: {metrics['avg_primitive_tags']:.4f}",
         f"- distinct primitives: {metrics['distinct_primitives']:.0f}",
+        f"- expected primitive coverage: {metrics.get('expected_primitive_coverage', 0.0):.4f}",
         "",
         "## Primitive Tags",
         "",
     ]
     for tag, count in sorted(report["primitive_tag_counts"].items()):
         lines.append(f"- `{tag}`: {count}")
+    lines.extend(["", "## Missing Expected Primitives", ""])
+    missing_expected = report.get("expected_primitives", {}).get("missing_counts", {})
+    if missing_expected:
+        for tag, count in sorted(missing_expected.items()):
+            lines.append(f"- `{tag}`: {count}")
+    else:
+        lines.append("- none")
     lines.extend(["", "## Failure Reasons", ""])
     for reason, count in report["failures"]["failure_reasons"].items():
         lines.append(f"- `{reason}`: {count}")

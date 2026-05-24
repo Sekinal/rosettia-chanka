@@ -406,6 +406,19 @@ cd /root/rosettia-chanka
 experiments/gspo/queue_meta_verifier_v3_from_thinking_outputs.sh
 ```
 
+## Frontier Primitive Requirements
+
+The DeepSeek V4 Pro synthetic-thinking builder now makes primitive tags row-specific instead of only asking for "2 to 4 tags" globally. For each reviewed source/reference pair, `scripts/build_frontier_thinking_sft_jsonl.py` derives expected tags:
+
+- Always `[SIGNIFICADO]` and `[GRAMATICA]`, because every row should teach meaning preservation and Chanka-form checks.
+- Add `[ENTIDADES]` when the row has names, numbers, or similar entity signals.
+- Add `[TERMINOLOGIA]` for legal/domain terms when there is no stronger entity signal.
+- Otherwise add `[ANTI_COPIA]` to keep the model alert to Spanish-copy failure modes.
+
+The builder passes those expected tags in the DeepSeek prompt and rejects rows that omit them by default. Use `--no-require-expected-primitives` only for debugging or prompt exploration, not for serious SFT data. The pre-SFT gate also checks accepted JSONLs with `--min-expected-primitive-coverage`; `experiments/gspo/run_deepseek_v4_pro_thinking_sft_then_gspo.sh` defaults this to `MIN_FRONTIER_EXPECTED_PRIMITIVE_COVERAGE=0.95`.
+
+This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
+
 For a faster smoke:
 
 ```bash
