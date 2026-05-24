@@ -9,6 +9,7 @@ BASE_ADAPTER="${BASE_ADAPTER:-outputs/full_sft_sweeps/20260523-qwen35-4b-full-sf
 DATA_DIR="${DATA_DIR:-outputs/frontier_thinking_data_${STAMP}}"
 FRONTIER_JSONL="${FRONTIER_JSONL:-${DATA_DIR}/deepseek_v4_pro_thinking_sft.jsonl}"
 FRONTIER_FAILURES_JSONL="${FRONTIER_FAILURES_JSONL:-${DATA_DIR}/deepseek_v4_pro_thinking_failures.jsonl}"
+FRONTIER_SUMMARY_JSON="${FRONTIER_SUMMARY_JSON:-${DATA_DIR}/deepseek_v4_pro_thinking_sft.summary.json}"
 THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/deepseek_v4_pro_thinking_sft_${STAMP}}"
 THINKING_SFT_ADAPTER="${THINKING_SFT_ADAPTER:-${THINKING_SFT_OUTPUT_DIR}/final_lora}"
 GSPO_OUTPUT_DIR="${GSPO_OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_deepseek_seeded_${STAMP}}"
@@ -19,6 +20,8 @@ SFT_EVAL_PREDICTIONS="${SFT_EVAL_PREDICTIONS:-${SFT_EVAL_DIR}/predictions.jsonl}
 RUN_GSPO="${RUN_GSPO:-true}"
 MIN_SFT_CHRF_FOR_GSPO="${MIN_SFT_CHRF_FOR_GSPO:-35}"
 MIN_SFT_FORMAT_FOR_GSPO="${MIN_SFT_FORMAT_FOR_GSPO:-60}"
+MIN_FRONTIER_ROWS_FOR_SFT="${MIN_FRONTIER_ROWS_FOR_SFT:-64}"
+MIN_FRONTIER_ACCEPT_RATE="${MIN_FRONTIER_ACCEPT_RATE:-0.50}"
 
 cd "$ROOT_DIR"
 
@@ -52,6 +55,7 @@ fi
 "$PYTHON" scripts/build_frontier_thinking_sft_jsonl.py \
   --output-jsonl "$FRONTIER_JSONL" \
   --failures-jsonl "$FRONTIER_FAILURES_JSONL" \
+  --summary-json "$FRONTIER_SUMMARY_JSON" \
   --model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
   --reasoning-effort "${FRONTIER_REASONING_EFFORT:-max}" \
   --max-rows "${FRONTIER_MAX_ROWS:-128}" \
@@ -60,6 +64,13 @@ fi
   --max-retries "${FRONTIER_MAX_RETRIES:-3}" \
   --max-output-tokens "${FRONTIER_MAX_OUTPUT_TOKENS:-512}" \
   "${FRONTIER_ARGS[@]}"
+
+"$PYTHON" scripts/check_frontier_thinking_data.py \
+  --summary-json "$FRONTIER_SUMMARY_JSON" \
+  --output-jsonl "$FRONTIER_JSONL" \
+  --failures-jsonl "$FRONTIER_FAILURES_JSONL" \
+  --min-written-rows "$MIN_FRONTIER_ROWS_FOR_SFT" \
+  --min-accept-rate "$MIN_FRONTIER_ACCEPT_RATE"
 
 "$PYTHON" scripts/train_jsonl_sft_unsloth.py \
   --jsonl "$FRONTIER_JSONL" \
