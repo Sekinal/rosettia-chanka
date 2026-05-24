@@ -464,6 +464,16 @@ ${DATA_DIR}/deepseek_v4_pro_prompt_preview_gate.json
 
 `scripts/check_frontier_prompt_preview.py` verifies that the preview covers every selected row, uses the expected model/reasoning-effort, keeps thinking enabled, requests JSON output, contains no auth/API-key markers, puts each row's expected primitive tags in the actual required-tags line, and does not use the current row as a few-shot example. The selection-only preview call now receives the same reasoning, output-token, and few-shot settings as the paid generation call, so this gate checks the real intended payload instead of a default approximation.
 
+For review-only or no-key readiness runs, set:
+
+```bash
+RUN_FRONTIER_GENERATION=false
+```
+
+The chain then stops cleanly after source selection, prompt preview, and preflight checks, printing the relevant artifact paths instead of attempting paid frontier generation. This is preferable to relying on an expected missing-key failure when we only want to inspect the curriculum and prompts.
+
+The 2026-05-24 full readiness pass on the remote server wrote `outputs/frontier_preapi_readiness_20260524/`. It selected 128 reviewed rows with average expected primitive count `3.0`, all five primitive families represented (`[SIGNIFICADO]` 128, `[GRAMATICA]` 128, `[ENTIDADES]` 50, `[TERMINOLOGIA]` 28, `[ANTI_COPIA]` 50), and estimated max frontier requests `256` with audit. The prompt gate passed for 128/128 previews with `deepseek-v4-pro`, reasoning effort `max`, thinking enabled, JSON output, no auth/API-key markers, no missing expected tags, and no current-row few-shot leakage. The only blocker to actual generation remains setting `DEEPSEEK_API_KEY` safely in the runtime environment.
+
 This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
 
 For a faster smoke:

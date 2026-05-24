@@ -42,6 +42,7 @@ SFT_META_OUTPUT_DIR="${SFT_META_OUTPUT_DIR:-outputs/chanka_translation_meta_veri
 SFT_META_ADAPTER="${SFT_META_ADAPTER:-${SFT_META_OUTPUT_DIR}/final_meta_verifier_lora}"
 MIN_SFT_META_RECORDS_FOR_TRAIN="${MIN_SFT_META_RECORDS_FOR_TRAIN:-32}"
 RUN_GSPO="${RUN_GSPO:-true}"
+RUN_FRONTIER_GENERATION="${RUN_FRONTIER_GENERATION:-true}"
 RUN_GSPO_PROMOTION_GATE="${RUN_GSPO_PROMOTION_GATE:-true}"
 REQUIRE_GSPO_PROMOTION="${REQUIRE_GSPO_PROMOTION:-false}"
 MIN_SFT_CHRF_FOR_GSPO="${MIN_SFT_CHRF_FOR_GSPO:-35}"
@@ -147,6 +148,16 @@ if is_truthy "$RUN_PREFLIGHT"; then
     --api-key-env "${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}" \
     --min-free-gb "$PREFLIGHT_MIN_FREE_GB" \
     "${PREFLIGHT_ARGS[@]}"
+fi
+
+if is_falsey "$RUN_FRONTIER_GENERATION"; then
+  echo "RUN_FRONTIER_GENERATION=$RUN_FRONTIER_GENERATION; stopping after frontier selection, prompt preview, and preflight checks."
+  echo "Selection report: $FRONTIER_SELECTION_REPORT_JSON"
+  echo "Selection gate: $FRONTIER_SELECTION_GATE_JSON"
+  echo "Prompt preview: $FRONTIER_PROMPT_PREVIEW_JSONL"
+  echo "Prompt preview gate: $FRONTIER_PROMPT_PREVIEW_GATE_JSON"
+  echo "Preflight report: $PREFLIGHT_REPORT_JSON"
+  exit 0
 fi
 
 if [[ -z "${META_VERIFIER_ADAPTER:-}" ]]; then
