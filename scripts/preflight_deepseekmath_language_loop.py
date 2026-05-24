@@ -24,6 +24,7 @@ DEFAULT_REQUIRED_PATHS = (
     "scripts/write_deepseekmath_cycle_manifest.py",
     "scripts/check_deepseekmath_cycle_manifest.py",
     "scripts/summarize_deepseekmath_cycles.py",
+    "scripts/select_deepseekmath_cycle.py",
     "experiments/gspo/run_2511_self_verifiable_thinking_translation.sh",
 )
 

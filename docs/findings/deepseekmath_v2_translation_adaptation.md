@@ -293,6 +293,8 @@ Manifests also record the produced `policy_adapter`, so a promoted cycle has a d
 
 `scripts/check_deepseekmath_cycle_manifest.py` turns that rule into a gate. It loads a `cycle_manifest.json`, checks promotion status, artifact completeness, the existence of `policy_adapter`, and minimum headline metrics, then exits nonzero with reasons if the cycle should not be used as the next base policy.
 
+`scripts/select_deepseekmath_cycle.py <cycle-root>` applies that gate across a directory of manifests and selects the highest-ranked passing cycle. Its JSON output includes the next `policy_adapter` and that cycle's metrics path as `baseline_metrics_json`, which is the clean handoff into the next hardcase/meta-verifier iteration.
+
 The two-step iteration can also be launched as one command:
 
 ```bash
