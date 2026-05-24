@@ -14,7 +14,10 @@ PREFLIGHT_REPORT_JSON="${PREFLIGHT_REPORT_JSON:-${DATA_DIR}/preflight_report.jso
 THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/deepseek_v4_pro_thinking_sft_${STAMP}}"
 THINKING_SFT_ADAPTER="${THINKING_SFT_ADAPTER:-${THINKING_SFT_OUTPUT_DIR}/final_lora}"
 GSPO_OUTPUT_DIR="${GSPO_OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_deepseek_seeded_${STAMP}}"
+GSPO_METRICS_JSON="${GSPO_METRICS_JSON:-${GSPO_OUTPUT_DIR}/chanka_gspo/final_metrics.json}"
 GSPO_PREDICTIONS_JSONL="${GSPO_PREDICTIONS_JSONL:-${GSPO_OUTPUT_DIR}/chanka_gspo/final_predictions.jsonl}"
+GSPO_PROMOTION_JSON="${GSPO_PROMOTION_JSON:-${GSPO_OUTPUT_DIR}/chanka_gspo/promotion_gate.json}"
+GSPO_CYCLE_MANIFEST_JSON="${GSPO_CYCLE_MANIFEST_JSON:-${GSPO_OUTPUT_DIR}/cycle_manifest.json}"
 GSPO_META_JSONL="${GSPO_META_JSONL:-${GSPO_OUTPUT_DIR}/chanka_gspo/meta_hardcases_from_gspo_eval.jsonl}"
 GSPO_META_SUMMARY_JSON="${GSPO_META_SUMMARY_JSON:-${GSPO_OUTPUT_DIR}/chanka_gspo/meta_hardcases_from_gspo_eval.summary.json}"
 TERMINOLOGY_FILE="${TERMINOLOGY_FILE:-clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet}"
@@ -31,6 +34,8 @@ SFT_META_OUTPUT_DIR="${SFT_META_OUTPUT_DIR:-outputs/chanka_translation_meta_veri
 SFT_META_ADAPTER="${SFT_META_ADAPTER:-${SFT_META_OUTPUT_DIR}/final_meta_verifier_lora}"
 MIN_SFT_META_RECORDS_FOR_TRAIN="${MIN_SFT_META_RECORDS_FOR_TRAIN:-32}"
 RUN_GSPO="${RUN_GSPO:-true}"
+RUN_GSPO_PROMOTION_GATE="${RUN_GSPO_PROMOTION_GATE:-true}"
+REQUIRE_GSPO_PROMOTION="${REQUIRE_GSPO_PROMOTION:-false}"
 MIN_SFT_CHRF_FOR_GSPO="${MIN_SFT_CHRF_FOR_GSPO:-35}"
 MIN_SFT_FORMAT_FOR_GSPO="${MIN_SFT_FORMAT_FOR_GSPO:-60}"
 MIN_FRONTIER_ROWS_FOR_SFT="${MIN_FRONTIER_ROWS_FOR_SFT:-64}"
@@ -248,6 +253,7 @@ fi
 BASE_MODEL="$THINKING_SFT_ADAPTER" \
 META_VERIFIER_ADAPTER="$META_VERIFIER_ADAPTER" \
 OUTPUT_DIR="$GSPO_OUTPUT_DIR" \
+METRICS_JSON="$GSPO_METRICS_JSON" \
 PREDICTIONS_JSONL="$GSPO_PREDICTIONS_JSONL" \
 MAX_STEPS="${GSPO_MAX_STEPS:-8}" \
 EVAL_STEPS="${GSPO_EVAL_STEPS:-8}" \
@@ -258,6 +264,31 @@ TRAINER_EVAL="${GSPO_TRAINER_EVAL:-false}" \
 FINAL_METRICS_MAX_SAMPLES="${GSPO_FINAL_METRICS_MAX_SAMPLES:-16}" \
 FINAL_GENERATION_BATCH_SIZE="${GSPO_FINAL_GENERATION_BATCH_SIZE:-8}" \
 experiments/gspo/run_2511_self_verifiable_thinking_translation.sh
+
+GSPO_PROMOTION_FAILED=0
+if is_truthy "$RUN_GSPO_PROMOTION_GATE"; then
+  if "$PYTHON" scripts/check_policy_iteration_metrics.py \
+    --candidate-json "$GSPO_METRICS_JSON" \
+    --baseline-json "$SFT_EVAL_JSON" \
+    --output-json "$GSPO_PROMOTION_JSON" \
+    --min-chrf "${PROMOTION_MIN_CHRF:-35}" \
+    --min-bleu "${PROMOTION_MIN_BLEU:-8}" \
+    --min-token-f1 "${PROMOTION_MIN_TOKEN_F1:-15}" \
+    --max-ter "${PROMOTION_MAX_TER:-120}" \
+    --min-format-rate "${PROMOTION_MIN_FORMAT_RATE:-50}" \
+    --max-false-confidence-rate "${PROMOTION_MAX_FALSE_CONFIDENCE_RATE:-95}" \
+    --max-missing-score-rate "${PROMOTION_MAX_MISSING_SCORE_RATE:-50}" \
+    --min-chrf-delta "${PROMOTION_MIN_CHRF_DELTA:--1}" \
+    --min-bleu-delta "${PROMOTION_MIN_BLEU_DELTA:--1}" \
+    --min-token-f1-delta "${PROMOTION_MIN_TOKEN_F1_DELTA:--1}" \
+    --max-false-confidence-delta "${PROMOTION_MAX_FALSE_CONFIDENCE_DELTA:-5}"
+  then
+    echo "Initial GSPO promotion gate passed: $GSPO_PROMOTION_JSON"
+  else
+    GSPO_PROMOTION_FAILED=1
+    echo "Initial GSPO promotion gate failed: $GSPO_PROMOTION_JSON"
+  fi
+fi
 
 if is_truthy "$MINE_GSPO_META" && [[ -f "$GSPO_PREDICTIONS_JSONL" ]]; then
   GSPO_META_ARGS=()
@@ -272,4 +303,28 @@ if is_truthy "$MINE_GSPO_META" && [[ -f "$GSPO_PREDICTIONS_JSONL" ]]; then
     "${GSPO_META_ARGS[@]}"
 elif is_truthy "$MINE_GSPO_META"; then
   echo "No GSPO predictions JSONL found at $GSPO_PREDICTIONS_JSONL; skipping post-GSPO meta hardcase mining."
+fi
+
+MANIFEST_INPUT_ARGS=()
+if [[ -f "$SFT_META_JSONL" ]]; then
+  MANIFEST_INPUT_ARGS+=(--input-hardcase-jsonl "$SFT_META_JSONL")
+fi
+
+"$PYTHON" scripts/write_deepseekmath_cycle_manifest.py \
+  --output-json "$GSPO_CYCLE_MANIFEST_JSON" \
+  --stamp "$STAMP" \
+  --base-model "$THINKING_SFT_ADAPTER" \
+  --meta-verifier-adapter "$META_VERIFIER_ADAPTER" \
+  --meta-output-dir "$SFT_META_OUTPUT_DIR" \
+  --followup-output-dir "$GSPO_OUTPUT_DIR" \
+  --metrics-json "$GSPO_METRICS_JSON" \
+  --promotion-json "$GSPO_PROMOTION_JSON" \
+  --predictions-jsonl "$GSPO_PREDICTIONS_JSONL" \
+  --output-hardcase-jsonl "$GSPO_META_JSONL" \
+  --baseline-metrics-json "$SFT_EVAL_JSON" \
+  "${MANIFEST_INPUT_ARGS[@]}"
+
+echo "Initial GSPO cycle manifest: $GSPO_CYCLE_MANIFEST_JSON"
+if [[ "$GSPO_PROMOTION_FAILED" -eq 1 ]] && is_truthy "$REQUIRE_GSPO_PROMOTION"; then
+  exit 1
 fi
