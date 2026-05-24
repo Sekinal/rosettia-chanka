@@ -326,6 +326,33 @@ def build_dataset(
     )
 
 
+def trainable_parameter_count(model: Any) -> int:
+    return sum(parameter.numel() for parameter in model.parameters() if parameter.requires_grad)
+
+
+def attach_fresh_lora(model: Any, args: argparse.Namespace, fast_language_model: Any) -> Any:
+    return fast_language_model.get_peft_model(
+        model,
+        r=args.lora_r,
+        target_modules=[
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ],
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
+        bias="none",
+        use_gradient_checkpointing="unsloth",
+        random_state=args.seed,
+        max_seq_length=args.max_seq_length,
+        **train_sft.adapter_flags(args.adapter_method),
+    )
+
+
 def main() -> None:
     args = parse_args()
     train_sft.validate_training_mode_args(args)
@@ -372,27 +399,19 @@ def main() -> None:
         load_in_16bit=args.training_mode == "lora" and not args.load_in_4bit,
         full_finetuning=args.training_mode == "full",
     )
-    if args.training_mode == "lora" and args.adapter_path is None:
-        model = FastLanguageModel.get_peft_model(
-            model,
-            r=args.lora_r,
-            target_modules=[
-                "q_proj",
-                "k_proj",
-                "v_proj",
-                "o_proj",
-                "gate_proj",
-                "up_proj",
-                "down_proj",
-            ],
-            lora_alpha=args.lora_alpha,
-            lora_dropout=args.lora_dropout,
-            bias="none",
-            use_gradient_checkpointing="unsloth",
-            random_state=args.seed,
-            max_seq_length=args.max_seq_length,
-            **train_sft.adapter_flags(args.adapter_method),
-        )
+    initial_trainable_parameters = trainable_parameter_count(model)
+    attached_fresh_lora = False
+    if args.training_mode == "lora" and (args.adapter_path is None or initial_trainable_parameters == 0):
+        if args.adapter_path is not None and hasattr(model, "peft_config"):
+            raise RuntimeError(
+                "Loaded adapter has PEFT config but no trainable parameters. "
+                "Refusing to silently continue with a frozen adapter."
+            )
+        model = attach_fresh_lora(model, args, FastLanguageModel)
+        attached_fresh_lora = True
+    final_trainable_parameters = trainable_parameter_count(model)
+    if args.training_mode == "lora" and final_trainable_parameters == 0:
+        raise RuntimeError("LoRA SFT setup produced zero trainable parameters.")
 
     train_dataset = build_dataset(
         tokenizer,
@@ -477,6 +496,9 @@ def main() -> None:
     print(f"Model or adapter: {model_name_or_adapter}")
     if args.training_mode == "lora":
         print(f"LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")
+        print(f"Initial trainable parameters: {initial_trainable_parameters:,}")
+        print(f"Attached fresh LoRA: {attached_fresh_lora}")
+        print(f"Final trainable parameters: {final_trainable_parameters:,}")
     print(f"Validation: every {args.eval_steps} steps, best checkpoint by eval_loss")
     print(f"Saving: every {args.save_steps} steps, keeping {args.save_total_limit} checkpoints")
     print(f"Save only model: {args.save_only_model}")

@@ -17,6 +17,23 @@ class DummyTokenizer:
         return "\n".join(f"{message['role']}: {message['content']}" for message in messages)
 
 
+class DummyParameter:
+    def __init__(self, size: int, requires_grad: bool):
+        self._size = size
+        self.requires_grad = requires_grad
+
+    def numel(self) -> int:
+        return self._size
+
+
+class DummyModel:
+    def __init__(self, parameters):
+        self._parameters = parameters
+
+    def parameters(self):
+        return iter(self._parameters)
+
+
 def write_jsonl(path: Path, records: list[dict[str, str]]) -> None:
     with path.open("w") as handle:
         for record in records:
@@ -203,6 +220,11 @@ class TrainJsonlSftUnslothTests(unittest.TestCase):
         train_jsonl_sft.configure_step_schedule(args, train_row_count=512)
 
         self.assertTrue(args.save_only_model)
+
+    def test_trainable_parameter_count_counts_only_trainable_weights(self):
+        model = DummyModel([DummyParameter(10, True), DummyParameter(20, False), DummyParameter(3, True)])
+
+        self.assertEqual(train_jsonl_sft.trainable_parameter_count(model), 13)
 
 
 if __name__ == "__main__":
