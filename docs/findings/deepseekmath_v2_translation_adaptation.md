@@ -428,6 +428,14 @@ ${DATA_DIR}/deepseek_v4_pro_source_selection_report.md
 
 This is produced through the builder's `--selection-only` mode, so it still works when `DEEPSEEK_API_KEY` is absent. Use it to inspect selected Spanish/Chanka rows and expected primitive counts before approving a paid frontier generation run.
 
+The selection report is now gated by `scripts/check_frontier_selection_report.py` before preflight or API calls. The chain writes:
+
+```text
+${DATA_DIR}/deepseek_v4_pro_source_selection_gate.json
+```
+
+Default gate values require enough rows for SFT, all five expected primitive families, average expected primitives per row >= `2.5`, and at least one selected row for every primitive tag. Disable with `RUN_FRONTIER_SELECTION_GATE=false` only when debugging the wrapper itself.
+
 This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
 
 For a faster smoke:
