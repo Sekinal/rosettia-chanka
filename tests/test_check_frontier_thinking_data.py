@@ -49,6 +49,73 @@ class CheckFrontierThinkingDataTests(unittest.TestCase):
 
         self.assertEqual(counts, {"written": 2, "failed": 1, "requested": 3})
 
+    def test_primitive_coverage_gate_passes_on_diverse_tags(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "out.jsonl"
+            output.write_text(
+                json.dumps(
+                    {
+                        "frontier_analysis": "[SIGNIFICADO] conserva; [GRAMATICA] revisa sufijo.",
+                        "row_key": "a",
+                    }
+                )
+                + "\n"
+                + json.dumps(
+                    {
+                        "frontier_analysis": "[ENTIDADES] preserva nombre; [ANTI_COPIA] evita espanol.",
+                        "row_key": "b",
+                    }
+                )
+                + "\n"
+            )
+
+            primitives = checker.primitive_counts(output)
+            metrics = checker.gate_metrics(
+                {"written": 2, "failed": 0, "requested": 2},
+                primitives,
+                min_tags_per_row=2,
+            )
+            passed, reasons = checker.check_gate(
+                metrics,
+                min_written_rows=2,
+                min_accept_rate=0.5,
+                min_primitive_tags_per_row=2,
+                min_primitive_row_rate=1.0,
+                min_distinct_primitives=4,
+            )
+
+        self.assertTrue(passed)
+        self.assertEqual(reasons, [])
+        self.assertEqual(metrics["avg_primitive_tags"], 2.0)
+        self.assertEqual(metrics["distinct_primitives"], 4.0)
+        self.assertEqual(metrics["primitive_row_rate"], 1.0)
+
+    def test_primitive_coverage_gate_fails_on_one_note_tags(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "out.jsonl"
+            output.write_text(
+                json.dumps({"target": "Analisis de traduccion: [SIGNIFICADO] conserva.", "row_key": "a"}) + "\n"
+            )
+
+            metrics = checker.gate_metrics(
+                {"written": 1, "failed": 0, "requested": 1},
+                checker.primitive_counts(output),
+                min_tags_per_row=2,
+            )
+            passed, reasons = checker.check_gate(
+                metrics,
+                min_written_rows=1,
+                min_accept_rate=0.5,
+                min_primitive_tags_per_row=2,
+                min_primitive_row_rate=0.9,
+                min_distinct_primitives=4,
+            )
+
+        self.assertFalse(passed)
+        self.assertIn("avg_primitive_tags 1.0000 < 2.0000", reasons)
+        self.assertIn("primitive_row_rate 0.0000 < 0.9000", reasons)
+        self.assertIn("distinct_primitives 1 < 4", reasons)
+
 
 if __name__ == "__main__":
     unittest.main()

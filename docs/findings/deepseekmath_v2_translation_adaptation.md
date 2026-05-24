@@ -229,7 +229,7 @@ The audit pass returns `pass`, `score`, and `reason`, and rejects rows below `--
 
 The builder writes incrementally now: accepted rows are appended directly to the output JSONL, rejected/error rows go to a failures JSONL, and `--resume` is enabled by default. This is important for API work because a timeout halfway through should not waste already-paid frontier calls. Use `--retry-failures` only after changing the prompt/model or when the failures were transient API errors.
 
-Before SFT, `scripts/check_frontier_thinking_data.py` now gates on accepted-row count and accept rate. The chain defaults to `MIN_FRONTIER_ROWS_FOR_SFT=64` and `MIN_FRONTIER_ACCEPT_RATE=0.50`; lower those only for smoke tests. This prevents training the student on a tiny or mostly rejected frontier batch, which would make the next RL result uninterpretable.
+Before SFT, `scripts/check_frontier_thinking_data.py` now gates on accepted-row count, accept rate, and primitive coverage. The chain defaults to `MIN_FRONTIER_ROWS_FOR_SFT=64`, `MIN_FRONTIER_ACCEPT_RATE=0.50`, `MIN_FRONTIER_PRIMITIVE_TAGS_PER_ROW=2`, `MIN_FRONTIER_PRIMITIVE_ROW_RATE=0.90`, and `MIN_FRONTIER_DISTINCT_PRIMITIVES=4`; lower those only for smoke tests. This prevents training the student on a tiny, mostly rejected, or one-note frontier batch, which would make the next RL result uninterpretable.
 
 The chained experiment now evaluates SFT-only before RL. It runs `scripts/evaluate_gspo_checkpoint.py --self-verification-thinking-output` after the frontier SFT and only enters GSPO if `MIN_SFT_CHRF_FOR_GSPO` and `MIN_SFT_FORMAT_FOR_GSPO` are met. If the SFT head-start already collapses translation quality or format adherence, the script exits without spending time on another GSPO collapse.
 
