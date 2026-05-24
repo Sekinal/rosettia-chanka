@@ -278,6 +278,18 @@ That follow-up runner performs a small self-verifiable thinking GSPO pass, write
 
 Promotion is now explicit. `scripts/check_policy_iteration_metrics.py` writes a pass/fail JSON report using chrF++/BLEU/token-F1/TER, self-verification required-format rate, false-confidence, and missing-score thresholds. `run_followup_gspo_with_meta_verifier.sh` writes this as `promotion_gate.json`; pass `BASELINE_METRICS_JSON` to compare against the previous SFT or policy metrics. For exploratory loops, leave `REQUIRE_PROMOTION=false` so the run still mines hardcases after a failed gate. For serious model promotion, set `REQUIRE_PROMOTION=true`. This guard exists because earlier runs showed trainer reward increasing while chrF++/BLEU collapsed.
 
+The two-step iteration can also be launched as one command:
+
+```bash
+BASE_MODEL=outputs/deepseek_v4_pro_thinking_sft_<stamp>/final_lora \
+SFT_META_JSONL=outputs/deepseek_v4_pro_thinking_sft_<stamp>/sft_only_eval/meta_hardcases_from_sft_eval.jsonl \
+GSPO_META_JSONL=outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_deepseek_seeded_<stamp>/chanka_gspo/meta_hardcases_from_gspo_eval.jsonl \
+BASELINE_METRICS_JSON=outputs/deepseek_v4_pro_thinking_sft_<stamp>/sft_only_eval/metrics.json \
+experiments/gspo/run_hardcase_meta_then_followup_gspo_cycle.sh
+```
+
+This wrapper trains the next meta-verifier and immediately runs the follow-up GSPO pass with promotion gating and hardcase mining. Use it after the first DeepSeek V4 Pro frontier SFT run has produced real SFT/GSPO hardcases.
+
 ## SFT-Seeded GSPO Negative Result
 
 The deterministic primitive-thinking SFT seed did not fix the RL collapse:
