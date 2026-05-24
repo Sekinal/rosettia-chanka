@@ -36,6 +36,7 @@ SFT_EVAL_JSON="${SFT_EVAL_JSON:-${SFT_EVAL_DIR}/metrics.json}"
 SFT_EVAL_PREDICTIONS="${SFT_EVAL_PREDICTIONS:-${SFT_EVAL_DIR}/predictions.jsonl}"
 SFT_META_JSONL="${SFT_META_JSONL:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.jsonl}"
 SFT_META_SUMMARY_JSON="${SFT_META_SUMMARY_JSON:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.summary.json}"
+SFT_PROMOTION_JSON="${SFT_PROMOTION_JSON:-${SFT_EVAL_DIR}/promotion_gate.json}"
 SFT_CYCLE_MANIFEST_JSON="${SFT_CYCLE_MANIFEST_JSON:-${THINKING_SFT_OUTPUT_DIR}/cycle_manifest.json}"
 MINE_SFT_META="${MINE_SFT_META:-true}"
 MINE_GSPO_META="${MINE_GSPO_META:-true}"
@@ -47,7 +48,9 @@ MIN_SFT_META_RECORDS_FOR_TRAIN="${MIN_SFT_META_RECORDS_FOR_TRAIN:-32}"
 RUN_GSPO="${RUN_GSPO:-true}"
 RUN_FRONTIER_GENERATION="${RUN_FRONTIER_GENERATION:-true}"
 RUN_THINKING_SFT="${RUN_THINKING_SFT:-true}"
+RUN_SFT_PROMOTION_GATE="${RUN_SFT_PROMOTION_GATE:-true}"
 RUN_GSPO_PROMOTION_GATE="${RUN_GSPO_PROMOTION_GATE:-true}"
+REQUIRE_SFT_PROMOTION="${REQUIRE_SFT_PROMOTION:-false}"
 REQUIRE_GSPO_PROMOTION="${REQUIRE_GSPO_PROMOTION:-false}"
 MIN_SFT_CHRF_FOR_GSPO="${MIN_SFT_CHRF_FOR_GSPO:-35}"
 MIN_SFT_FORMAT_FOR_GSPO="${MIN_SFT_FORMAT_FOR_GSPO:-60}"
@@ -78,10 +81,6 @@ is_falsey() {
 }
 
 write_sft_seed_manifest() {
-  SFT_MANIFEST_INPUT_ARGS=()
-  if [[ -f "$SFT_META_JSONL" ]]; then
-    SFT_MANIFEST_INPUT_ARGS+=(--input-hardcase-jsonl "$SFT_META_JSONL")
-  fi
   SFT_MANIFEST_BASELINE_ARGS=()
   if [[ -n "${SFT_BASELINE_METRICS_JSON:-}" ]]; then
     SFT_MANIFEST_BASELINE_ARGS+=(--baseline-metrics-json "$SFT_BASELINE_METRICS_JSON")
@@ -96,10 +95,9 @@ write_sft_seed_manifest() {
     --meta-output-dir "$SFT_META_OUTPUT_DIR" \
     --followup-output-dir "$THINKING_SFT_OUTPUT_DIR" \
     --metrics-json "$SFT_EVAL_JSON" \
-    --promotion-json "${SFT_PROMOTION_JSON:-${SFT_EVAL_DIR}/promotion_gate.json}" \
+    --promotion-json "$SFT_PROMOTION_JSON" \
     --predictions-jsonl "$SFT_EVAL_PREDICTIONS" \
     --output-hardcase-jsonl "$SFT_META_JSONL" \
-    "${SFT_MANIFEST_INPUT_ARGS[@]}" \
     "${SFT_MANIFEST_BASELINE_ARGS[@]}"
 }
 
@@ -336,11 +334,43 @@ if is_truthy "$MINE_SFT_META"; then
     "${SFT_META_ARGS[@]}"
 fi
 
+SFT_PROMOTION_FAILED=0
+if is_truthy "$RUN_SFT_PROMOTION_GATE"; then
+  SFT_PROMOTION_BASELINE_ARGS=()
+  if [[ -n "${SFT_BASELINE_METRICS_JSON:-}" ]]; then
+    SFT_PROMOTION_BASELINE_ARGS+=(--baseline-json "$SFT_BASELINE_METRICS_JSON")
+  fi
+  if "$PYTHON" scripts/check_policy_iteration_metrics.py \
+    --candidate-json "$SFT_EVAL_JSON" \
+    --output-json "$SFT_PROMOTION_JSON" \
+    --min-chrf "${SFT_PROMOTION_MIN_CHRF:-35}" \
+    --min-bleu "${SFT_PROMOTION_MIN_BLEU:-8}" \
+    --min-token-f1 "${SFT_PROMOTION_MIN_TOKEN_F1:-15}" \
+    --max-ter "${SFT_PROMOTION_MAX_TER:-120}" \
+    --min-format-rate "${SFT_PROMOTION_MIN_FORMAT_RATE:-50}" \
+    --max-false-confidence-rate "${SFT_PROMOTION_MAX_FALSE_CONFIDENCE_RATE:-95}" \
+    --max-missing-score-rate "${SFT_PROMOTION_MAX_MISSING_SCORE_RATE:-50}" \
+    --min-chrf-delta "${SFT_PROMOTION_MIN_CHRF_DELTA:--1}" \
+    --min-bleu-delta "${SFT_PROMOTION_MIN_BLEU_DELTA:--1}" \
+    --min-token-f1-delta "${SFT_PROMOTION_MIN_TOKEN_F1_DELTA:--1}" \
+    --max-false-confidence-delta "${SFT_PROMOTION_MAX_FALSE_CONFIDENCE_DELTA:-5}" \
+    "${SFT_PROMOTION_BASELINE_ARGS[@]}"
+  then
+    echo "SFT seed promotion gate passed: $SFT_PROMOTION_JSON"
+  else
+    SFT_PROMOTION_FAILED=1
+    echo "SFT seed promotion gate failed: $SFT_PROMOTION_JSON"
+  fi
+fi
+
 write_sft_seed_manifest
 
 if is_falsey "$RUN_GSPO"; then
   echo "RUN_GSPO=$RUN_GSPO; stopping after SFT-only evaluation at $SFT_EVAL_JSON"
   echo "SFT seed cycle manifest: $SFT_CYCLE_MANIFEST_JSON"
+  if [[ "$SFT_PROMOTION_FAILED" -eq 1 ]] && is_truthy "$REQUIRE_SFT_PROMOTION"; then
+    exit 1
+  fi
   exit 0
 fi
 
@@ -414,7 +444,15 @@ PY
 then
   echo "SFT-only gate failed; skipping GSPO to avoid another translation collapse."
   echo "SFT seed cycle manifest: $SFT_CYCLE_MANIFEST_JSON"
+  if [[ "$SFT_PROMOTION_FAILED" -eq 1 ]] && is_truthy "$REQUIRE_SFT_PROMOTION"; then
+    exit 1
+  fi
   exit 0
+fi
+
+if [[ "$SFT_PROMOTION_FAILED" -eq 1 ]] && is_truthy "$REQUIRE_SFT_PROMOTION"; then
+  echo "SFT promotion was required and failed; stopping before GSPO."
+  exit 1
 fi
 
 BASE_MODEL="$THINKING_SFT_ADAPTER" \
