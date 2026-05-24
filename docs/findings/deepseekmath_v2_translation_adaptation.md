@@ -298,13 +298,13 @@ Manifests also record the produced `policy_adapter`, so a promoted cycle has a d
 The two-step iteration can also be launched as one command:
 
 ```bash
-BASE_CYCLE_MANIFEST=outputs/deepseek_v4_pro_thinking_sft_<stamp>/cycle_manifest.json \
+BASE_CYCLE_ROOT=outputs \
 SFT_META_JSONL=outputs/deepseek_v4_pro_thinking_sft_<stamp>/sft_only_eval/meta_hardcases_from_sft_eval.jsonl \
 GSPO_META_JSONL=outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_deepseek_seeded_<stamp>/chanka_gspo/meta_hardcases_from_gspo_eval.jsonl \
 experiments/gspo/run_hardcase_meta_then_followup_gspo_cycle.sh
 ```
 
-This wrapper gates the base cycle manifest, derives `BASE_MODEL` from its checked `policy_adapter`, uses that manifest's metrics as the default baseline, trains the next meta-verifier, and immediately runs the follow-up GSPO pass with promotion gating and hardcase mining. Use it after the first DeepSeek V4 Pro frontier SFT run has produced real SFT/GSPO hardcases.
+This wrapper can select from `BASE_CYCLE_ROOT` automatically, or use an explicit `BASE_CYCLE_MANIFEST` for targeted runs. It gates the selected base cycle manifest, derives `BASE_MODEL` from its checked `policy_adapter`, uses that manifest's metrics as the default baseline, trains the next meta-verifier, and immediately runs the follow-up GSPO pass with promotion gating and hardcase mining. Use it after the first DeepSeek V4 Pro frontier SFT run has produced real SFT/GSPO hardcases.
 
 The wrapper also writes `cycle_manifest.json` in the follow-up output directory. That manifest records the base policy, produced policy adapter, refreshed meta-verifier adapter, promotion gate, final metrics, input hardcase counts, and newly mined hardcase counts. Treat this manifest as the audit record for the iteration; shell logs are secondary.
 

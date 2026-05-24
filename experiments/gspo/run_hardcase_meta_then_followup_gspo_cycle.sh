@@ -8,6 +8,8 @@ STAMP="${STAMP:-$(date -u +%Y%m%d-hardcase-cycle)}"
 BASE_MODEL="${BASE_MODEL:-}"
 BASE_CYCLE_MANIFEST="${BASE_CYCLE_MANIFEST:-}"
 BASE_CYCLE_GATE_JSON="${BASE_CYCLE_GATE_JSON:-}"
+BASE_CYCLE_ROOT="${BASE_CYCLE_ROOT:-}"
+BASE_CYCLE_SELECTION_JSON="${BASE_CYCLE_SELECTION_JSON:-}"
 META_OUTPUT_DIR="${META_OUTPUT_DIR:-outputs/chanka_translation_meta_verifier_iter_${STAMP}}"
 FOLLOWUP_OUTPUT_DIR="${FOLLOWUP_OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_cycle_${STAMP}}"
 BASELINE_METRICS_JSON="${BASELINE_METRICS_JSON:-}"
@@ -15,6 +17,37 @@ REQUIRE_PROMOTION="${REQUIRE_PROMOTION:-false}"
 CYCLE_MANIFEST_JSON="${CYCLE_MANIFEST_JSON:-${FOLLOWUP_OUTPUT_DIR}/cycle_manifest.json}"
 
 cd "$ROOT_DIR"
+
+if [[ -n "$BASE_CYCLE_ROOT" && -z "$BASE_CYCLE_MANIFEST" ]]; then
+  if [[ -z "$BASE_CYCLE_SELECTION_JSON" ]]; then
+    BASE_CYCLE_SELECTION_JSON="${FOLLOWUP_OUTPUT_DIR}/base_cycle_selection.json"
+  fi
+  "$PYTHON" scripts/select_deepseekmath_cycle.py "$BASE_CYCLE_ROOT" \
+    --output-json "$BASE_CYCLE_SELECTION_JSON" \
+    --min-chrf "${BASE_CYCLE_MIN_CHRF:-35}" \
+    --min-bleu "${BASE_CYCLE_MIN_BLEU:-8}" \
+    --min-token-f1 "${BASE_CYCLE_MIN_TOKEN_F1:-15}"
+  BASE_CYCLE_MANIFEST="$("$PYTHON" - <<'PY' "$BASE_CYCLE_SELECTION_JSON"
+import json
+import sys
+from pathlib import Path
+
+selection = json.loads(Path(sys.argv[1]).read_text())
+print(selection["selected"]["manifest_json"])
+PY
+)"
+  if [[ -z "$BASELINE_METRICS_JSON" ]]; then
+    BASELINE_METRICS_JSON="$("$PYTHON" - <<'PY' "$BASE_CYCLE_SELECTION_JSON"
+import json
+import sys
+from pathlib import Path
+
+selection = json.loads(Path(sys.argv[1]).read_text())
+print(selection["selected"].get("baseline_metrics_json") or "")
+PY
+)"
+  fi
+fi
 
 if [[ -n "$BASE_CYCLE_MANIFEST" ]]; then
   if [[ -z "$BASE_CYCLE_GATE_JSON" ]]; then
@@ -50,7 +83,7 @@ PY
 fi
 
 if [[ -z "$BASE_MODEL" ]]; then
-  echo "BASE_MODEL or BASE_CYCLE_MANIFEST is required. Use a promoted cycle manifest or a previous policy adapter." >&2
+  echo "BASE_MODEL, BASE_CYCLE_MANIFEST, or BASE_CYCLE_ROOT is required. Use a promoted cycle manifest/root or a previous policy adapter." >&2
   exit 1
 fi
 
@@ -107,6 +140,9 @@ echo "Cycle base model: $BASE_MODEL"
 if [[ -n "$BASE_CYCLE_MANIFEST" ]]; then
   echo "Cycle base manifest: $BASE_CYCLE_MANIFEST"
   echo "Cycle base gate: $BASE_CYCLE_GATE_JSON"
+fi
+if [[ -n "$BASE_CYCLE_SELECTION_JSON" ]]; then
+  echo "Cycle base selection: $BASE_CYCLE_SELECTION_JSON"
 fi
 echo "Cycle follow-up output: $FOLLOWUP_OUTPUT_DIR"
 echo "Cycle manifest: $CYCLE_MANIFEST_JSON"
