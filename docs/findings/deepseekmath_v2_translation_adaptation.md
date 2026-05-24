@@ -290,6 +290,8 @@ experiments/gspo/run_hardcase_meta_then_followup_gspo_cycle.sh
 
 This wrapper trains the next meta-verifier and immediately runs the follow-up GSPO pass with promotion gating and hardcase mining. Use it after the first DeepSeek V4 Pro frontier SFT run has produced real SFT/GSPO hardcases.
 
+The wrapper also writes `cycle_manifest.json` in the follow-up output directory. That manifest records the base policy, refreshed meta-verifier adapter, promotion gate, final metrics, input hardcase counts, and newly mined hardcase counts. Treat this manifest as the audit record for the iteration; shell logs are secondary.
+
 ## SFT-Seeded GSPO Negative Result
 
 The deterministic primitive-thinking SFT seed did not fix the RL collapse:
