@@ -13,7 +13,7 @@ import math
 import random
 import re
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 import polars as pl
 from datasets import Dataset
@@ -335,6 +335,19 @@ def validate_grpo_batching(args: argparse.Namespace) -> None:
             f"({args.per_device_eval_batch_size}) to be divisible by num_generations "
             f"({args.num_generations})."
         )
+
+
+def trainable_parameter_count(model: Any) -> int:
+    return sum(parameter.numel() for parameter in model.parameters() if parameter.requires_grad)
+
+
+def enable_peft_adapter_training(model: Any) -> int:
+    enabled = 0
+    for name, parameter in model.named_parameters():
+        if "lora_" in name or "modules_to_save" in name:
+            parameter.requires_grad_(True)
+            enabled += parameter.numel()
+    return enabled
 
 
 def prompt_messages(
@@ -1874,6 +1887,8 @@ def main() -> None:
         full_finetuning=False,
     )
     patched_no_thinking_template = force_tokenizer_no_thinking_template(tokenizer)
+    initial_trainable_parameters = trainable_parameter_count(model)
+    resumed_peft_trainable_parameters = 0
     if args.attach_lora:
         if hasattr(model, "peft_config"):
             raise ValueError("--attach-lora expects a base/full model, but the loaded model already has PEFT config")
@@ -1896,6 +1911,11 @@ def main() -> None:
             random_state=args.seed,
             max_seq_length=args.max_seq_length,
         )
+    elif initial_trainable_parameters == 0 and hasattr(model, "peft_config"):
+        resumed_peft_trainable_parameters = enable_peft_adapter_training(model)
+    final_trainable_parameters = trainable_parameter_count(model)
+    if final_trainable_parameters == 0:
+        raise RuntimeError("GSPO policy setup produced zero trainable parameters.")
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model.generation_config.eos_token_id = tokenizer.eos_token_id
@@ -1929,6 +1949,12 @@ def main() -> None:
     print(f"Model or adapter: {model_name_or_adapter}")
     if args.attach_lora:
         print(f"Attached fresh LoRA r/alpha/dropout: {args.lora_r}/{args.lora_alpha}/{args.lora_dropout}")
+    else:
+        print("Attached fresh LoRA: False")
+    print(f"Initial trainable parameters: {initial_trainable_parameters:,}")
+    if resumed_peft_trainable_parameters:
+        print(f"Re-enabled PEFT adapter trainable parameters: {resumed_peft_trainable_parameters:,}")
+    print(f"Final trainable parameters: {final_trainable_parameters:,}")
     print('GSPO mode: GRPO with importance_sampling_level=\"sequence\"')
     print(f"Reward profile: {args.reward_profile}")
     if use_self_verification_prompt:

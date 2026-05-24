@@ -10,6 +10,29 @@ from unittest import mock
 from scripts import train_gspo_chanka_unsloth as train_gspo
 
 
+class DummyParameter:
+    def __init__(self, size: int, requires_grad: bool = False):
+        self._size = size
+        self.requires_grad = requires_grad
+
+    def numel(self) -> int:
+        return self._size
+
+    def requires_grad_(self, value: bool):
+        self.requires_grad = value
+
+
+class DummyModel:
+    def __init__(self, named_parameters):
+        self._named_parameters = named_parameters
+
+    def parameters(self):
+        return iter(parameter for _, parameter in self._named_parameters)
+
+    def named_parameters(self):
+        return iter(self._named_parameters)
+
+
 class TrainGspoChankaUnslothTests(unittest.TestCase):
     def test_default_checkpoint_is_current_broad_lora_checkpoint(self):
         args = train_gspo.parse_args([])
@@ -258,6 +281,26 @@ suffix"""
         )
         with self.assertRaises(ValueError):
             train_gspo.validate_grpo_batching(invalid_eval)
+
+    def test_enable_peft_adapter_training_only_unfreezes_adapter_weights(self):
+        lora = DummyParameter(10)
+        dense = DummyParameter(100)
+        saved = DummyParameter(3)
+        model = DummyModel(
+            [
+                ("base.layer.weight", dense),
+                ("base.lora_A.default.weight", lora),
+                ("base.modules_to_save.default.weight", saved),
+            ]
+        )
+
+        enabled = train_gspo.enable_peft_adapter_training(model)
+
+        self.assertEqual(enabled, 13)
+        self.assertFalse(dense.requires_grad)
+        self.assertTrue(lora.requires_grad)
+        self.assertTrue(saved.requires_grad)
+        self.assertEqual(train_gspo.trainable_parameter_count(model), 13)
 
     def test_completion_text_handles_conversational_completion(self):
         completion = [{"role": "assistant", "content": "  Allin   punchaw.  "}]

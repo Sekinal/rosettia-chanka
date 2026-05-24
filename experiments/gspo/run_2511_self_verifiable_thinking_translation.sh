@@ -21,6 +21,7 @@ TRAIN_BATCH_SIZE="${TRAIN_BATCH_SIZE:-4}"
 EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-4}"
 LEARNING_RATE="${LEARNING_RATE:-2e-7}"
 TRAINER_EVAL="${TRAINER_EVAL:-true}"
+ATTACH_LORA="${ATTACH_LORA:-true}"
 
 cd "$ROOT_DIR"
 mkdir -p "$OUTPUT_DIR"
@@ -46,12 +47,16 @@ fi
 if [[ -n "${FINAL_GENERATION_BATCH_SIZE:-}" ]]; then
   SPEED_ARGS+=(--final-generation-batch-size "$FINAL_GENERATION_BATCH_SIZE")
 fi
+ATTACH_ARGS=()
+if [[ "$ATTACH_LORA" == "true" || "$ATTACH_LORA" == "1" || "$ATTACH_LORA" == "yes" ]]; then
+  ATTACH_ARGS+=(--attach-lora)
+fi
 
 "$PYTHON" scripts/train_gspo_chanka_unsloth.py \
   --adapter-path "$BASE_MODEL" \
   --output-dir "$OUTPUT_DIR" \
   --reward-profile self_verifiable_thinking_translation_2511 \
-  --attach-lora \
+  "${ATTACH_ARGS[@]}" \
   --lora-r "${LORA_R:-32}" \
   --lora-alpha "${LORA_ALPHA:-64}" \
   --max-seq-length 256 \
