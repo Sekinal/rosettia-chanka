@@ -23,6 +23,12 @@ def manifest(stamp: str, promoted: bool, chrf: float, bleu: float, output_hardca
             "self_verification_missing_score_rate": 5.0,
         },
         "promotion": {"promoted": promoted, "reasons": [] if promoted else ["regressed"]},
+        "artifacts": {
+            "metrics": {"path": "metrics.json", "exists": True},
+            "promotion": {"path": "promotion.json", "exists": True},
+            "predictions": {"path": "predictions.jsonl", "exists": promoted},
+            "baseline_metrics": {"path": "baseline.json", "exists": False},
+        },
         "input_hardcases": {"valid_records": 32},
         "output_hardcases": {"valid_records": output_hardcases},
     }
@@ -45,17 +51,30 @@ class SummarizeDeepSeekMathCyclesTests(unittest.TestCase):
         self.assertEqual(records[0]["stamp"], "promoted")
         self.assertTrue(records[0]["promoted"])
         self.assertIn("cycle_score", records[0])
+        self.assertEqual(records[0]["artifact_missing_count"], 0)
+        self.assertEqual(records[1]["missing_artifacts"], ["predictions"])
 
     def test_write_markdown_includes_hardcase_columns(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "summary.md"
-            summarize.write_markdown([manifest("cycle-a", True, 40.0, 10.0, output_hardcases=7)], path)
+            payload = manifest("cycle-a", True, 40.0, 10.0, output_hardcases=7)
+            payload["promotion"]["deltas"] = {
+                "chrf++": 1.25,
+                "bleu": 0.5,
+                "token_f1": 0.75,
+                "self_verification_false_confidence_rate": -2.0,
+            }
+            payload["artifact_missing_count"] = 0
+            summarize.write_markdown([payload], path)
 
             content = path.read_text()
 
         self.assertIn("cycle-a", content)
         self.assertIn("Stage", content)
         self.assertIn("initial_gspo", content)
+        self.assertIn("delta chrF++", content)
+        self.assertIn("1.2500", content)
+        self.assertIn("missing artifacts", content)
         self.assertIn("output hardcases", content)
         self.assertIn("Promoted", content)
 

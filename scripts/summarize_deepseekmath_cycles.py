@@ -55,10 +55,36 @@ def cycle_score(record: dict[str, Any]) -> float:
     )
 
 
+def artifact_record_missing(name: str, record: Any) -> bool:
+    if not isinstance(record, dict):
+        return False
+    if name == "baseline_metrics":
+        return False
+    return "exists" in record and not bool(record.get("exists"))
+
+
+def missing_artifacts(record: dict[str, Any]) -> list[str]:
+    artifacts = record.get("artifacts")
+    if not isinstance(artifacts, dict):
+        return []
+
+    missing: list[str] = []
+    for name, artifact in artifacts.items():
+        if isinstance(artifact, list):
+            for index, item in enumerate(artifact, start=1):
+                if artifact_record_missing(name, item):
+                    missing.append(f"{name}[{index}]")
+        elif artifact_record_missing(name, artifact):
+            missing.append(name)
+    return missing
+
+
 def load_manifest(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text())
     payload["manifest_path"] = str(path)
     payload["cycle_score"] = cycle_score(payload)
+    payload["missing_artifacts"] = missing_artifacts(payload)
+    payload["artifact_missing_count"] = len(payload["missing_artifacts"])
     return payload
 
 
@@ -90,6 +116,19 @@ def format_value(value: Any) -> str:
     return str(value)
 
 
+def promotion_delta(record: dict[str, Any], key: str) -> float:
+    promotion = record.get("promotion")
+    if not isinstance(promotion, dict):
+        return 0.0
+    deltas = promotion.get("deltas")
+    if not isinstance(deltas, dict):
+        return 0.0
+    try:
+        return float(deltas.get(key, 0.0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def write_markdown(records: Sequence[dict[str, Any]], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
@@ -97,12 +136,11 @@ def write_markdown(records: Sequence[dict[str, Any]], path: Path) -> None:
         "",
         "Ranking prioritizes promoted cycles, then external translation metrics and calibration. Failed cycles can still be useful if they mined many hardcases.",
         "",
-        "| Rank | Promoted | Score | Stamp | Stage | chrF++ | BLEU | token F1 | TER | format % | false-conf % | missing-score % | input hardcases | output hardcases |",
-        "| ---: | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Rank | Promoted | Score | Stamp | Stage | chrF++ | delta chrF++ | BLEU | delta BLEU | token F1 | delta token F1 | TER | format % | false-conf % | delta false-conf % | missing artifacts | output hardcases |",
+        "| ---: | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for rank, record in enumerate(records, start=1):
         metrics = record.get("metrics") if isinstance(record.get("metrics"), dict) else {}
-        input_hardcases = record.get("input_hardcases") if isinstance(record.get("input_hardcases"), dict) else {}
         output_hardcases = record.get("output_hardcases") if isinstance(record.get("output_hardcases"), dict) else {}
         lines.append(
             "| "
@@ -114,13 +152,16 @@ def write_markdown(records: Sequence[dict[str, Any]], path: Path) -> None:
                     str(record.get("stamp", "unknown")),
                     str(record.get("stage", "gspo")),
                     format_value(metric(metrics, "chrf++")),
+                    format_value(promotion_delta(record, "chrf++")),
                     format_value(metric(metrics, "bleu")),
+                    format_value(promotion_delta(record, "bleu")),
                     format_value(metric(metrics, "token_f1")),
+                    format_value(promotion_delta(record, "token_f1")),
                     format_value(metric(metrics, "ter")),
                     format_value(metric(metrics, "self_verification_required_format_rate")),
                     format_value(metric(metrics, "self_verification_false_confidence_rate")),
-                    format_value(metric(metrics, "self_verification_missing_score_rate")),
-                    str(input_hardcases.get("valid_records", 0)),
+                    format_value(promotion_delta(record, "self_verification_false_confidence_rate")),
+                    str(record.get("artifact_missing_count", len(record.get("missing_artifacts", [])))),
                     str(output_hardcases.get("valid_records", 0)),
                 ]
             )

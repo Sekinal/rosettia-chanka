@@ -309,7 +309,7 @@ To compare several iterations:
 python scripts/summarize_deepseekmath_cycles.py outputs/gspo_paper_profiles
 ```
 
-This writes `cycle_summary.jsonl` and `cycle_summary.md`, ranking promoted cycles before failed cycles and including calibration plus hardcase counts. Failed cycles should be read as data-mining events unless the promotion gate passes.
+This writes `cycle_summary.jsonl` and `cycle_summary.md`, ranking promoted cycles before failed cycles and including calibration plus hardcase counts. The Markdown summary also surfaces promotion deltas (`delta chrF++`, `delta BLEU`, `delta token F1`, `delta false-conf`) and missing artifact counts, so it is the fastest way to see whether an iteration improved over its baseline and whether its evidence is complete. Failed cycles should be read as data-mining events unless the promotion gate passes.
 
 ## SFT-Seeded GSPO Negative Result
 
