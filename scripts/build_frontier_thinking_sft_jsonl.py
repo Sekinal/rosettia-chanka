@@ -46,6 +46,18 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--selection-report-json", type=Path, default=None)
     parser.add_argument("--selection-report-md", type=Path, default=None)
     parser.add_argument("--selection-jsonl", type=Path, default=None)
+    parser.add_argument(
+        "--prompt-preview-jsonl",
+        type=Path,
+        default=None,
+        help="Write the exact selected generation request payloads before any API call.",
+    )
+    parser.add_argument(
+        "--prompt-preview-limit",
+        type=int,
+        default=0,
+        help="Maximum prompt preview rows to write. 0 means all selected rows.",
+    )
     parser.add_argument("--api-key-env", default="DEEPSEEK_API_KEY")
     parser.add_argument("--base-url", default="https://api.deepseek.com")
     parser.add_argument("--model", default="deepseek-v4-pro")
@@ -770,6 +782,55 @@ def write_selected_rows_jsonl(records: Sequence[dict[str, Any]], path: Path | No
             handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
 
 
+def prompt_preview_records(
+    rows: Sequence[dict[str, str]],
+    selected_records: Sequence[dict[str, Any]],
+    args: argparse.Namespace,
+    limit: int = 0,
+) -> list[dict[str, Any]]:
+    """Build pre-API prompt preview records with no secret material."""
+    status_by_key = {str(record["row_key"]): record.get("resume_status") for record in selected_records}
+    max_records = len(rows) if limit <= 0 else min(limit, len(rows))
+    records: list[dict[str, Any]] = []
+    for index, row in enumerate(rows[:max_records], start=1):
+        key = row_key(row["source"], row["target"])
+        expected_primitives = expected_primitives_for_row(row["source"], row["target"])
+        few_shots = select_few_shots(rows, row, args.few_shot_count)
+        generation_payload = request_payload_with_few_shots(args, row["source"], row["target"], few_shots)
+        records.append(
+            {
+                "index": index,
+                "row_key": key,
+                "source": row["source"],
+                "reference": row["target"],
+                "expected_primitives": expected_primitives,
+                "few_shot_row_keys": [
+                    row_key(str(example["source"]), str(example["reference"])) for example in few_shots
+                ],
+                "few_shot_sources": [example["source"] for example in few_shots],
+                "frontier_model": args.model,
+                "audit_enabled": args.audit,
+                "audit_model": (args.audit_model or args.model) if args.audit else None,
+                "resume_status": status_by_key.get(key, "pending"),
+                "generation_payload": generation_payload,
+            }
+        )
+    return records
+
+
+def write_prompt_preview_jsonl(
+    rows: Sequence[dict[str, str]],
+    selected_records: Sequence[dict[str, Any]],
+    args: argparse.Namespace,
+) -> None:
+    if args.prompt_preview_jsonl is None:
+        return
+    write_jsonl(
+        args.prompt_preview_jsonl,
+        prompt_preview_records(rows, selected_records, args, args.prompt_preview_limit),
+    )
+
+
 def main_from_args(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     input_rows = load_rows(args)
@@ -777,10 +838,9 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
     selected_report = selection_report(rows, args, input_rows)
     write_selection_report(selected_report, args.selection_report_json, args.selection_report_md)
     failures_path = args.failures_jsonl or args.output_jsonl.with_suffix(".failures.jsonl")
-    write_selected_rows_jsonl(
-        selected_row_records(rows, args.output_jsonl, failures_path, args.resume, args.retry_failures),
-        args.selection_jsonl,
-    )
+    selected_records = selected_row_records(rows, args.output_jsonl, failures_path, args.resume, args.retry_failures)
+    write_selected_rows_jsonl(selected_records, args.selection_jsonl)
+    write_prompt_preview_jsonl(rows, selected_records, args)
     if args.selection_only:
         print(json.dumps(selected_report, indent=2, ensure_ascii=False, sort_keys=True))
         return

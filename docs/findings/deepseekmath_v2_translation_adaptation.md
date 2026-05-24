@@ -448,6 +448,14 @@ ${DATA_DIR}/deepseek_v4_pro_source_selection_rows.jsonl
 
 Each record has the row key, Spanish source, reviewed Chanka reference, expected primitives, source metadata, and resume status. This is the file to inspect or diff before approving a paid DeepSeek run.
 
+The exact generation prompts are exported as a separate pre-API preview:
+
+```text
+${DATA_DIR}/deepseek_v4_pro_prompt_preview.jsonl
+```
+
+Each record includes selected row metadata, required primitive tags, few-shot row keys/sources, and the OpenAI-compatible JSON payload for the DeepSeek generation request. The preview is written by selection-only mode before preflight/API-key checks and contains no API key or authorization header. Use it to review the actual prompt text and `deepseek-v4-pro` payload before spending tokens.
+
 This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
 
 For a faster smoke:

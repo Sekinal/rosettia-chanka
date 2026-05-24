@@ -270,6 +270,32 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         self.assertEqual(statuses["Hay 3 documentos."], "pending")
         self.assertIn("[ENTIDADES]", records[1]["expected_primitives"])
 
+    def test_prompt_preview_records_include_exact_generation_payload_without_secret(self):
+        rows = [
+            {"source": "Hola.", "target": "Rimaykullayki."},
+            {"source": "Hay 3 documentos.", "target": "Kimsa qillqakuna kan."},
+        ]
+        args = builder.parse_args(["--output-jsonl", "out.jsonl", "--few-shot-count", "1"])
+        selected_records = [
+            {
+                "row_key": builder.row_key(row["source"], row["target"]),
+                "resume_status": "pending",
+            }
+            for row in rows
+        ]
+
+        previews = builder.prompt_preview_records(rows, selected_records, args)
+
+        self.assertEqual(len(previews), 2)
+        self.assertEqual(previews[0]["frontier_model"], "deepseek-v4-pro")
+        self.assertEqual(previews[0]["generation_payload"]["model"], "deepseek-v4-pro")
+        self.assertEqual(previews[0]["generation_payload"]["thinking"]["type"], "enabled")
+        self.assertNotIn("Authorization", json.dumps(previews[0], ensure_ascii=False))
+        self.assertNotIn("DEEPSEEK_API_KEY", json.dumps(previews[0], ensure_ascii=False))
+        self.assertIn("[SIGNIFICADO]", previews[0]["generation_payload"]["messages"][1]["content"])
+        self.assertIn("[GRAMATICA]", previews[0]["generation_payload"]["messages"][1]["content"])
+        self.assertEqual(previews[0]["few_shot_sources"], ["Hay 3 documentos."])
+
     def test_selection_only_writes_reports_without_api_key(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
@@ -277,6 +303,7 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
             report_json = tmp / "selection.json"
             report_md = tmp / "selection.md"
             selection_jsonl = tmp / "selection_rows.jsonl"
+            preview_jsonl = tmp / "prompt_preview.jsonl"
             source_jsonl.write_text(
                 '{"source":"Hola.","reference":"Rimaykullayki."}\n'
                 '{"source":"Hay 3 documentos.","reference":"Kimsa qillqakuna kan."}\n'
@@ -295,6 +322,8 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
                         str(report_md),
                         "--selection-jsonl",
                         str(selection_jsonl),
+                        "--prompt-preview-jsonl",
+                        str(preview_jsonl),
                         "--selection-only",
                     ]
                 )
@@ -302,11 +331,15 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
             payload = json.loads(report_json.read_text())
             markdown = report_md.read_text()
             selected_rows = [json.loads(line) for line in selection_jsonl.read_text().splitlines()]
+            previews = [json.loads(line) for line in preview_jsonl.read_text().splitlines()]
 
         self.assertEqual(payload["selected_rows"], 2)
         self.assertIn("[ENTIDADES]", payload["expected_primitive_counts"])
         self.assertEqual(len(selected_rows), 2)
         self.assertEqual({row["resume_status"] for row in selected_rows}, {"pending"})
+        self.assertEqual(len(previews), 2)
+        self.assertEqual(previews[0]["generation_payload"]["model"], "deepseek-v4-pro")
+        self.assertNotIn("Authorization", json.dumps(previews, ensure_ascii=False))
         self.assertIn("duplicate input rows skipped", markdown)
         self.assertIn("Frontier Source Selection Report", markdown)
 
