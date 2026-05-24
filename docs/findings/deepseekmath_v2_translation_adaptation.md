@@ -233,6 +233,8 @@ Before SFT, `scripts/check_frontier_thinking_data.py` now gates on accepted-row 
 
 The chained experiment now evaluates SFT-only before RL. It runs `scripts/evaluate_gspo_checkpoint.py --self-verification-thinking-output` after the frontier SFT and only enters GSPO if `MIN_SFT_CHRF_FOR_GSPO` and `MIN_SFT_FORMAT_FOR_GSPO` are met. If the SFT head-start already collapses translation quality or format adherence, the script exits without spending time on another GSPO collapse.
 
+The same SFT-only evaluation is mined into meta-verifier hard cases before the GSPO gate. The chain writes `meta_hardcases_from_sft_eval.jsonl` and `meta_hardcases_from_sft_eval.summary.json` with `scripts/build_meta_verifier_from_self_outputs.py`. This keeps failed frontier SFT attempts useful: overconfident or malformed student outputs become real meta-verifier negatives for the next verifier iteration instead of just dead-end metrics.
+
 ## SFT-Seeded GSPO Negative Result
 
 The deterministic primitive-thinking SFT seed did not fix the RL collapse:

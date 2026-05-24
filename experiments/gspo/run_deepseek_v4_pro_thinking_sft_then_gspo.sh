@@ -17,6 +17,9 @@ TERMINOLOGY_FILE="${TERMINOLOGY_FILE:-clean_chanka/manual_quechua_chanka_glossar
 SFT_EVAL_DIR="${SFT_EVAL_DIR:-${THINKING_SFT_OUTPUT_DIR}/sft_only_eval}"
 SFT_EVAL_JSON="${SFT_EVAL_JSON:-${SFT_EVAL_DIR}/metrics.json}"
 SFT_EVAL_PREDICTIONS="${SFT_EVAL_PREDICTIONS:-${SFT_EVAL_DIR}/predictions.jsonl}"
+SFT_META_JSONL="${SFT_META_JSONL:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.jsonl}"
+SFT_META_SUMMARY_JSON="${SFT_META_SUMMARY_JSON:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.summary.json}"
+MINE_SFT_META="${MINE_SFT_META:-true}"
 RUN_GSPO="${RUN_GSPO:-true}"
 MIN_SFT_CHRF_FOR_GSPO="${MIN_SFT_CHRF_FOR_GSPO:-35}"
 MIN_SFT_FORMAT_FOR_GSPO="${MIN_SFT_FORMAT_FOR_GSPO:-60}"
@@ -108,6 +111,19 @@ fi
   --terminology-file "$TERMINOLOGY_FILE" \
   --terminology-top-k "${TERMINOLOGY_TOP_K:-1}" \
   --progress-every "${SFT_EVAL_PROGRESS_EVERY:-16}"
+
+if [[ "$MINE_SFT_META" == "true" || "$MINE_SFT_META" == "1" || "$MINE_SFT_META" == "yes" ]]; then
+  SFT_META_ARGS=()
+  if [[ -n "${SFT_META_MAX_RECORDS:-}" ]]; then
+    SFT_META_ARGS+=(--max-records "$SFT_META_MAX_RECORDS")
+  fi
+  "$PYTHON" scripts/build_meta_verifier_from_self_outputs.py \
+    --self-predictions-jsonl "$SFT_EVAL_PREDICTIONS" \
+    --output-jsonl "$SFT_META_JSONL" \
+    --summary-json "$SFT_META_SUMMARY_JSON" \
+    --min-quality-gap "${SFT_META_MIN_QUALITY_GAP:-0.20}" \
+    "${SFT_META_ARGS[@]}"
+fi
 
 if [[ "$RUN_GSPO" == "false" || "$RUN_GSPO" == "0" || "$RUN_GSPO" == "no" ]]; then
   echo "RUN_GSPO=$RUN_GSPO; stopping after SFT-only evaluation at $SFT_EVAL_JSON"
