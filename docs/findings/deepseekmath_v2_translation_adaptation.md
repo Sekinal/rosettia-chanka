@@ -259,6 +259,23 @@ experiments/gspo/run_next_meta_verifier_from_hardcases.sh
 
 It uses `scripts/check_meta_hardcase_data.py` to require enough valid real hardcases, adds cold-start meta rows, and trains a new meta-verifier. Feed the printed `final_meta_verifier_lora` back as `META_VERIFIER_ADAPTER` for the next GSPO cycle. This is the practical iteration boundary: data generation and SFT may be reused, while the verifier keeps absorbing the student's current failure distribution.
 
+Then run the next policy update without regenerating frontier data:
+
+```bash
+BASE_MODEL=outputs/deepseek_v4_pro_thinking_sft_<stamp>/final_lora \
+META_VERIFIER_ADAPTER=outputs/chanka_translation_meta_verifier_iter_<stamp>/final_meta_verifier_lora \
+experiments/gspo/run_followup_gspo_with_meta_verifier.sh
+```
+
+That follow-up runner performs a small self-verifiable thinking GSPO pass, writes final predictions, and mines `meta_hardcases_from_followup_gspo_eval.jsonl`. If those hardcases are valid and numerous enough, feed them back into `run_next_meta_verifier_from_hardcases.sh` as `GSPO_META_JSONL` or `EXTRA_META_JSONLS`. This gives the project a concrete loop:
+
+1. frontier thinking SFT;
+2. GSPO with current meta-verifier;
+3. mine SFT/GSPO self-analysis failures;
+4. refresh meta-verifier;
+5. GSPO again from the same thinking-SFT base or from the previous policy adapter;
+6. repeat only while corpus metrics and calibration improve.
+
 ## SFT-Seeded GSPO Negative Result
 
 The deterministic primitive-thinking SFT seed did not fix the RL collapse:
