@@ -287,6 +287,8 @@ The first DeepSeek V4 Pro chain now follows the same evidence protocol at both t
 
 The same chain now also creates the SFT baseline by default. With `RUN_SFT_BASELINE_EVAL=true`, it evaluates `BASE_ADAPTER` under the same bounded-thinking prompt/eval settings before training the frontier-thinking SFT adapter, writes `${DATA_DIR}/base_adapter_thinking_eval/metrics.json`, and uses that metrics file for the SFT promotion gate and manifest. This makes the frontier-thinking head-start a measurable policy iteration rather than an unanchored SFT run. Use `SFT_BASELINE_FORCE_EVAL=true` to refresh a stale baseline, or disable the step only when supplying a trusted `SFT_BASELINE_METRICS_JSON`.
 
+The manifest itself now checks directory artifacts as well as JSON files. It records existence and type for `meta_verifier_adapter`, `meta_output_dir`, and `followup_output_dir`, and the DeepSeek V4 Pro chain rewrites the `sft_seed` manifest after any SFT-hardcase meta-verifier refresh. That keeps the cycle ledger aligned with the verifier adapter actually handed to GSPO.
+
 The two-step iteration can also be launched as one command:
 
 ```bash

@@ -43,10 +43,13 @@ def load_json_if_exists(path: Path | None) -> dict[str, Any] | None:
 def file_record(path: Path | None) -> dict[str, Any] | None:
     if path is None:
         return None
+    exists = path.exists()
     return {
         "path": str(path),
-        "exists": path.exists(),
-        "bytes": path.stat().st_size if path.exists() else 0,
+        "exists": exists,
+        "is_dir": path.is_dir() if exists else False,
+        "is_file": path.is_file() if exists else False,
+        "bytes": path.stat().st_size if exists and path.is_file() else 0,
     }
 
 
@@ -69,6 +72,9 @@ def manifest_for(args: argparse.Namespace) -> dict[str, Any]:
         "followup_output_dir": str(args.followup_output_dir),
         "artifacts": {
             "baseline_metrics": file_record(args.baseline_metrics_json),
+            "meta_verifier_adapter": file_record(Path(args.meta_verifier_adapter)),
+            "meta_output_dir": file_record(args.meta_output_dir),
+            "followup_output_dir": file_record(args.followup_output_dir),
             "metrics": file_record(args.metrics_json),
             "promotion": file_record(args.promotion_json),
             "predictions": file_record(args.predictions_jsonl),

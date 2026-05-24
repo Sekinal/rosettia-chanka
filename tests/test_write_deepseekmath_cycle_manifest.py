@@ -27,12 +27,14 @@ class WriteDeepSeekMathCycleManifestTests(unittest.TestCase):
             input_hardcases = root / "input.jsonl"
             output_hardcases = root / "output.jsonl"
             predictions = root / "predictions.jsonl"
+            meta_adapter = root / "meta" / "final"
             output = root / "manifest.json"
             metrics.write_text(json.dumps({"chrf++": 42.0, "bleu": 12.0}))
             promotion.write_text(json.dumps({"promoted": True, "reasons": []}))
             input_hardcases.write_text(json.dumps(hardcase("a")) + "\n" + json.dumps(hardcase("b")) + "\n")
             output_hardcases.write_text(json.dumps(hardcase("c")) + "\n")
             predictions.write_text('{"source":"a"}\n')
+            meta_adapter.mkdir(parents=True)
 
             args = manifest.parse_args(
                 [
@@ -45,7 +47,7 @@ class WriteDeepSeekMathCycleManifestTests(unittest.TestCase):
                     "--base-model",
                     "base",
                     "--meta-verifier-adapter",
-                    "meta/final",
+                    str(meta_adapter),
                     "--meta-output-dir",
                     str(root / "meta"),
                     "--followup-output-dir",
@@ -72,6 +74,8 @@ class WriteDeepSeekMathCycleManifestTests(unittest.TestCase):
         self.assertEqual(payload["input_hardcases"]["valid_records"], 2)
         self.assertEqual(payload["output_hardcases"]["valid_records"], 1)
         self.assertTrue(payload["artifacts"]["predictions"]["exists"])
+        self.assertTrue(payload["artifacts"]["meta_verifier_adapter"]["exists"])
+        self.assertTrue(payload["artifacts"]["meta_verifier_adapter"]["is_dir"])
 
 
 if __name__ == "__main__":

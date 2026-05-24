@@ -443,6 +443,8 @@ elif is_truthy "$TRAIN_SFT_META_VERIFIER"; then
   echo "No SFT meta hardcase summary found at $SFT_META_SUMMARY_JSON; keeping existing meta-verifier: $META_VERIFIER_ADAPTER"
 fi
 
+write_sft_seed_manifest
+
 if ! SFT_EVAL_JSON="$SFT_EVAL_JSON" \
   MIN_SFT_CHRF_FOR_GSPO="$MIN_SFT_CHRF_FOR_GSPO" \
   MIN_SFT_FORMAT_FOR_GSPO="$MIN_SFT_FORMAT_FOR_GSPO" \
