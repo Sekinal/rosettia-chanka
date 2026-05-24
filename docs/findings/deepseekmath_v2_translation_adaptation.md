@@ -456,6 +456,14 @@ ${DATA_DIR}/deepseek_v4_pro_prompt_preview.jsonl
 
 Each record includes selected row metadata, required primitive tags, few-shot row keys/sources, and the OpenAI-compatible JSON payload for the DeepSeek generation request. The preview is written by selection-only mode before preflight/API-key checks and contains no API key or authorization header. Use it to review the actual prompt text and `deepseek-v4-pro` payload before spending tokens.
 
+The prompt preview has its own pre-API gate:
+
+```text
+${DATA_DIR}/deepseek_v4_pro_prompt_preview_gate.json
+```
+
+`scripts/check_frontier_prompt_preview.py` verifies that the preview covers every selected row, uses the expected model/reasoning-effort, keeps thinking enabled, requests JSON output, contains no auth/API-key markers, puts each row's expected primitive tags in the actual required-tags line, and does not use the current row as a few-shot example. The selection-only preview call now receives the same reasoning, output-token, and few-shot settings as the paid generation call, so this gate checks the real intended payload instead of a default approximation.
+
 This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
 
 For a faster smoke:

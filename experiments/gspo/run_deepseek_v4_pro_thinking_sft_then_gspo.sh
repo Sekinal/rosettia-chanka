@@ -17,6 +17,7 @@ FRONTIER_SELECTION_REPORT_MD="${FRONTIER_SELECTION_REPORT_MD:-${DATA_DIR}/deepse
 FRONTIER_SELECTION_JSONL="${FRONTIER_SELECTION_JSONL:-${DATA_DIR}/deepseek_v4_pro_source_selection_rows.jsonl}"
 FRONTIER_SELECTION_GATE_JSON="${FRONTIER_SELECTION_GATE_JSON:-${DATA_DIR}/deepseek_v4_pro_source_selection_gate.json}"
 FRONTIER_PROMPT_PREVIEW_JSONL="${FRONTIER_PROMPT_PREVIEW_JSONL:-${DATA_DIR}/deepseek_v4_pro_prompt_preview.jsonl}"
+FRONTIER_PROMPT_PREVIEW_GATE_JSON="${FRONTIER_PROMPT_PREVIEW_GATE_JSON:-${DATA_DIR}/deepseek_v4_pro_prompt_preview_gate.json}"
 PREFLIGHT_REPORT_JSON="${PREFLIGHT_REPORT_JSON:-${DATA_DIR}/preflight_report.json}"
 THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/deepseek_v4_pro_thinking_sft_${STAMP}}"
 THINKING_SFT_ADAPTER="${THINKING_SFT_ADAPTER:-${THINKING_SFT_OUTPUT_DIR}/final_lora}"
@@ -97,9 +98,12 @@ if is_truthy "${RUN_FRONTIER_SELECTION_REPORT:-true}"; then
     --prompt-preview-limit "${FRONTIER_PROMPT_PREVIEW_LIMIT:-0}" \
     --api-key-env "${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}" \
     --model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
+    --reasoning-effort "${FRONTIER_REASONING_EFFORT:-max}" \
     --max-rows "${FRONTIER_MAX_ROWS:-128}" \
     --offset "${FRONTIER_OFFSET:-0}" \
     --max-retries "${FRONTIER_MAX_RETRIES:-3}" \
+    --max-output-tokens "${FRONTIER_MAX_OUTPUT_TOKENS:-512}" \
+    --few-shot-count "${FRONTIER_FEW_SHOT_COUNT:-2}" \
     --selection-only \
     "${FRONTIER_STRATIFY_ARGS[@]}" \
     "${FRONTIER_SELECTION_ARGS[@]}"
@@ -113,6 +117,21 @@ if is_truthy "${RUN_FRONTIER_SELECTION_REPORT:-true}"; then
       --min-avg-expected-primitives "$MIN_FRONTIER_SELECTION_AVG_PRIMITIVES" \
       --min-count-per-required-primitive "$MIN_FRONTIER_SELECTION_COUNT_PER_REQUIRED" \
       --max-estimated-frontier-requests "$MAX_FRONTIER_SELECTION_REQUESTS"
+  fi
+
+  if is_truthy "${RUN_FRONTIER_PROMPT_PREVIEW_GATE:-true}"; then
+    FRONTIER_PROMPT_PREVIEW_GATE_ARGS=()
+    if is_falsey "${FRONTIER_PROMPT_PREVIEW_REQUIRE_ALL_SELECTED:-true}"; then
+      FRONTIER_PROMPT_PREVIEW_GATE_ARGS+=(--no-require-all-selected)
+    fi
+    "$PYTHON" scripts/check_frontier_prompt_preview.py \
+      --prompt-preview-jsonl "$FRONTIER_PROMPT_PREVIEW_JSONL" \
+      --selection-jsonl "$FRONTIER_SELECTION_JSONL" \
+      --output-json "$FRONTIER_PROMPT_PREVIEW_GATE_JSON" \
+      --expected-model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
+      --expected-reasoning-effort "${FRONTIER_REASONING_EFFORT:-max}" \
+      --min-preview-rows "${MIN_FRONTIER_PROMPT_PREVIEW_ROWS:-$MIN_FRONTIER_SELECTION_ROWS}" \
+      "${FRONTIER_PROMPT_PREVIEW_GATE_ARGS[@]}"
   fi
 fi
 

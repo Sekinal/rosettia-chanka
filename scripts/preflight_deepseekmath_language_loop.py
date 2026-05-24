@@ -12,6 +12,8 @@ from typing import Any, Sequence
 
 DEFAULT_REQUIRED_PATHS = (
     "scripts/build_frontier_thinking_sft_jsonl.py",
+    "scripts/check_frontier_selection_report.py",
+    "scripts/check_frontier_prompt_preview.py",
     "scripts/check_frontier_thinking_data.py",
     "scripts/train_jsonl_sft_unsloth.py",
     "scripts/evaluate_gspo_checkpoint.py",
