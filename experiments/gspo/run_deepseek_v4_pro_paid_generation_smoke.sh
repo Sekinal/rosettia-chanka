@@ -12,6 +12,7 @@ FRONTIER_BASE_URL="${FRONTIER_BASE_URL:-https://api.deepseek.com}"
 FRONTIER_MODEL="${FRONTIER_MODEL:-deepseek-v4-pro}"
 FRONTIER_REASONING_EFFORT="${FRONTIER_REASONING_EFFORT:-max}"
 FRONTIER_API_KEY_ENV="${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}"
+READ_FRONTIER_API_KEY="${READ_FRONTIER_API_KEY:-true}"
 
 MIN_FRONTIER_ROWS_FOR_SFT="${MIN_FRONTIER_ROWS_FOR_SFT:-$FRONTIER_MAX_ROWS}"
 MIN_FRONTIER_SELECTION_ROWS="${MIN_FRONTIER_SELECTION_ROWS:-$FRONTIER_MAX_ROWS}"
@@ -32,8 +33,24 @@ FRONTIER_REPORT_MD="${FRONTIER_REPORT_MD:-${DATA_DIR}/deepseek_v4_pro_thinking_r
 PAID_SMOKE_GATE_JSON="${PAID_SMOKE_GATE_JSON:-${DATA_DIR}/deepseek_v4_pro_paid_smoke_gate.json}"
 
 if [[ -z "${!FRONTIER_API_KEY_ENV:-}" ]]; then
-  echo "${FRONTIER_API_KEY_ENV} is unset. Export it in the shell environment; do not write it to files or command history." >&2
-  exit 2
+  if [[ "$READ_FRONTIER_API_KEY" == "true" || "$READ_FRONTIER_API_KEY" == "1" || "$READ_FRONTIER_API_KEY" == "yes" ]]; then
+    if [[ ! -t 0 ]]; then
+      echo "${FRONTIER_API_KEY_ENV} is unset and stdin is not an interactive terminal." >&2
+      echo "Run from a TTY or export ${FRONTIER_API_KEY_ENV} in the shell environment; do not write it to files or command history." >&2
+      exit 2
+    fi
+    read -rsp "${FRONTIER_API_KEY_ENV}: " frontier_api_key
+    echo
+    if [[ -z "$frontier_api_key" ]]; then
+      echo "${FRONTIER_API_KEY_ENV} was empty." >&2
+      exit 2
+    fi
+    export "${FRONTIER_API_KEY_ENV}=${frontier_api_key}"
+    unset frontier_api_key
+  else
+    echo "${FRONTIER_API_KEY_ENV} is unset. Export it in the shell environment; do not write it to files or command history." >&2
+    exit 2
+  fi
 fi
 
 if [[ "$FRONTIER_BASE_URL" != "https://api.deepseek.com" && "${ALLOW_NON_DEEPSEEK_BASE_URL:-false}" != "true" ]]; then
