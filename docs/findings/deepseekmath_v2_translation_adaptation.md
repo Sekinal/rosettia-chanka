@@ -440,6 +440,14 @@ The builder also dedupes exact source/reference pairs after the seeded shuffle a
 
 The selection report is resume-aware too. It records already accepted rows, already failed rows, pending rows, and estimated frontier requests. With audit enabled, `estimated_max_frontier_requests` is at most `pending_rows * 2`, because each accepted generation can trigger a second audit call. The selection gate can enforce a hard cap through `--max-estimated-frontier-requests`; the chain exposes this as `MAX_FRONTIER_SELECTION_REQUESTS` and leaves it disabled by default (`0`). Use it for small paid smokes or when resuming partial frontier batches.
 
+The exact selected rows are exported separately:
+
+```text
+${DATA_DIR}/deepseek_v4_pro_source_selection_rows.jsonl
+```
+
+Each record has the row key, Spanish source, reviewed Chanka reference, expected primitives, source metadata, and resume status. This is the file to inspect or diff before approving a paid DeepSeek run.
+
 This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
 
 For a faster smoke:

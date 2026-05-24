@@ -14,6 +14,7 @@ FRONTIER_REPORT_JSON="${FRONTIER_REPORT_JSON:-${DATA_DIR}/deepseek_v4_pro_thinki
 FRONTIER_REPORT_MD="${FRONTIER_REPORT_MD:-${DATA_DIR}/deepseek_v4_pro_thinking_report.md}"
 FRONTIER_SELECTION_REPORT_JSON="${FRONTIER_SELECTION_REPORT_JSON:-${DATA_DIR}/deepseek_v4_pro_source_selection_report.json}"
 FRONTIER_SELECTION_REPORT_MD="${FRONTIER_SELECTION_REPORT_MD:-${DATA_DIR}/deepseek_v4_pro_source_selection_report.md}"
+FRONTIER_SELECTION_JSONL="${FRONTIER_SELECTION_JSONL:-${DATA_DIR}/deepseek_v4_pro_source_selection_rows.jsonl}"
 FRONTIER_SELECTION_GATE_JSON="${FRONTIER_SELECTION_GATE_JSON:-${DATA_DIR}/deepseek_v4_pro_source_selection_gate.json}"
 PREFLIGHT_REPORT_JSON="${PREFLIGHT_REPORT_JSON:-${DATA_DIR}/preflight_report.json}"
 THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/deepseek_v4_pro_thinking_sft_${STAMP}}"
@@ -90,6 +91,7 @@ if is_truthy "${RUN_FRONTIER_SELECTION_REPORT:-true}"; then
     --failures-jsonl "$FRONTIER_FAILURES_JSONL" \
     --selection-report-json "$FRONTIER_SELECTION_REPORT_JSON" \
     --selection-report-md "$FRONTIER_SELECTION_REPORT_MD" \
+    --selection-jsonl "$FRONTIER_SELECTION_JSONL" \
     --api-key-env "${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}" \
     --model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
     --max-rows "${FRONTIER_MAX_ROWS:-128}" \
@@ -159,6 +161,7 @@ FRONTIER_ARGS+=("${FRONTIER_STRATIFY_ARGS[@]}")
   --summary-json "$FRONTIER_SUMMARY_JSON" \
   --selection-report-json "$FRONTIER_SELECTION_REPORT_JSON" \
   --selection-report-md "$FRONTIER_SELECTION_REPORT_MD" \
+  --selection-jsonl "$FRONTIER_SELECTION_JSONL" \
   --api-key-env "${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}" \
   --model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
   --reasoning-effort "${FRONTIER_REASONING_EFFORT:-max}" \

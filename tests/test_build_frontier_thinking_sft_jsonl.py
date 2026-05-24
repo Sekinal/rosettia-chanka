@@ -245,12 +245,38 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         self.assertEqual(payload["estimated_max_frontier_requests"], 2)
         self.assertEqual(payload["estimated_max_http_attempts"], 8)
 
+    def test_selected_row_records_include_resume_statuses(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            output = tmp / "out.jsonl"
+            failures = tmp / "failures.jsonl"
+            rows = [
+                {"source": "Hola.", "target": "Rimaykullayki."},
+                {"source": "Hay 3 documentos.", "target": "Kimsa qillqakuna kan."},
+                {"source": "Gracias.", "target": "Anay."},
+            ]
+            output.write_text(
+                json.dumps({"row_key": builder.row_key("Hola.", "Rimaykullayki.")}) + "\n"
+            )
+            failures.write_text(
+                json.dumps({"row_key": builder.row_key("Gracias.", "Anay.")}) + "\n"
+            )
+
+            records = builder.selected_row_records(rows, output, failures, resume=True, retry_failures=False)
+
+        statuses = {record["source"]: record["resume_status"] for record in records}
+        self.assertEqual(statuses["Hola."], "existing_accepted")
+        self.assertEqual(statuses["Gracias."], "existing_failed")
+        self.assertEqual(statuses["Hay 3 documentos."], "pending")
+        self.assertIn("[ENTIDADES]", records[1]["expected_primitives"])
+
     def test_selection_only_writes_reports_without_api_key(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
             source_jsonl = tmp / "rows.jsonl"
             report_json = tmp / "selection.json"
             report_md = tmp / "selection.md"
+            selection_jsonl = tmp / "selection_rows.jsonl"
             source_jsonl.write_text(
                 '{"source":"Hola.","reference":"Rimaykullayki."}\n'
                 '{"source":"Hay 3 documentos.","reference":"Kimsa qillqakuna kan."}\n'
@@ -267,15 +293,20 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
                         str(report_json),
                         "--selection-report-md",
                         str(report_md),
+                        "--selection-jsonl",
+                        str(selection_jsonl),
                         "--selection-only",
                     ]
                 )
 
             payload = json.loads(report_json.read_text())
             markdown = report_md.read_text()
+            selected_rows = [json.loads(line) for line in selection_jsonl.read_text().splitlines()]
 
         self.assertEqual(payload["selected_rows"], 2)
         self.assertIn("[ENTIDADES]", payload["expected_primitive_counts"])
+        self.assertEqual(len(selected_rows), 2)
+        self.assertEqual({row["resume_status"] for row in selected_rows}, {"pending"})
         self.assertIn("duplicate input rows skipped", markdown)
         self.assertIn("Frontier Source Selection Report", markdown)
 

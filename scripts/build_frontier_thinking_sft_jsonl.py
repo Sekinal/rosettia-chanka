@@ -45,6 +45,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--summary-json", type=Path, default=None)
     parser.add_argument("--selection-report-json", type=Path, default=None)
     parser.add_argument("--selection-report-md", type=Path, default=None)
+    parser.add_argument("--selection-jsonl", type=Path, default=None)
     parser.add_argument("--api-key-env", default="DEEPSEEK_API_KEY")
     parser.add_argument("--base-url", default="https://api.deepseek.com")
     parser.add_argument("--model", default="deepseek-v4-pro")
@@ -640,6 +641,43 @@ def selected_row_resume_accounting(
     }
 
 
+def selected_row_records(
+    rows: Sequence[dict[str, str]],
+    output_jsonl: Path,
+    failures_jsonl: Path,
+    resume: bool,
+    retry_failures: bool,
+) -> list[dict[str, Any]]:
+    if not resume:
+        accepted_keys: set[str] = set()
+        failed_keys: set[str] = set()
+    else:
+        accepted_keys = existing_keys(output_jsonl)
+        failed_keys = set() if retry_failures else existing_keys(failures_jsonl)
+    records: list[dict[str, Any]] = []
+    for index, row in enumerate(rows, start=1):
+        key = row_key(row["source"], row["target"])
+        if key in accepted_keys:
+            status = "existing_accepted"
+        elif key in failed_keys:
+            status = "existing_failed"
+        else:
+            status = "pending"
+        records.append(
+            {
+                "index": index,
+                "row_key": key,
+                "source": row["source"],
+                "reference": row["target"],
+                "expected_primitives": expected_primitives_for_row(row["source"], row["target"]),
+                "source_name": row.get("source_name"),
+                "variant": row.get("variant"),
+                "resume_status": status,
+            }
+        )
+    return records
+
+
 def selection_report(
     rows: Sequence[dict[str, str]],
     args: argparse.Namespace,
@@ -723,12 +761,26 @@ def write_selection_report(report: dict[str, Any], json_path: Path | None, md_pa
         md_path.write_text("\n".join(lines) + "\n")
 
 
+def write_selected_rows_jsonl(records: Sequence[dict[str, Any]], path: Path | None) -> None:
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+
 def main_from_args(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     input_rows = load_rows(args)
     rows = select_rows(input_rows, args.offset, args.max_rows, args.seed, args.stratify_primitives)
     selected_report = selection_report(rows, args, input_rows)
     write_selection_report(selected_report, args.selection_report_json, args.selection_report_md)
+    failures_path = args.failures_jsonl or args.output_jsonl.with_suffix(".failures.jsonl")
+    write_selected_rows_jsonl(
+        selected_row_records(rows, args.output_jsonl, failures_path, args.resume, args.retry_failures),
+        args.selection_jsonl,
+    )
     if args.selection_only:
         print(json.dumps(selected_report, indent=2, ensure_ascii=False, sort_keys=True))
         return
