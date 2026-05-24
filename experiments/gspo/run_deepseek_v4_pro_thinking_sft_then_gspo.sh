@@ -105,6 +105,7 @@ fi
   --sleep-seconds "${FRONTIER_SLEEP_SECONDS:-0}" \
   --max-retries "${FRONTIER_MAX_RETRIES:-3}" \
   --max-output-tokens "${FRONTIER_MAX_OUTPUT_TOKENS:-512}" \
+  --few-shot-count "${FRONTIER_FEW_SHOT_COUNT:-2}" \
   "${FRONTIER_ARGS[@]}"
 
 "$PYTHON" scripts/check_frontier_thinking_data.py \

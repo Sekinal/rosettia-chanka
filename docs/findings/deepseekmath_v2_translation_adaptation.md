@@ -201,6 +201,7 @@ The strongest cold-start path is synthetic primitive thinking from a stronger re
 - defaults to `deepseek-v4-pro` through `https://api.deepseek.com`;
 - reads the API key only from `DEEPSEEK_API_KEY`;
 - asks for short JSON outputs with 2-4 primitive tags;
+- includes reviewed few-shot primitive-check examples by default (`--few-shot-count 2`) to demonstrate the compact JSON/tag style without replacing reviewed translations;
 - writes `source`, `reference`, and `target` rows compatible with `scripts/train_jsonl_sft_unsloth.py --target-field target`;
 - keeps the reviewed reference as `Traduccion final` unless `--allow-model-translation` is explicitly set.
 

@@ -20,6 +20,38 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         self.assertEqual(payload["reasoning_effort"], "max")
         self.assertEqual(payload["response_format"], {"type": "json_object"})
 
+    def test_prompt_can_include_reviewed_few_shot_primitive_examples(self):
+        rows = [
+            {"source": "Buenos dias.", "target": "Allin punchaw."},
+            {"source": "Hola.", "target": "Rimaykullayki."},
+            {"source": "Gracias.", "target": "Añay."},
+        ]
+
+        few_shots = builder.select_few_shots(rows, rows[0], count=2)
+        messages = builder.prompt_messages(rows[0]["source"], rows[0]["target"], few_shots)
+
+        self.assertEqual(len(few_shots), 2)
+        self.assertNotIn("Buenos dias.", {example["source"] for example in few_shots})
+        self.assertIn("Good examples", messages[1]["content"])
+        self.assertIn("[SIGNIFICADO]", messages[1]["content"])
+        self.assertIn("[GRAMATICA]", messages[1]["content"])
+        self.assertIn("JSON target", messages[1]["content"])
+
+    def test_request_payload_with_few_shots_includes_examples(self):
+        args = builder.parse_args(["--output-jsonl", "out.jsonl"])
+        few_shots = [
+            {
+                "source": "Hola.",
+                "reference": "Rimaykullayki.",
+                "target": builder.few_shot_target("Rimaykullayki.", 0),
+            }
+        ]
+
+        payload = builder.request_payload_with_few_shots(args, "Buenos dias.", "Allin punchaw.", few_shots)
+
+        self.assertIn("Good examples", payload["messages"][1]["content"])
+        self.assertIn("Rimaykullayki.", payload["messages"][1]["content"])
+
     def test_dry_run_audit_payload_uses_audit_model_when_set(self):
         args = builder.parse_args(
             [

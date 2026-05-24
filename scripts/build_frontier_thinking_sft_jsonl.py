@@ -57,6 +57,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-output-tokens", type=int, default=512)
     parser.add_argument("--min-primitive-tags", type=int, default=2)
     parser.add_argument(
+        "--few-shot-count",
+        type=int,
+        default=2,
+        help="Include this many reviewed examples with synthetic primitive-check targets in the frontier prompt.",
+    )
+    parser.add_argument(
         "--resume",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -127,7 +133,64 @@ def row_key(source: str, reference: str) -> str:
     return f"{gspo.normalize_text(source).lower()}\t{gspo.normalize_text(reference).lower()}"
 
 
-def prompt_messages(source: str, reference: str) -> list[dict[str, str]]:
+def few_shot_target(reference: str, index: int) -> dict[str, Any]:
+    tag_pairs = (
+        ("[SIGNIFICADO]", "[ANTI_COPIA]", "conserva el sentido central", "evita copiar palabras del espanol"),
+        ("[GRAMATICA]", "[SIGNIFICADO]", "mantiene una forma chanka natural", "preserva la intencion del enunciado"),
+        ("[ENTIDADES]", "[TERMINOLOGIA]", "conserva nombres o numeros", "usa vocabulario compatible con la referencia"),
+    )
+    first_tag, second_tag, first_note, second_note = tag_pairs[index % len(tag_pairs)]
+    return {
+        "analysis": f"{first_tag} {first_note}; {second_tag} {second_note}.",
+        "translation": gspo.normalize_text(reference),
+        "self_evaluation": "Riesgo bajo porque la traduccion esta anclada a la referencia revisada.",
+        "score": 0.98,
+    }
+
+
+def select_few_shots(
+    rows: Sequence[dict[str, str]],
+    current: dict[str, str],
+    count: int,
+) -> list[dict[str, Any]]:
+    if count <= 0:
+        return []
+    current_key = row_key(current["source"], current["target"])
+    examples: list[dict[str, Any]] = []
+    for row in rows:
+        if row_key(row["source"], row["target"]) == current_key:
+            continue
+        examples.append(
+            {
+                "source": row["source"],
+                "reference": row["target"],
+                "target": few_shot_target(row["target"], len(examples)),
+            }
+        )
+        if len(examples) >= count:
+            break
+    return examples
+
+
+def render_few_shots(few_shots: Sequence[dict[str, Any]]) -> str:
+    if not few_shots:
+        return ""
+    blocks = ["Good examples of the desired concise JSON style:"]
+    for index, example in enumerate(few_shots, start=1):
+        blocks.append(
+            "\n".join(
+                [
+                    f"Example {index} Spanish source: {example['source']}",
+                    f"Example {index} reviewed Chanka reference: {example['reference']}",
+                    f"Example {index} JSON target: {json.dumps(example['target'], ensure_ascii=False, sort_keys=True)}",
+                ]
+            )
+        )
+    return "\n\n".join(blocks) + "\n\n"
+
+
+def prompt_messages(source: str, reference: str, few_shots: Sequence[dict[str, Any]] | None = None) -> list[dict[str, str]]:
+    few_shot_block = render_few_shots(few_shots or [])
     return [
         {
             "role": "system",
@@ -141,6 +204,7 @@ def prompt_messages(source: str, reference: str) -> list[dict[str, str]]:
             "role": "user",
             "content": (
                 "Create a concise supervised thinking target for this reviewed translation.\n\n"
+                f"{few_shot_block}"
                 f"Spanish source:\n{source}\n\n"
                 f"Reviewed Quechua Chanka reference:\n{reference}\n\n"
                 "Return a JSON object with exactly these keys:\n"
@@ -206,6 +270,15 @@ def request_payload(args: argparse.Namespace, source: str, reference: str) -> di
     return chat_payload(args, args.model, prompt_messages(source, reference), args.max_output_tokens)
 
 
+def request_payload_with_few_shots(
+    args: argparse.Namespace,
+    source: str,
+    reference: str,
+    few_shots: Sequence[dict[str, Any]],
+) -> dict[str, Any]:
+    return chat_payload(args, args.model, prompt_messages(source, reference, few_shots), args.max_output_tokens)
+
+
 def call_chat_payload(args: argparse.Namespace, api_key: str, payload: dict[str, Any]) -> dict[str, Any]:
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
@@ -232,8 +305,18 @@ def call_chat_payload(args: argparse.Namespace, api_key: str, payload: dict[str,
     raise RuntimeError(f"DeepSeek request failed after {args.max_retries} attempts: {last_error}")
 
 
-def call_chat_completion(args: argparse.Namespace, api_key: str, source: str, reference: str) -> dict[str, Any]:
-    return call_chat_payload(args, api_key, request_payload(args, source, reference))
+def call_chat_completion(
+    args: argparse.Namespace,
+    api_key: str,
+    source: str,
+    reference: str,
+    few_shots: Sequence[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    return call_chat_payload(
+        args,
+        api_key,
+        request_payload_with_few_shots(args, source, reference, few_shots or []),
+    )
 
 
 def response_content(response: dict[str, Any]) -> str:
@@ -364,7 +447,12 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     rows = select_rows(load_rows(args), args.offset, args.max_rows, args.seed)
     if args.dry_run:
-        dry_payload = request_payload(args, rows[0]["source"], rows[0]["target"])
+        dry_payload = request_payload_with_few_shots(
+            args,
+            rows[0]["source"],
+            rows[0]["target"],
+            select_few_shots(rows, rows[0], args.few_shot_count),
+        )
         if args.audit:
             dry_payload = {
                 "generation": dry_payload,
@@ -409,7 +497,8 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
             skipped_rows += 1
             continue
         try:
-            response = call_chat_completion(args, api_key, row["source"], row["target"])
+            few_shots = select_few_shots(rows, row, args.few_shot_count)
+            response = call_chat_completion(args, api_key, row["source"], row["target"], few_shots)
             parsed = parse_frontier_json(response_content(response))
             if not record_passes(parsed, args.min_primitive_tags):
                 failure = failure_record(index, row, "failed_quality_filter", parsed=parsed)
