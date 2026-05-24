@@ -20,6 +20,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--stamp", required=True)
+    parser.add_argument("--stage", default="gspo")
     parser.add_argument("--base-model", required=True)
     parser.add_argument("--meta-verifier-adapter", required=True)
     parser.add_argument("--meta-output-dir", type=Path, required=True)
@@ -61,6 +62,7 @@ def manifest_for(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "created_at_utc": datetime.now(UTC).isoformat(),
         "stamp": args.stamp,
+        "stage": args.stage,
         "base_model": args.base_model,
         "meta_verifier_adapter": args.meta_verifier_adapter,
         "meta_output_dir": str(args.meta_output_dir),

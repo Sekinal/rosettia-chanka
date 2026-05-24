@@ -97,8 +97,8 @@ def write_markdown(records: Sequence[dict[str, Any]], path: Path) -> None:
         "",
         "Ranking prioritizes promoted cycles, then external translation metrics and calibration. Failed cycles can still be useful if they mined many hardcases.",
         "",
-        "| Rank | Promoted | Score | Stamp | chrF++ | BLEU | token F1 | TER | format % | false-conf % | missing-score % | input hardcases | output hardcases |",
-        "| ---: | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Rank | Promoted | Score | Stamp | Stage | chrF++ | BLEU | token F1 | TER | format % | false-conf % | missing-score % | input hardcases | output hardcases |",
+        "| ---: | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for rank, record in enumerate(records, start=1):
         metrics = record.get("metrics") if isinstance(record.get("metrics"), dict) else {}
@@ -112,6 +112,7 @@ def write_markdown(records: Sequence[dict[str, Any]], path: Path) -> None:
                     "yes" if record.get("promoted") else "no",
                     format_value(float(record.get("cycle_score", 0.0))),
                     str(record.get("stamp", "unknown")),
+                    str(record.get("stage", "gspo")),
                     format_value(metric(metrics, "chrf++")),
                     format_value(metric(metrics, "bleu")),
                     format_value(metric(metrics, "token_f1")),

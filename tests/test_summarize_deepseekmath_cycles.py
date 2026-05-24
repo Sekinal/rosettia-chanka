@@ -11,6 +11,7 @@ from scripts import summarize_deepseekmath_cycles as summarize
 def manifest(stamp: str, promoted: bool, chrf: float, bleu: float, output_hardcases: int = 0) -> dict:
     return {
         "stamp": stamp,
+        "stage": "sft_seed" if not promoted else "initial_gspo",
         "promoted": promoted,
         "metrics": {
             "chrf++": chrf,
@@ -53,6 +54,8 @@ class SummarizeDeepSeekMathCyclesTests(unittest.TestCase):
             content = path.read_text()
 
         self.assertIn("cycle-a", content)
+        self.assertIn("Stage", content)
+        self.assertIn("initial_gspo", content)
         self.assertIn("output hardcases", content)
         self.assertIn("Promoted", content)
 

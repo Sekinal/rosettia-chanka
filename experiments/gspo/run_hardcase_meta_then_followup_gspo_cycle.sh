@@ -54,6 +54,7 @@ fi
 "$PYTHON" scripts/write_deepseekmath_cycle_manifest.py \
   --output-json "$CYCLE_MANIFEST_JSON" \
   --stamp "$STAMP" \
+  --stage hardcase_followup_gspo \
   --base-model "$BASE_MODEL" \
   --meta-verifier-adapter "$NEXT_META_VERIFIER_ADAPTER" \
   --meta-output-dir "$META_OUTPUT_DIR" \

@@ -36,6 +36,7 @@ SFT_EVAL_JSON="${SFT_EVAL_JSON:-${SFT_EVAL_DIR}/metrics.json}"
 SFT_EVAL_PREDICTIONS="${SFT_EVAL_PREDICTIONS:-${SFT_EVAL_DIR}/predictions.jsonl}"
 SFT_META_JSONL="${SFT_META_JSONL:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.jsonl}"
 SFT_META_SUMMARY_JSON="${SFT_META_SUMMARY_JSON:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.summary.json}"
+SFT_CYCLE_MANIFEST_JSON="${SFT_CYCLE_MANIFEST_JSON:-${THINKING_SFT_OUTPUT_DIR}/cycle_manifest.json}"
 MINE_SFT_META="${MINE_SFT_META:-true}"
 MINE_GSPO_META="${MINE_GSPO_META:-true}"
 TRAIN_SFT_META_VERIFIER="${TRAIN_SFT_META_VERIFIER:-true}"
@@ -74,6 +75,32 @@ is_truthy() {
 
 is_falsey() {
   [[ "$1" == "false" || "$1" == "0" || "$1" == "no" ]]
+}
+
+write_sft_seed_manifest() {
+  SFT_MANIFEST_INPUT_ARGS=()
+  if [[ -f "$SFT_META_JSONL" ]]; then
+    SFT_MANIFEST_INPUT_ARGS+=(--input-hardcase-jsonl "$SFT_META_JSONL")
+  fi
+  SFT_MANIFEST_BASELINE_ARGS=()
+  if [[ -n "${SFT_BASELINE_METRICS_JSON:-}" ]]; then
+    SFT_MANIFEST_BASELINE_ARGS+=(--baseline-metrics-json "$SFT_BASELINE_METRICS_JSON")
+  fi
+
+  "$PYTHON" scripts/write_deepseekmath_cycle_manifest.py \
+    --output-json "$SFT_CYCLE_MANIFEST_JSON" \
+    --stamp "${STAMP}-sft-seed" \
+    --stage sft_seed \
+    --base-model "$BASE_ADAPTER" \
+    --meta-verifier-adapter "${META_VERIFIER_ADAPTER:-none}" \
+    --meta-output-dir "$SFT_META_OUTPUT_DIR" \
+    --followup-output-dir "$THINKING_SFT_OUTPUT_DIR" \
+    --metrics-json "$SFT_EVAL_JSON" \
+    --promotion-json "${SFT_PROMOTION_JSON:-${SFT_EVAL_DIR}/promotion_gate.json}" \
+    --predictions-jsonl "$SFT_EVAL_PREDICTIONS" \
+    --output-hardcase-jsonl "$SFT_META_JSONL" \
+    "${SFT_MANIFEST_INPUT_ARGS[@]}" \
+    "${SFT_MANIFEST_BASELINE_ARGS[@]}"
 }
 
 FRONTIER_STRATIFY_ARGS=()
@@ -309,8 +336,11 @@ if is_truthy "$MINE_SFT_META"; then
     "${SFT_META_ARGS[@]}"
 fi
 
+write_sft_seed_manifest
+
 if is_falsey "$RUN_GSPO"; then
   echo "RUN_GSPO=$RUN_GSPO; stopping after SFT-only evaluation at $SFT_EVAL_JSON"
+  echo "SFT seed cycle manifest: $SFT_CYCLE_MANIFEST_JSON"
   exit 0
 fi
 
@@ -383,6 +413,7 @@ if chrf < min_chrf or format_rate < min_format:
 PY
 then
   echo "SFT-only gate failed; skipping GSPO to avoid another translation collapse."
+  echo "SFT seed cycle manifest: $SFT_CYCLE_MANIFEST_JSON"
   exit 0
 fi
 
@@ -449,6 +480,7 @@ fi
 "$PYTHON" scripts/write_deepseekmath_cycle_manifest.py \
   --output-json "$GSPO_CYCLE_MANIFEST_JSON" \
   --stamp "$STAMP" \
+  --stage initial_gspo \
   --base-model "$THINKING_SFT_ADAPTER" \
   --meta-verifier-adapter "$META_VERIFIER_ADAPTER" \
   --meta-output-dir "$SFT_META_OUTPUT_DIR" \

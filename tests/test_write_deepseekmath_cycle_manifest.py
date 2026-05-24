@@ -40,6 +40,8 @@ class WriteDeepSeekMathCycleManifestTests(unittest.TestCase):
                     str(output),
                     "--stamp",
                     "cycle",
+                    "--stage",
+                    "sft_seed",
                     "--base-model",
                     "base",
                     "--meta-verifier-adapter",
@@ -64,6 +66,7 @@ class WriteDeepSeekMathCycleManifestTests(unittest.TestCase):
             payload = manifest.manifest_for(args)
 
         self.assertEqual(payload["stamp"], "cycle")
+        self.assertEqual(payload["stage"], "sft_seed")
         self.assertTrue(payload["promoted"])
         self.assertEqual(payload["metrics"]["chrf++"], 42.0)
         self.assertEqual(payload["input_hardcases"]["valid_records"], 2)
