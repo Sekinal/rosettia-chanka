@@ -248,6 +248,17 @@ This is still not proof that RL improves translation. It is the first version of
 
 After GSPO, the loop now writes the RL model's final structured predictions and mines them too. `scripts/train_gspo_chanka_unsloth.py --predictions-jsonl` emits source/reference/prediction/raw/self-verification rows, `run_2511_self_verifiable_thinking_translation.sh` writes `final_predictions.jsonl`, and the DeepSeek V4 Pro chain turns that into `meta_hardcases_from_gspo_eval.jsonl` when `MINE_GSPO_META=true`. Those post-GSPO hard cases should be treated as the seed for the next iteration's meta-verifier, because they reflect the failure modes created by the actual RL policy rather than only the SFT head-start.
 
+The next-iteration runner is:
+
+```bash
+cd /root/rosettia-chanka
+SFT_META_JSONL=outputs/deepseek_v4_pro_thinking_sft_<stamp>/sft_only_eval/meta_hardcases_from_sft_eval.jsonl \
+GSPO_META_JSONL=outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_deepseek_seeded_<stamp>/chanka_gspo/meta_hardcases_from_gspo_eval.jsonl \
+experiments/gspo/run_next_meta_verifier_from_hardcases.sh
+```
+
+It uses `scripts/check_meta_hardcase_data.py` to require enough valid real hardcases, adds cold-start meta rows, and trains a new meta-verifier. Feed the printed `final_meta_verifier_lora` back as `META_VERIFIER_ADAPTER` for the next GSPO cycle. This is the practical iteration boundary: data generation and SFT may be reused, while the verifier keeps absorbing the student's current failure distribution.
+
 ## SFT-Seeded GSPO Negative Result
 
 The deterministic primitive-thinking SFT seed did not fix the RL collapse:
