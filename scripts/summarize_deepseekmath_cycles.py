@@ -79,12 +79,24 @@ def missing_artifacts(record: dict[str, Any]) -> list[str]:
     return missing
 
 
+def promotion_reasons(record: dict[str, Any], limit: int = 3) -> list[str]:
+    promotion = record.get("promotion")
+    if not isinstance(promotion, dict):
+        return []
+    reasons = promotion.get("reasons")
+    if not isinstance(reasons, list):
+        return []
+    compact = [str(reason).replace("|", "/") for reason in reasons if str(reason).strip()]
+    return compact[:limit]
+
+
 def load_manifest(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text())
     payload["manifest_path"] = str(path)
     payload["cycle_score"] = cycle_score(payload)
     payload["missing_artifacts"] = missing_artifacts(payload)
     payload["artifact_missing_count"] = len(payload["missing_artifacts"])
+    payload["promotion_reasons"] = promotion_reasons(payload)
     return payload
 
 
@@ -136,12 +148,13 @@ def write_markdown(records: Sequence[dict[str, Any]], path: Path) -> None:
         "",
         "Ranking prioritizes promoted cycles, then external translation metrics and calibration. Failed cycles can still be useful if they mined many hardcases.",
         "",
-        "| Rank | Promoted | Score | Stamp | Stage | chrF++ | delta chrF++ | BLEU | delta BLEU | token F1 | delta token F1 | TER | format % | false-conf % | delta false-conf % | missing artifacts | output hardcases |",
-        "| ---: | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Rank | Promoted | Score | Stamp | Stage | chrF++ | delta chrF++ | BLEU | delta BLEU | token F1 | delta token F1 | TER | format % | false-conf % | delta false-conf % | missing artifacts | output hardcases | promotion reasons |",
+        "| ---: | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
     for rank, record in enumerate(records, start=1):
         metrics = record.get("metrics") if isinstance(record.get("metrics"), dict) else {}
         output_hardcases = record.get("output_hardcases") if isinstance(record.get("output_hardcases"), dict) else {}
+        reasons = promotion_reasons(record)
         lines.append(
             "| "
             + " | ".join(
@@ -163,6 +176,7 @@ def write_markdown(records: Sequence[dict[str, Any]], path: Path) -> None:
                     format_value(promotion_delta(record, "self_verification_false_confidence_rate")),
                     str(record.get("artifact_missing_count", len(record.get("missing_artifacts", [])))),
                     str(output_hardcases.get("valid_records", 0)),
+                    "<br>".join(reasons) if reasons else "",
                 ]
             )
             + " |"

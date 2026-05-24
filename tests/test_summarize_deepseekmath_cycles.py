@@ -53,6 +53,7 @@ class SummarizeDeepSeekMathCyclesTests(unittest.TestCase):
         self.assertIn("cycle_score", records[0])
         self.assertEqual(records[0]["artifact_missing_count"], 0)
         self.assertEqual(records[1]["missing_artifacts"], ["predictions"])
+        self.assertEqual(records[1]["promotion_reasons"], ["regressed"])
 
     def test_write_markdown_includes_hardcase_columns(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -76,7 +77,28 @@ class SummarizeDeepSeekMathCyclesTests(unittest.TestCase):
         self.assertIn("1.2500", content)
         self.assertIn("missing artifacts", content)
         self.assertIn("output hardcases", content)
+        self.assertIn("promotion reasons", content)
         self.assertIn("Promoted", content)
+
+    def test_write_markdown_includes_compact_promotion_reasons(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "summary.md"
+            payload = manifest("cycle-b", False, 38.0, 7.0, output_hardcases=5)
+            payload["promotion"]["reasons"] = [
+                "bleu 7.0000 < 8.0000",
+                "self_verification_required_format_rate 40.0000 < 50.0000",
+                "reason with | pipe",
+                "extra hidden in markdown",
+            ]
+            payload["artifact_missing_count"] = 1
+            summarize.write_markdown([payload], path)
+
+            content = path.read_text()
+
+        self.assertIn("bleu 7.0000 < 8.0000", content)
+        self.assertIn("self_verification_required_format_rate", content)
+        self.assertIn("reason with / pipe", content)
+        self.assertNotIn("extra hidden in markdown", content)
 
 
 if __name__ == "__main__":
