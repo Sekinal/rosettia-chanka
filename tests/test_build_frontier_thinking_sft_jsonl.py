@@ -130,6 +130,38 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         self.assertTrue(builder.record_passes(parsed, min_primitive_tags=2, required_primitives=expected))
         self.assertFalse(builder.record_passes(missing, min_primitive_tags=2, required_primitives=expected))
 
+    def test_select_rows_balances_expected_primitives(self):
+        rows = [
+            {"source": "Hola.", "target": "Rimaykullayki."},
+            {"source": "Buenos dias.", "target": "Allin punchaw."},
+            {"source": "Gracias.", "target": "Anay."},
+            {"source": "Hay 3 documentos.", "target": "Kimsa qillqakuna kan."},
+            {"source": "El tribunal revisa el proceso.", "target": "Tribunalqa procesota qawan."},
+            {"source": "Hasta manana.", "target": "Paqarinkama."},
+        ]
+
+        selected = builder.select_rows(rows, offset=0, max_rows=3, seed=7, stratify_primitives=True)
+        selected_tags = {
+            tag
+            for row in selected
+            for tag in builder.expected_primitives_for_row(row["source"], row["target"])
+        }
+
+        self.assertEqual(len(selected), 3)
+        self.assertIn("[ENTIDADES]", selected_tags)
+        self.assertIn("[TERMINOLOGIA]", selected_tags)
+
+    def test_select_rows_can_keep_seeded_random_slice(self):
+        rows = [
+            {"source": "Hola.", "target": "Rimaykullayki."},
+            {"source": "Buenos dias.", "target": "Allin punchaw."},
+            {"source": "Gracias.", "target": "Anay."},
+        ]
+
+        selected = builder.select_rows(rows, offset=0, max_rows=2, seed=1, stratify_primitives=False)
+
+        self.assertEqual(selected, builder.select_rows(rows, offset=0, max_rows=2, seed=1, stratify_primitives=False))
+
     def test_parse_and_gate_audit_json(self):
         audit = builder.parse_audit_json('{"pass": true, "score": 0.82, "reason": "concise"}')
 

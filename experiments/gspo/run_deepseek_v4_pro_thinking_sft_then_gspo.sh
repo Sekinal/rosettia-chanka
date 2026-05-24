@@ -100,6 +100,9 @@ fi
 if is_truthy "${FRONTIER_RETRY_FAILURES:-false}"; then
   FRONTIER_ARGS+=(--retry-failures)
 fi
+if is_falsey "${FRONTIER_STRATIFY_PRIMITIVES:-true}"; then
+  FRONTIER_ARGS+=(--no-stratify-primitives)
+fi
 
 "$PYTHON" scripts/build_frontier_thinking_sft_jsonl.py \
   --output-jsonl "$FRONTIER_JSONL" \

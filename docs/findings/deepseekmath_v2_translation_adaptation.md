@@ -417,6 +417,8 @@ The DeepSeek V4 Pro synthetic-thinking builder now makes primitive tags row-spec
 
 The builder passes those expected tags in the DeepSeek prompt and rejects rows that omit them by default. Use `--no-require-expected-primitives` only for debugging or prompt exploration, not for serious SFT data. The pre-SFT gate also checks accepted JSONLs with `--min-expected-primitive-coverage`; `experiments/gspo/run_deepseek_v4_pro_thinking_sft_then_gspo.sh` defaults this to `MIN_FRONTIER_EXPECTED_PRIMITIVE_COVERAGE=0.95`.
 
+The same builder also stratifies the selected source rows by expected primitives before any API call. After the seeded shuffle, `--stratify-primitives` greedily chooses rows that cover currently underrepresented tags, which gives small DeepSeek batches a better chance of including entity, terminology, grammar, meaning, and anti-copy cases. The chain leaves this on by default and exposes `FRONTIER_STRATIFY_PRIMITIVES=false` only for exact random-slice debugging.
+
 This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
 
 For a faster smoke:

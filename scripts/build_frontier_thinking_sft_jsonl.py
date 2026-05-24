@@ -52,6 +52,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-rows", type=int, default=32)
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--seed", type=int, default=3407)
+    parser.add_argument(
+        "--stratify-primitives",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Select rows greedily to balance expected primitive tags before calling the frontier model.",
+    )
     parser.add_argument("--sleep-seconds", type=float, default=0.0)
     parser.add_argument("--timeout-seconds", type=float, default=120.0)
     parser.add_argument("--max-retries", type=int, default=3)
@@ -126,13 +132,42 @@ def load_rows(args: argparse.Namespace) -> list[dict[str, str]]:
     return gspo.load_chanka_rows(args.dataset_repo, args.dataset_file)
 
 
-def select_rows(rows: Sequence[dict[str, str]], offset: int, max_rows: int | None, seed: int) -> list[dict[str, str]]:
+def balance_rows_by_expected_primitives(rows: Sequence[dict[str, str]], max_rows: int) -> list[dict[str, str]]:
+    """Greedily select rows that cover underrepresented expected primitive tags."""
+    remaining = list(rows)
+    selected: list[dict[str, str]] = []
+    counts = {tag: 0 for tag in PRIMITIVES}
+    while remaining and len(selected) < max_rows:
+        best_index = max(
+            range(len(remaining)),
+            key=lambda index: sum(
+                1.0 / (1.0 + counts[tag])
+                for tag in expected_primitives_for_row(remaining[index]["source"], remaining[index]["target"])
+            ),
+        )
+        row = remaining.pop(best_index)
+        selected.append(row)
+        for tag in expected_primitives_for_row(row["source"], row["target"]):
+            counts[tag] += 1
+    return selected
+
+
+def select_rows(
+    rows: Sequence[dict[str, str]],
+    offset: int,
+    max_rows: int | None,
+    seed: int,
+    stratify_primitives: bool = True,
+) -> list[dict[str, str]]:
     selected = list(rows)
     random.Random(seed).shuffle(selected)
     if offset:
         selected = selected[offset:]
     if max_rows is not None:
-        selected = selected[:max_rows]
+        if stratify_primitives:
+            selected = balance_rows_by_expected_primitives(selected, max_rows)
+        else:
+            selected = selected[:max_rows]
     return selected
 
 
@@ -547,7 +582,7 @@ def failure_record(index: int, row: dict[str, str], reason: str, **extra: Any) -
 
 def main_from_args(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
-    rows = select_rows(load_rows(args), args.offset, args.max_rows, args.seed)
+    rows = select_rows(load_rows(args), args.offset, args.max_rows, args.seed, args.stratify_primitives)
     if args.dry_run:
         expected_primitives = expected_primitives_for_row(rows[0]["source"], rows[0]["target"])
         dry_payload = request_payload_with_few_shots(
@@ -676,6 +711,7 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
         "audit_min_score": args.audit_min_score if args.audit else None,
         "allow_model_translation": args.allow_model_translation,
         "require_expected_primitives": args.require_expected_primitives,
+        "stratify_primitives": args.stratify_primitives,
         "resume": args.resume,
         "retry_failures": args.retry_failures,
         "output_jsonl": str(args.output_jsonl),
