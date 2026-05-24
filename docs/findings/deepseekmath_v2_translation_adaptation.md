@@ -214,6 +214,24 @@ FRONTIER_MAX_ROWS=128 experiments/gspo/run_deepseek_v4_pro_thinking_sft_then_gsp
 
 Use small batches first. Generated frontier JSONL should remain an artifact, not a committed repo file.
 
+## SFT-Seeded GSPO Negative Result
+
+The deterministic primitive-thinking SFT seed did not fix the RL collapse:
+
+- run directory: `outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_sft_seeded_20260523-thinking-generator-seeded`
+- source seed: `outputs/self_verifiable_thinking_generator_sft_20260523-thinking-generator-seeded/final_lora`
+- final metric rows: 16 of 32 held-out rows
+- chrF++: 18.5127
+- BLEU: 0.6980
+- TER: 302.5641
+- token F1: 6.1756
+- format/thinking-format rate: 18.75%
+- missing self-score rate: 81.25%
+- false-confidence rate: 100.0%
+- average thinking primitive count: 2.125
+
+This is worse than the non-seeded v3 run. The lesson is that deterministic template SFT teaches the model to mention the primitive tags, but not to use them as reliable translation checks. Before more RL, evaluate SFT-only outputs and replace the deterministic traces with frontier-generated, audited, concise translation checks. The frontier traces should still keep the reviewed reference as the final translation unless a human reviews model-proposed alternatives.
+
 ## Why This Fits Chanka Better Than Plain BLEU RL
 
 BLEU/chrF rewards are useful but too shallow for the user's goal of learning grammar structures. A translation can gain n-gram overlap while still copying Spanish structure, omitting agglutinative morphology, or choosing a misleading Chanka term. The DeepSeekMath-V2 adaptation makes the model expose its own quality judgement, then rewards calibration. This creates pressure toward internal checks like:
