@@ -276,6 +276,8 @@ That follow-up runner performs a small self-verifiable thinking GSPO pass, write
 5. GSPO again from the same thinking-SFT base or from the previous policy adapter;
 6. repeat only while corpus metrics and calibration improve.
 
+Promotion is now explicit. `scripts/check_policy_iteration_metrics.py` writes a pass/fail JSON report using chrF++/BLEU/token-F1/TER, self-verification required-format rate, false-confidence, and missing-score thresholds. `run_followup_gspo_with_meta_verifier.sh` writes this as `promotion_gate.json`; pass `BASELINE_METRICS_JSON` to compare against the previous SFT or policy metrics. For exploratory loops, leave `REQUIRE_PROMOTION=false` so the run still mines hardcases after a failed gate. For serious model promotion, set `REQUIRE_PROMOTION=true`. This guard exists because earlier runs showed trainer reward increasing while chrF++/BLEU collapsed.
+
 ## SFT-Seeded GSPO Negative Result
 
 The deterministic primitive-thinking SFT seed did not fix the RL collapse:
