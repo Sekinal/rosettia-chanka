@@ -10,6 +10,8 @@ DATA_DIR="${DATA_DIR:-outputs/frontier_thinking_data_${STAMP}}"
 FRONTIER_JSONL="${FRONTIER_JSONL:-${DATA_DIR}/deepseek_v4_pro_thinking_sft.jsonl}"
 FRONTIER_FAILURES_JSONL="${FRONTIER_FAILURES_JSONL:-${DATA_DIR}/deepseek_v4_pro_thinking_failures.jsonl}"
 FRONTIER_SUMMARY_JSON="${FRONTIER_SUMMARY_JSON:-${DATA_DIR}/deepseek_v4_pro_thinking_sft.summary.json}"
+FRONTIER_REPORT_JSON="${FRONTIER_REPORT_JSON:-${DATA_DIR}/deepseek_v4_pro_thinking_report.json}"
+FRONTIER_REPORT_MD="${FRONTIER_REPORT_MD:-${DATA_DIR}/deepseek_v4_pro_thinking_report.md}"
 PREFLIGHT_REPORT_JSON="${PREFLIGHT_REPORT_JSON:-${DATA_DIR}/preflight_report.json}"
 THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/deepseek_v4_pro_thinking_sft_${STAMP}}"
 THINKING_SFT_ADAPTER="${THINKING_SFT_ADAPTER:-${THINKING_SFT_OUTPUT_DIR}/final_lora}"
@@ -122,6 +124,13 @@ fi
   --min-primitive-tags-per-row "$MIN_FRONTIER_PRIMITIVE_TAGS_PER_ROW" \
   --min-primitive-row-rate "$MIN_FRONTIER_PRIMITIVE_ROW_RATE" \
   --min-distinct-primitives "$MIN_FRONTIER_DISTINCT_PRIMITIVES"
+
+"$PYTHON" scripts/report_frontier_thinking_data.py \
+  --output-jsonl "$FRONTIER_JSONL" \
+  --failures-jsonl "$FRONTIER_FAILURES_JSONL" \
+  --summary-json "$FRONTIER_SUMMARY_JSON" \
+  --report-json "$FRONTIER_REPORT_JSON" \
+  --report-md "$FRONTIER_REPORT_MD"
 
 "$PYTHON" scripts/train_jsonl_sft_unsloth.py \
   --jsonl "$FRONTIER_JSONL" \
