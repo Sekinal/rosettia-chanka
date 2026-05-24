@@ -214,6 +214,21 @@ FRONTIER_MAX_ROWS=128 experiments/gspo/run_deepseek_v4_pro_thinking_sft_then_gsp
 
 Use small batches first. Generated frontier JSONL should remain an artifact, not a committed repo file.
 
+The frontier builder now supports a second-pass audit:
+
+```bash
+python scripts/build_frontier_thinking_sft_jsonl.py \
+  --output-jsonl outputs/frontier_thinking_data/deepseek_v4_pro_thinking_sft.jsonl \
+  --model deepseek-v4-pro \
+  --audit \
+  --audit-model deepseek-v4-flash \
+  --max-rows 128
+```
+
+The audit pass returns `pass`, `score`, and `reason`, and rejects rows below `--audit-min-score`. This matters because the deterministic seed showed that primitive tags alone are not enough: the trace must make reliable, translation-grounded checks.
+
+The chained experiment now evaluates SFT-only before RL. It runs `scripts/evaluate_gspo_checkpoint.py --self-verification-thinking-output` after the frontier SFT and only enters GSPO if `MIN_SFT_CHRF_FOR_GSPO` and `MIN_SFT_FORMAT_FOR_GSPO` are met. If the SFT head-start already collapses translation quality or format adherence, the script exits without spending time on another GSPO collapse.
+
 ## SFT-Seeded GSPO Negative Result
 
 The deterministic primitive-thinking SFT seed did not fix the RL collapse:

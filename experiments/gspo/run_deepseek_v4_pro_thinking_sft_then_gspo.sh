@@ -12,6 +12,12 @@ THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/deepseek_v4_pro_thin
 THINKING_SFT_ADAPTER="${THINKING_SFT_ADAPTER:-${THINKING_SFT_OUTPUT_DIR}/final_lora}"
 GSPO_OUTPUT_DIR="${GSPO_OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_deepseek_seeded_${STAMP}}"
 TERMINOLOGY_FILE="${TERMINOLOGY_FILE:-clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet}"
+SFT_EVAL_DIR="${SFT_EVAL_DIR:-${THINKING_SFT_OUTPUT_DIR}/sft_only_eval}"
+SFT_EVAL_JSON="${SFT_EVAL_JSON:-${SFT_EVAL_DIR}/metrics.json}"
+SFT_EVAL_PREDICTIONS="${SFT_EVAL_PREDICTIONS:-${SFT_EVAL_DIR}/predictions.jsonl}"
+RUN_GSPO="${RUN_GSPO:-true}"
+MIN_SFT_CHRF_FOR_GSPO="${MIN_SFT_CHRF_FOR_GSPO:-35}"
+MIN_SFT_FORMAT_FOR_GSPO="${MIN_SFT_FORMAT_FOR_GSPO:-60}"
 
 cd "$ROOT_DIR"
 
@@ -25,6 +31,17 @@ if [[ -z "${META_VERIFIER_ADAPTER:-}" ]]; then
   fi
 fi
 
+FRONTIER_ARGS=()
+if [[ "${FRONTIER_AUDIT:-true}" == "true" || "${FRONTIER_AUDIT:-true}" == "1" || "${FRONTIER_AUDIT:-true}" == "yes" ]]; then
+  FRONTIER_ARGS+=(--audit)
+fi
+if [[ -n "${FRONTIER_AUDIT_MODEL:-}" ]]; then
+  FRONTIER_ARGS+=(--audit-model "$FRONTIER_AUDIT_MODEL")
+fi
+if [[ -n "${FRONTIER_AUDIT_MIN_SCORE:-}" ]]; then
+  FRONTIER_ARGS+=(--audit-min-score "$FRONTIER_AUDIT_MIN_SCORE")
+fi
+
 "$PYTHON" scripts/build_frontier_thinking_sft_jsonl.py \
   --output-jsonl "$FRONTIER_JSONL" \
   --model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
@@ -33,7 +50,8 @@ fi
   --offset "${FRONTIER_OFFSET:-0}" \
   --sleep-seconds "${FRONTIER_SLEEP_SECONDS:-0}" \
   --max-retries "${FRONTIER_MAX_RETRIES:-3}" \
-  --max-output-tokens "${FRONTIER_MAX_OUTPUT_TOKENS:-512}"
+  --max-output-tokens "${FRONTIER_MAX_OUTPUT_TOKENS:-512}" \
+  "${FRONTIER_ARGS[@]}"
 
 "$PYTHON" scripts/train_jsonl_sft_unsloth.py \
   --jsonl "$FRONTIER_JSONL" \
@@ -58,6 +76,50 @@ fi
   --terminology-file "$TERMINOLOGY_FILE" \
   --terminology-top-k "${TERMINOLOGY_TOP_K:-1}" \
   --logging-steps "${SFT_LOGGING_STEPS:-4}"
+
+"$PYTHON" scripts/evaluate_gspo_checkpoint.py \
+  --adapter-path "$THINKING_SFT_ADAPTER" \
+  --output-json "$SFT_EVAL_JSON" \
+  --predictions-jsonl "$SFT_EVAL_PREDICTIONS" \
+  --max-seq-length "${SFT_EVAL_MAX_SEQ_LENGTH:-384}" \
+  --max-completion-length "${SFT_EVAL_MAX_COMPLETION_LENGTH:-112}" \
+  --batch-size "${SFT_EVAL_BATCH_SIZE:-8}" \
+  --max-eval-samples "${SFT_EVAL_MAX_ROWS:-64}" \
+  --self-verification-thinking-output \
+  --terminology-file "$TERMINOLOGY_FILE" \
+  --terminology-top-k "${TERMINOLOGY_TOP_K:-1}" \
+  --progress-every "${SFT_EVAL_PROGRESS_EVERY:-16}"
+
+if [[ "$RUN_GSPO" == "false" || "$RUN_GSPO" == "0" || "$RUN_GSPO" == "no" ]]; then
+  echo "RUN_GSPO=$RUN_GSPO; stopping after SFT-only evaluation at $SFT_EVAL_JSON"
+  exit 0
+fi
+
+if ! SFT_EVAL_JSON="$SFT_EVAL_JSON" \
+  MIN_SFT_CHRF_FOR_GSPO="$MIN_SFT_CHRF_FOR_GSPO" \
+  MIN_SFT_FORMAT_FOR_GSPO="$MIN_SFT_FORMAT_FOR_GSPO" \
+  "$PYTHON" - <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+metrics = json.loads(Path(os.environ["SFT_EVAL_JSON"]).read_text())
+chrf = float(metrics.get("chrf++", 0.0))
+format_rate = float(metrics.get("self_verification_required_format_rate", 0.0))
+min_chrf = float(os.environ["MIN_SFT_CHRF_FOR_GSPO"])
+min_format = float(os.environ["MIN_SFT_FORMAT_FOR_GSPO"])
+print(
+    f"SFT-only gate: chrF++={chrf:.4f} required>={min_chrf:.4f}; "
+    f"format={format_rate:.2f}% required>={min_format:.2f}%"
+)
+if chrf < min_chrf or format_rate < min_format:
+    sys.exit(1)
+PY
+then
+  echo "SFT-only gate failed; skipping GSPO to avoid another translation collapse."
+  exit 0
+fi
 
 BASE_MODEL="$THINKING_SFT_ADAPTER" \
 META_VERIFIER_ADAPTER="$META_VERIFIER_ADAPTER" \

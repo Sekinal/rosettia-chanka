@@ -44,6 +44,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--api-key-env", default="DEEPSEEK_API_KEY")
     parser.add_argument("--base-url", default="https://api.deepseek.com")
     parser.add_argument("--model", default="deepseek-v4-pro")
+    parser.add_argument("--audit-model", default=None)
     parser.add_argument("--reasoning-effort", choices=("high", "max"), default="max")
     parser.add_argument("--disable-thinking", action="store_true")
     parser.add_argument("--max-rows", type=int, default=32)
@@ -54,6 +55,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-retries", type=int, default=3)
     parser.add_argument("--max-output-tokens", type=int, default=512)
     parser.add_argument("--min-primitive-tags", type=int, default=2)
+    parser.add_argument(
+        "--audit",
+        action="store_true",
+        help="Run a second frontier pass that accepts or rejects the generated thinking row.",
+    )
+    parser.add_argument("--audit-min-score", type=float, default=0.75)
     parser.add_argument(
         "--allow-model-translation",
         action="store_true",
@@ -132,11 +139,43 @@ def prompt_messages(source: str, reference: str) -> list[dict[str, str]]:
     ]
 
 
-def request_payload(args: argparse.Namespace, source: str, reference: str) -> dict[str, Any]:
+def audit_messages(source: str, reference: str, parsed: dict[str, Any]) -> list[dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You audit synthetic training data for Spanish to Quechua Chanka translation. "
+                "Return only valid JSON. Do not include private chain-of-thought."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                "Decide whether this synthetic thinking target is safe to train on.\n\n"
+                f"Spanish source:\n{source}\n\n"
+                f"Reviewed Quechua Chanka reference:\n{reference}\n\n"
+                f"Analysis:\n{parsed['analysis']}\n\n"
+                f"Proposed translation:\n{parsed['translation']}\n\n"
+                f"Self evaluation:\n{parsed['self_evaluation']}\n\n"
+                f"Score:\n{parsed['score']}\n\n"
+                "Accept only if the analysis is concise, uses the primitive tags correctly, "
+                "does not invent unsupported grammar claims, and the final translation is compatible with the reference.\n"
+                "Return a JSON object with exactly: pass (boolean), score (0.0 to 1.0), reason (short sentence)."
+            ),
+        },
+    ]
+
+
+def chat_payload(
+    args: argparse.Namespace,
+    model: str,
+    messages: list[dict[str, str]],
+    max_output_tokens: int,
+) -> dict[str, Any]:
     payload: dict[str, Any] = {
-        "model": args.model,
-        "messages": prompt_messages(source, reference),
-        "max_tokens": args.max_output_tokens,
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_output_tokens,
         "response_format": {"type": "json_object"},
     }
     if args.disable_thinking:
@@ -147,8 +186,11 @@ def request_payload(args: argparse.Namespace, source: str, reference: str) -> di
     return payload
 
 
-def call_chat_completion(args: argparse.Namespace, api_key: str, source: str, reference: str) -> dict[str, Any]:
-    payload = request_payload(args, source, reference)
+def request_payload(args: argparse.Namespace, source: str, reference: str) -> dict[str, Any]:
+    return chat_payload(args, args.model, prompt_messages(source, reference), args.max_output_tokens)
+
+
+def call_chat_payload(args: argparse.Namespace, api_key: str, payload: dict[str, Any]) -> dict[str, Any]:
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
         args.base_url.rstrip("/") + "/chat/completions",
@@ -172,6 +214,10 @@ def call_chat_completion(args: argparse.Namespace, api_key: str, source: str, re
             last_error = exc
         time.sleep(min(2.0**attempt, 30.0))
     raise RuntimeError(f"DeepSeek request failed after {args.max_retries} attempts: {last_error}")
+
+
+def call_chat_completion(args: argparse.Namespace, api_key: str, source: str, reference: str) -> dict[str, Any]:
+    return call_chat_payload(args, api_key, request_payload(args, source, reference))
 
 
 def response_content(response: dict[str, Any]) -> str:
@@ -202,6 +248,22 @@ def parse_frontier_json(content: str) -> dict[str, Any]:
     }
 
 
+def parse_audit_json(content: str) -> dict[str, Any]:
+    try:
+        payload = json.loads(content)
+    except json.JSONDecodeError:
+        start = content.find("{")
+        end = content.rfind("}")
+        if start < 0 or end <= start:
+            raise
+        payload = json.loads(content[start : end + 1])
+    return {
+        "pass": bool(payload.get("pass", False)),
+        "score": float(payload.get("score", 0.0)),
+        "reason": gspo.normalize_text(str(payload.get("reason") or "")),
+    }
+
+
 def primitive_count(text: str) -> int:
     return sum(1 for tag in PRIMITIVES if tag in text)
 
@@ -227,6 +289,21 @@ def record_passes(parsed: dict[str, Any], min_primitive_tags: int) -> bool:
     return 0.0 <= float(parsed["score"]) <= 1.0
 
 
+def audit_passes(audit: dict[str, Any], min_score: float) -> bool:
+    return bool(audit["pass"]) and float(audit["score"]) >= min_score
+
+
+def audit_record(args: argparse.Namespace, api_key: str, source: str, reference: str, parsed: dict[str, Any]) -> dict[str, Any]:
+    payload = chat_payload(
+        args,
+        args.audit_model or args.model,
+        audit_messages(source, reference, parsed),
+        min(args.max_output_tokens, 256),
+    )
+    response = call_chat_payload(args, api_key, payload)
+    return parse_audit_json(response_content(response))
+
+
 def write_jsonl(path: Path, records: Sequence[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as handle:
@@ -238,7 +315,27 @@ def main() -> None:
     args = parse_args()
     rows = select_rows(load_rows(args), args.offset, args.max_rows, args.seed)
     if args.dry_run:
-        print(json.dumps(request_payload(args, rows[0]["source"], rows[0]["target"]), indent=2, ensure_ascii=False))
+        dry_payload = request_payload(args, rows[0]["source"], rows[0]["target"])
+        if args.audit:
+            dry_payload = {
+                "generation": dry_payload,
+                "audit": chat_payload(
+                    args,
+                    args.audit_model or args.model,
+                    audit_messages(
+                        rows[0]["source"],
+                        rows[0]["target"],
+                        {
+                            "analysis": "[SIGNIFICADO] conserva sentido; [ANTI_COPIA] evita copiar espanol.",
+                            "translation": rows[0]["target"],
+                            "self_evaluation": "Riesgo bajo.",
+                            "score": 0.95,
+                        },
+                    ),
+                    min(args.max_output_tokens, 256),
+                ),
+            }
+        print(json.dumps(dry_payload, indent=2, ensure_ascii=False))
         return
 
     api_key = os.environ.get(args.api_key_env)
@@ -254,6 +351,20 @@ def main() -> None:
             if not record_passes(parsed, args.min_primitive_tags):
                 failures.append({"index": index, "source": row["source"], "reason": "failed_quality_filter", "parsed": parsed})
                 continue
+            audit: dict[str, Any] | None = None
+            if args.audit:
+                audit = audit_record(args, api_key, row["source"], row["target"], parsed)
+                if not audit_passes(audit, args.audit_min_score):
+                    failures.append(
+                        {
+                            "index": index,
+                            "source": row["source"],
+                            "reason": "failed_frontier_audit",
+                            "parsed": parsed,
+                            "audit": audit,
+                        }
+                    )
+                    continue
             records.append(
                 {
                     "source": row["source"],
@@ -263,6 +374,7 @@ def main() -> None:
                     "frontier_analysis": parsed["analysis"],
                     "frontier_translation": parsed["translation"],
                     "frontier_score": parsed["score"],
+                    "frontier_audit": audit,
                     "source_name": row.get("source_name"),
                     "variant": row.get("variant"),
                     "task": "frontier_synthetic_thinking_translation_generation",
@@ -279,6 +391,9 @@ def main() -> None:
         "requested_rows": len(rows),
         "written_rows": len(records),
         "failed_rows": len(failures),
+        "audit": args.audit,
+        "audit_model": (args.audit_model or args.model) if args.audit else None,
+        "audit_min_score": args.audit_min_score if args.audit else None,
         "allow_model_translation": args.allow_model_translation,
         "output_jsonl": str(args.output_jsonl),
     }

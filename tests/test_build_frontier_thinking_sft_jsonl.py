@@ -19,6 +19,36 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         self.assertEqual(payload["reasoning_effort"], "max")
         self.assertEqual(payload["response_format"], {"type": "json_object"})
 
+    def test_dry_run_audit_payload_uses_audit_model_when_set(self):
+        args = builder.parse_args(
+            [
+                "--output-jsonl",
+                "out.jsonl",
+                "--audit",
+                "--audit-model",
+                "deepseek-v4-flash",
+            ]
+        )
+
+        payload = builder.chat_payload(
+            args,
+            args.audit_model,
+            builder.audit_messages(
+                "Buenos dias.",
+                "Allin punchaw.",
+                {
+                    "analysis": "[SIGNIFICADO] conserva; [ANTI_COPIA] evita copia.",
+                    "translation": "Allin punchaw.",
+                    "self_evaluation": "Riesgo bajo.",
+                    "score": 0.95,
+                },
+            ),
+            128,
+        )
+
+        self.assertEqual(payload["model"], "deepseek-v4-flash")
+        self.assertIn("pass (boolean)", payload["messages"][1]["content"])
+
     def test_parse_frontier_json_and_build_target_keeps_reference_by_default(self):
         parsed = builder.parse_frontier_json(
             json.dumps(
@@ -49,6 +79,12 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
 
         self.assertTrue(builder.record_passes(good, min_primitive_tags=2))
         self.assertFalse(builder.record_passes(bad, min_primitive_tags=2))
+
+    def test_parse_and_gate_audit_json(self):
+        audit = builder.parse_audit_json('{"pass": true, "score": 0.82, "reason": "concise"}')
+
+        self.assertTrue(builder.audit_passes(audit, min_score=0.75))
+        self.assertFalse(builder.audit_passes(audit, min_score=0.9))
 
     def test_load_source_jsonl_accepts_reference_field(self):
         with tempfile.TemporaryDirectory() as tmpdir:
