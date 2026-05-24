@@ -20,6 +20,11 @@ SFT_EVAL_PREDICTIONS="${SFT_EVAL_PREDICTIONS:-${SFT_EVAL_DIR}/predictions.jsonl}
 SFT_META_JSONL="${SFT_META_JSONL:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.jsonl}"
 SFT_META_SUMMARY_JSON="${SFT_META_SUMMARY_JSON:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.summary.json}"
 MINE_SFT_META="${MINE_SFT_META:-true}"
+TRAIN_SFT_META_VERIFIER="${TRAIN_SFT_META_VERIFIER:-true}"
+SFT_META_DATA_DIR="${SFT_META_DATA_DIR:-${SFT_EVAL_DIR}/self_verifiable_meta_data}"
+SFT_META_OUTPUT_DIR="${SFT_META_OUTPUT_DIR:-outputs/chanka_translation_meta_verifier_deepseek_sft_${STAMP}}"
+SFT_META_ADAPTER="${SFT_META_ADAPTER:-${SFT_META_OUTPUT_DIR}/final_meta_verifier_lora}"
+MIN_SFT_META_RECORDS_FOR_TRAIN="${MIN_SFT_META_RECORDS_FOR_TRAIN:-32}"
 RUN_GSPO="${RUN_GSPO:-true}"
 MIN_SFT_CHRF_FOR_GSPO="${MIN_SFT_CHRF_FOR_GSPO:-35}"
 MIN_SFT_FORMAT_FOR_GSPO="${MIN_SFT_FORMAT_FOR_GSPO:-60}"
@@ -27,6 +32,14 @@ MIN_FRONTIER_ROWS_FOR_SFT="${MIN_FRONTIER_ROWS_FOR_SFT:-64}"
 MIN_FRONTIER_ACCEPT_RATE="${MIN_FRONTIER_ACCEPT_RATE:-0.50}"
 
 cd "$ROOT_DIR"
+
+is_truthy() {
+  [[ "$1" == "true" || "$1" == "1" || "$1" == "yes" ]]
+}
+
+is_falsey() {
+  [[ "$1" == "false" || "$1" == "0" || "$1" == "no" ]]
+}
 
 if [[ -z "${META_VERIFIER_ADAPTER:-}" ]]; then
   META_VERIFIER_V3="outputs/chanka_translation_meta_verifier_v3_thinking_20260523-meta-v3-thinking/final_meta_verifier_lora"
@@ -39,7 +52,7 @@ if [[ -z "${META_VERIFIER_ADAPTER:-}" ]]; then
 fi
 
 FRONTIER_ARGS=()
-if [[ "${FRONTIER_AUDIT:-true}" == "true" || "${FRONTIER_AUDIT:-true}" == "1" || "${FRONTIER_AUDIT:-true}" == "yes" ]]; then
+if is_truthy "${FRONTIER_AUDIT:-true}"; then
   FRONTIER_ARGS+=(--audit)
 fi
 if [[ -n "${FRONTIER_AUDIT_MODEL:-}" ]]; then
@@ -48,10 +61,10 @@ fi
 if [[ -n "${FRONTIER_AUDIT_MIN_SCORE:-}" ]]; then
   FRONTIER_ARGS+=(--audit-min-score "$FRONTIER_AUDIT_MIN_SCORE")
 fi
-if [[ "${FRONTIER_RESUME:-true}" == "false" || "${FRONTIER_RESUME:-true}" == "0" || "${FRONTIER_RESUME:-true}" == "no" ]]; then
+if is_falsey "${FRONTIER_RESUME:-true}"; then
   FRONTIER_ARGS+=(--no-resume)
 fi
-if [[ "${FRONTIER_RETRY_FAILURES:-false}" == "true" || "${FRONTIER_RETRY_FAILURES:-false}" == "1" || "${FRONTIER_RETRY_FAILURES:-false}" == "yes" ]]; then
+if is_truthy "${FRONTIER_RETRY_FAILURES:-false}"; then
   FRONTIER_ARGS+=(--retry-failures)
 fi
 
@@ -112,7 +125,7 @@ fi
   --terminology-top-k "${TERMINOLOGY_TOP_K:-1}" \
   --progress-every "${SFT_EVAL_PROGRESS_EVERY:-16}"
 
-if [[ "$MINE_SFT_META" == "true" || "$MINE_SFT_META" == "1" || "$MINE_SFT_META" == "yes" ]]; then
+if is_truthy "$MINE_SFT_META"; then
   SFT_META_ARGS=()
   if [[ -n "${SFT_META_MAX_RECORDS:-}" ]]; then
     SFT_META_ARGS+=(--max-records "$SFT_META_MAX_RECORDS")
@@ -125,9 +138,55 @@ if [[ "$MINE_SFT_META" == "true" || "$MINE_SFT_META" == "1" || "$MINE_SFT_META" 
     "${SFT_META_ARGS[@]}"
 fi
 
-if [[ "$RUN_GSPO" == "false" || "$RUN_GSPO" == "0" || "$RUN_GSPO" == "no" ]]; then
+if is_falsey "$RUN_GSPO"; then
   echo "RUN_GSPO=$RUN_GSPO; stopping after SFT-only evaluation at $SFT_EVAL_JSON"
   exit 0
+fi
+
+if is_truthy "$TRAIN_SFT_META_VERIFIER" && [[ -f "$SFT_META_SUMMARY_JSON" ]]; then
+  if SFT_META_SUMMARY_JSON="$SFT_META_SUMMARY_JSON" \
+    MIN_SFT_META_RECORDS_FOR_TRAIN="$MIN_SFT_META_RECORDS_FOR_TRAIN" \
+    "$PYTHON" - <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+summary = json.loads(Path(os.environ["SFT_META_SUMMARY_JSON"]).read_text())
+records = int(summary.get("records", 0))
+minimum = int(os.environ["MIN_SFT_META_RECORDS_FOR_TRAIN"])
+print(f"SFT meta-verifier refresh gate: hardcases={records} required>={minimum}")
+if records < minimum:
+    sys.exit(1)
+PY
+  then
+    "$PYTHON" scripts/build_self_verifiable_translation_data.py \
+      --output-dir "$SFT_META_DATA_DIR" \
+      --max-rows "${SFT_META_COLD_START_MAX_ROWS:-256}"
+
+    "$PYTHON" scripts/train_meta_verifier_chanka_unsloth.py \
+      --meta-jsonl "${SFT_META_DATA_DIR}/translation_meta_verifier_cold_start.jsonl" \
+      --meta-jsonl "$SFT_META_JSONL" \
+      --output-dir "$SFT_META_OUTPUT_DIR" \
+      --max-seq-length "${SFT_META_VERIFIER_MAX_SEQ_LENGTH:-768}" \
+      --max-steps "${SFT_META_VERIFIER_MAX_STEPS:-64}" \
+      --eval-steps "${SFT_META_VERIFIER_EVAL_STEPS:-16}" \
+      --save-steps "${SFT_META_VERIFIER_SAVE_STEPS:-16}" \
+      --per-device-train-batch-size "${SFT_META_VERIFIER_TRAIN_BATCH_SIZE:-4}" \
+      --per-device-eval-batch-size "${SFT_META_VERIFIER_EVAL_BATCH_SIZE:-4}" \
+      --gradient-accumulation-steps "${SFT_META_VERIFIER_GRADIENT_ACCUMULATION_STEPS:-4}" \
+      --learning-rate "${SFT_META_VERIFIER_LEARNING_RATE:-2e-5}" \
+      --lora-r "${SFT_META_VERIFIER_LORA_R:-64}" \
+      --lora-alpha "${SFT_META_VERIFIER_LORA_ALPHA:-128}" \
+      --logging-steps "${SFT_META_VERIFIER_LOGGING_STEPS:-8}"
+
+    META_VERIFIER_ADAPTER="$SFT_META_ADAPTER"
+    echo "Using refreshed SFT hardcase meta-verifier: $META_VERIFIER_ADAPTER"
+  else
+    echo "SFT meta-verifier refresh gate failed; keeping existing meta-verifier: $META_VERIFIER_ADAPTER"
+  fi
+elif is_truthy "$TRAIN_SFT_META_VERIFIER"; then
+  echo "No SFT meta hardcase summary found at $SFT_META_SUMMARY_JSON; keeping existing meta-verifier: $META_VERIFIER_ADAPTER"
 fi
 
 if ! SFT_EVAL_JSON="$SFT_EVAL_JSON" \

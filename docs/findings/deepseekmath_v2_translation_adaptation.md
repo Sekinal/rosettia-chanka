@@ -235,6 +235,17 @@ The chained experiment now evaluates SFT-only before RL. It runs `scripts/evalua
 
 The same SFT-only evaluation is mined into meta-verifier hard cases before the GSPO gate. The chain writes `meta_hardcases_from_sft_eval.jsonl` and `meta_hardcases_from_sft_eval.summary.json` with `scripts/build_meta_verifier_from_self_outputs.py`. This keeps failed frontier SFT attempts useful: overconfident or malformed student outputs become real meta-verifier negatives for the next verifier iteration instead of just dead-end metrics.
 
+The chain can now close that loop inside the same run. With `TRAIN_SFT_META_VERIFIER=true` it checks `MIN_SFT_META_RECORDS_FOR_TRAIN`, builds cold-start meta rows with `scripts/build_self_verifiable_translation_data.py`, trains `scripts/train_meta_verifier_chanka_unsloth.py` on cold-start plus real SFT hard cases, and then uses the refreshed meta-verifier for GSPO. That makes the ordering:
+
+1. frontier primitive-thinking SFT data;
+2. SFT head-start on the translator;
+3. SFT-only self-verification evaluation;
+4. real hardcase mining for false confidence and malformed scores;
+5. meta-verifier refresh;
+6. gated GSPO with the refreshed verifier signal.
+
+This is still not proof that RL improves translation. It is the first version of the actual DeepSeekMath-style feedback loop for language, because the verifier is updated from student self-analysis failures instead of remaining a static synthetic judge.
+
 ## SFT-Seeded GSPO Negative Result
 
 The deterministic primitive-thinking SFT seed did not fix the RL collapse:
