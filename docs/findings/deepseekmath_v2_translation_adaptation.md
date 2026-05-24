@@ -464,6 +464,15 @@ ${DATA_DIR}/deepseek_v4_pro_prompt_preview_gate.json
 
 `scripts/check_frontier_prompt_preview.py` verifies that the preview covers every selected row, uses the expected model/reasoning-effort, keeps thinking enabled, requests JSON output, contains no auth/API-key markers, puts each row's expected primitive tags in the actual required-tags line, and does not use the current row as a few-shot example. The selection-only preview call now receives the same reasoning, output-token, and few-shot settings as the paid generation call, so this gate checks the real intended payload instead of a default approximation.
 
+The chain also writes a consolidated review artifact:
+
+```text
+${DATA_DIR}/deepseek_v4_pro_preapi_readiness.json
+${DATA_DIR}/deepseek_v4_pro_preapi_readiness.md
+```
+
+`scripts/report_frontier_preapi_readiness.py` combines the selection report, selected rows, prompt previews, and gate results. Use the Markdown report as the one-page pre-spend audit: it shows readiness, estimated frontier requests, model/reasoning/token payload settings, few-shot and prompt-length stats, primitive counts, source-name counts, and sample required-tag lines.
+
 For review-only or no-key readiness runs, set:
 
 ```bash

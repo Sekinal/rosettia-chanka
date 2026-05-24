@@ -18,6 +18,8 @@ FRONTIER_SELECTION_JSONL="${FRONTIER_SELECTION_JSONL:-${DATA_DIR}/deepseek_v4_pr
 FRONTIER_SELECTION_GATE_JSON="${FRONTIER_SELECTION_GATE_JSON:-${DATA_DIR}/deepseek_v4_pro_source_selection_gate.json}"
 FRONTIER_PROMPT_PREVIEW_JSONL="${FRONTIER_PROMPT_PREVIEW_JSONL:-${DATA_DIR}/deepseek_v4_pro_prompt_preview.jsonl}"
 FRONTIER_PROMPT_PREVIEW_GATE_JSON="${FRONTIER_PROMPT_PREVIEW_GATE_JSON:-${DATA_DIR}/deepseek_v4_pro_prompt_preview_gate.json}"
+FRONTIER_PREAPI_REPORT_JSON="${FRONTIER_PREAPI_REPORT_JSON:-${DATA_DIR}/deepseek_v4_pro_preapi_readiness.json}"
+FRONTIER_PREAPI_REPORT_MD="${FRONTIER_PREAPI_REPORT_MD:-${DATA_DIR}/deepseek_v4_pro_preapi_readiness.md}"
 PREFLIGHT_REPORT_JSON="${PREFLIGHT_REPORT_JSON:-${DATA_DIR}/preflight_report.json}"
 THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/deepseek_v4_pro_thinking_sft_${STAMP}}"
 THINKING_SFT_ADAPTER="${THINKING_SFT_ADAPTER:-${THINKING_SFT_OUTPUT_DIR}/final_lora}"
@@ -134,6 +136,23 @@ if is_truthy "${RUN_FRONTIER_SELECTION_REPORT:-true}"; then
       --min-preview-rows "${MIN_FRONTIER_PROMPT_PREVIEW_ROWS:-$MIN_FRONTIER_SELECTION_ROWS}" \
       "${FRONTIER_PROMPT_PREVIEW_GATE_ARGS[@]}"
   fi
+
+  if is_truthy "${RUN_FRONTIER_PREAPI_REPORT:-true}"; then
+    FRONTIER_PREAPI_REPORT_ARGS=()
+    if [[ -f "$FRONTIER_SELECTION_GATE_JSON" ]]; then
+      FRONTIER_PREAPI_REPORT_ARGS+=(--selection-gate-json "$FRONTIER_SELECTION_GATE_JSON")
+    fi
+    if [[ -f "$FRONTIER_PROMPT_PREVIEW_GATE_JSON" ]]; then
+      FRONTIER_PREAPI_REPORT_ARGS+=(--prompt-preview-gate-json "$FRONTIER_PROMPT_PREVIEW_GATE_JSON")
+    fi
+    "$PYTHON" scripts/report_frontier_preapi_readiness.py \
+      --selection-report-json "$FRONTIER_SELECTION_REPORT_JSON" \
+      --selection-jsonl "$FRONTIER_SELECTION_JSONL" \
+      --prompt-preview-jsonl "$FRONTIER_PROMPT_PREVIEW_JSONL" \
+      --output-json "$FRONTIER_PREAPI_REPORT_JSON" \
+      --output-md "$FRONTIER_PREAPI_REPORT_MD" \
+      "${FRONTIER_PREAPI_REPORT_ARGS[@]}"
+  fi
 fi
 
 if is_truthy "$RUN_PREFLIGHT"; then
@@ -156,6 +175,7 @@ if is_falsey "$RUN_FRONTIER_GENERATION"; then
   echo "Selection gate: $FRONTIER_SELECTION_GATE_JSON"
   echo "Prompt preview: $FRONTIER_PROMPT_PREVIEW_JSONL"
   echo "Prompt preview gate: $FRONTIER_PROMPT_PREVIEW_GATE_JSON"
+  echo "Pre-API readiness report: $FRONTIER_PREAPI_REPORT_JSON"
   echo "Preflight report: $PREFLIGHT_REPORT_JSON"
   exit 0
 fi
