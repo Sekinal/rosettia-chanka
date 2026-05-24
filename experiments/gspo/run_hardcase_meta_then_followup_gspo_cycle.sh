@@ -6,6 +6,8 @@ PYTHON="${PYTHON:-.venv/bin/python}"
 STAMP="${STAMP:-$(date -u +%Y%m%d-hardcase-cycle)}"
 
 BASE_MODEL="${BASE_MODEL:-}"
+BASE_CYCLE_MANIFEST="${BASE_CYCLE_MANIFEST:-}"
+BASE_CYCLE_GATE_JSON="${BASE_CYCLE_GATE_JSON:-}"
 META_OUTPUT_DIR="${META_OUTPUT_DIR:-outputs/chanka_translation_meta_verifier_iter_${STAMP}}"
 FOLLOWUP_OUTPUT_DIR="${FOLLOWUP_OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_cycle_${STAMP}}"
 BASELINE_METRICS_JSON="${BASELINE_METRICS_JSON:-}"
@@ -14,8 +16,41 @@ CYCLE_MANIFEST_JSON="${CYCLE_MANIFEST_JSON:-${FOLLOWUP_OUTPUT_DIR}/cycle_manifes
 
 cd "$ROOT_DIR"
 
+if [[ -n "$BASE_CYCLE_MANIFEST" ]]; then
+  if [[ -z "$BASE_CYCLE_GATE_JSON" ]]; then
+    BASE_CYCLE_GATE_JSON="${FOLLOWUP_OUTPUT_DIR}/base_cycle_gate.json"
+  fi
+  "$PYTHON" scripts/check_deepseekmath_cycle_manifest.py \
+    --manifest-json "$BASE_CYCLE_MANIFEST" \
+    --output-json "$BASE_CYCLE_GATE_JSON" \
+    --min-chrf "${BASE_CYCLE_MIN_CHRF:-35}" \
+    --min-bleu "${BASE_CYCLE_MIN_BLEU:-8}" \
+    --min-token-f1 "${BASE_CYCLE_MIN_TOKEN_F1:-15}"
+  BASE_MODEL="$("$PYTHON" - <<'PY' "$BASE_CYCLE_GATE_JSON"
+import json
+import sys
+from pathlib import Path
+
+gate = json.loads(Path(sys.argv[1]).read_text())
+print(gate["policy_adapter"])
+PY
+)"
+  if [[ -z "$BASELINE_METRICS_JSON" ]]; then
+    BASELINE_METRICS_JSON="$("$PYTHON" - <<'PY' "$BASE_CYCLE_MANIFEST"
+import json
+import sys
+from pathlib import Path
+
+manifest = json.loads(Path(sys.argv[1]).read_text())
+artifact = (manifest.get("artifacts") or {}).get("metrics") or {}
+print(artifact.get("path") or "")
+PY
+)"
+  fi
+fi
+
 if [[ -z "$BASE_MODEL" ]]; then
-  echo "BASE_MODEL is required. Use the frontier thinking SFT adapter or previous policy adapter." >&2
+  echo "BASE_MODEL or BASE_CYCLE_MANIFEST is required. Use a promoted cycle manifest or a previous policy adapter." >&2
   exit 1
 fi
 
@@ -68,5 +103,10 @@ fi
   "${MANIFEST_BASELINE_ARGS[@]}"
 
 echo "Cycle meta-verifier adapter: $NEXT_META_VERIFIER_ADAPTER"
+echo "Cycle base model: $BASE_MODEL"
+if [[ -n "$BASE_CYCLE_MANIFEST" ]]; then
+  echo "Cycle base manifest: $BASE_CYCLE_MANIFEST"
+  echo "Cycle base gate: $BASE_CYCLE_GATE_JSON"
+fi
 echo "Cycle follow-up output: $FOLLOWUP_OUTPUT_DIR"
 echo "Cycle manifest: $CYCLE_MANIFEST_JSON"
