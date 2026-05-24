@@ -423,6 +423,95 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         self.assertEqual(rows[-1]["source"], "Hola")
         self.assertFalse(failures_jsonl.exists())
 
+    def test_main_stops_at_runtime_api_request_budget(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            source_jsonl = tmp / "rows.jsonl"
+            output_jsonl = tmp / "out.jsonl"
+            summary_json = tmp / "summary.json"
+            source_jsonl.write_text(
+                '{"source":"Buenos dias.","reference":"Allin punchaw."}\n'
+                '{"source":"Hola","reference":"Rimaykullayki"}\n'
+            )
+            response = {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "analysis": (
+                                        "[SIGNIFICADO] conserva saludo; [GRAMATICA] forma natural; "
+                                        "[ANTI_COPIA] evita copia."
+                                    ),
+                                    "translation": "Rimaykullayki",
+                                    "self_evaluation": "Riesgo bajo.",
+                                    "score": 0.94,
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+            with mock.patch.dict("os.environ", {"DEEPSEEK_API_KEY": "test"}, clear=False), mock.patch.object(
+                builder, "call_chat_completion", return_value=response
+            ) as mocked_call:
+                builder.main_from_args(
+                    [
+                        "--source-jsonl",
+                        str(source_jsonl),
+                        "--output-jsonl",
+                        str(output_jsonl),
+                        "--summary-json",
+                        str(summary_json),
+                        "--max-rows",
+                        "2",
+                        "--max-api-requests",
+                        "1",
+                    ]
+                )
+
+            rows = list(builder.iter_jsonl(output_jsonl))
+            summary = json.loads(summary_json.read_text())["summary"]
+
+        self.assertEqual(mocked_call.call_count, 1)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(summary["api_requests_used"], 1)
+        self.assertEqual(summary["max_api_requests"], 1)
+        self.assertTrue(summary["stopped_by_api_request_budget"])
+
+    def test_audit_mode_reserves_two_runtime_api_requests_per_row(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            source_jsonl = tmp / "rows.jsonl"
+            output_jsonl = tmp / "out.jsonl"
+            summary_json = tmp / "summary.json"
+            source_jsonl.write_text('{"source":"Hola","reference":"Rimaykullayki"}\n')
+
+            with mock.patch.dict("os.environ", {"DEEPSEEK_API_KEY": "test"}, clear=False), mock.patch.object(
+                builder, "call_chat_completion"
+            ) as mocked_call:
+                builder.main_from_args(
+                    [
+                        "--source-jsonl",
+                        str(source_jsonl),
+                        "--output-jsonl",
+                        str(output_jsonl),
+                        "--summary-json",
+                        str(summary_json),
+                        "--audit",
+                        "--max-api-requests",
+                        "1",
+                    ]
+                )
+
+            summary = json.loads(summary_json.read_text())["summary"]
+
+        self.assertEqual(mocked_call.call_count, 0)
+        self.assertFalse(output_jsonl.exists())
+        self.assertEqual(summary["api_requests_used"], 0)
+        self.assertTrue(summary["stopped_by_api_request_budget"])
+
 
 if __name__ == "__main__":
     unittest.main()

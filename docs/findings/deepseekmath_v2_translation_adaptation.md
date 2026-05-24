@@ -483,6 +483,14 @@ The chain then stops cleanly after source selection, prompt preview, and preflig
 
 The 2026-05-24 full readiness pass on the remote server wrote `outputs/frontier_preapi_readiness_20260524/`. It selected 128 reviewed rows with average expected primitive count `3.0`, all five primitive families represented (`[SIGNIFICADO]` 128, `[GRAMATICA]` 128, `[ENTIDADES]` 50, `[TERMINOLOGIA]` 28, `[ANTI_COPIA]` 50), and estimated max frontier requests `256` with audit. The prompt gate passed for 128/128 previews with `deepseek-v4-pro`, reasoning effort `max`, thinking enabled, JSON output, no auth/API-key markers, no missing expected tags, and no current-row few-shot leakage. The only blocker to actual generation remains setting `DEEPSEEK_API_KEY` safely in the runtime environment.
 
+For paid smokes, use the runtime spend fuse:
+
+```bash
+FRONTIER_MAX_API_REQUESTS=16
+```
+
+This is enforced inside `scripts/build_frontier_thinking_sft_jsonl.py`, not just by the pre-API estimate. It records `api_requests_used`, `max_api_requests`, and `stopped_by_api_request_budget` in the frontier summary. With audit enabled, the builder reserves two calls before starting a row, so a budget too small for generation plus audit stops cleanly instead of accepting unaudited rows.
+
 This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
 
 For a faster smoke:

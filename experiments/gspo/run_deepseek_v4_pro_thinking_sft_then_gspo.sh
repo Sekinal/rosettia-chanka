@@ -225,6 +225,7 @@ FRONTIER_ARGS+=("${FRONTIER_STRATIFY_ARGS[@]}")
   --sleep-seconds "${FRONTIER_SLEEP_SECONDS:-0}" \
   --max-retries "${FRONTIER_MAX_RETRIES:-3}" \
   --max-output-tokens "${FRONTIER_MAX_OUTPUT_TOKENS:-512}" \
+  --max-api-requests "${FRONTIER_MAX_API_REQUESTS:-0}" \
   --few-shot-count "${FRONTIER_FEW_SHOT_COUNT:-2}" \
   "${FRONTIER_ARGS[@]}"
 

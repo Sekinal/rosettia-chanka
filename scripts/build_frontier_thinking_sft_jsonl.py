@@ -77,6 +77,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--timeout-seconds", type=float, default=120.0)
     parser.add_argument("--max-retries", type=int, default=3)
     parser.add_argument("--max-output-tokens", type=int, default=512)
+    parser.add_argument(
+        "--max-api-requests",
+        type=int,
+        default=0,
+        help=(
+            "Hard cap on logical frontier API calls during this invocation. "
+            "0 disables the cap. With --audit, a row reserves two calls before starting."
+        ),
+    )
     parser.add_argument("--min-primitive-tags", type=int, default=2)
     parser.add_argument(
         "--few-shot-count",
@@ -891,14 +900,21 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
     records: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     skipped_rows = 0
+    api_requests_used = 0
+    stopped_by_api_request_budget = False
     for index, row in enumerate(rows, start=1):
         key = row_key(row["source"], row["target"])
         if key in completed_keys:
             skipped_rows += 1
             continue
+        required_budget_for_row = 2 if args.audit else 1
+        if args.max_api_requests > 0 and api_requests_used + required_budget_for_row > args.max_api_requests:
+            stopped_by_api_request_budget = True
+            break
         try:
             expected_primitives = expected_primitives_for_row(row["source"], row["target"])
             few_shots = select_few_shots(rows, row, args.few_shot_count)
+            api_requests_used += 1
             response = call_chat_completion(args, api_key, row["source"], row["target"], few_shots)
             parsed = parse_frontier_json(response_content(response))
             required_primitives = expected_primitives if args.require_expected_primitives else []
@@ -917,6 +933,7 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
             audit: dict[str, Any] | None = None
             if args.audit:
                 audit_payload = {**parsed, "expected_primitives": expected_primitives}
+                api_requests_used += 1
                 audit = audit_record(args, api_key, row["source"], row["target"], audit_payload)
                 if not audit_passes(audit, args.audit_min_score):
                     failure = failure_record(
@@ -963,6 +980,9 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
         "new_written_rows": len(records),
         "new_failed_rows": len(failures),
         "skipped_rows": skipped_rows,
+        "api_requests_used": api_requests_used,
+        "max_api_requests": args.max_api_requests,
+        "stopped_by_api_request_budget": stopped_by_api_request_budget,
         "existing_accepted_rows": len(accepted_keys),
         "existing_failed_rows": len(failed_keys),
         "total_written_rows": len(existing_keys(args.output_jsonl)),
