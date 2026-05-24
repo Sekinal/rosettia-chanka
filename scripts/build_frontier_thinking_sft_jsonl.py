@@ -139,6 +139,20 @@ def load_rows(args: argparse.Namespace) -> list[dict[str, str]]:
     return gspo.load_chanka_rows(args.dataset_repo, args.dataset_file)
 
 
+def dedupe_rows(rows: Sequence[dict[str, str]]) -> tuple[list[dict[str, str]], int]:
+    seen: set[str] = set()
+    unique: list[dict[str, str]] = []
+    duplicate_count = 0
+    for row in rows:
+        key = row_key(row["source"], row["target"])
+        if key in seen:
+            duplicate_count += 1
+            continue
+        seen.add(key)
+        unique.append(row)
+    return unique, duplicate_count
+
+
 def balance_rows_by_expected_primitives(rows: Sequence[dict[str, str]], max_rows: int) -> list[dict[str, str]]:
     """Greedily select rows that cover underrepresented expected primitive tags."""
     remaining = list(rows)
@@ -168,6 +182,7 @@ def select_rows(
 ) -> list[dict[str, str]]:
     selected = list(rows)
     random.Random(seed).shuffle(selected)
+    selected, _ = dedupe_rows(selected)
     if offset:
         selected = selected[offset:]
     if max_rows is not None:
@@ -587,7 +602,13 @@ def failure_record(index: int, row: dict[str, str], reason: str, **extra: Any) -
     }
 
 
-def selection_report(rows: Sequence[dict[str, str]], args: argparse.Namespace) -> dict[str, Any]:
+def selection_report(
+    rows: Sequence[dict[str, str]],
+    args: argparse.Namespace,
+    input_rows: Sequence[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    raw_rows = list(input_rows) if input_rows is not None else load_rows(args)
+    _, duplicate_input_rows = dedupe_rows(raw_rows)
     primitive_counts = {tag: 0 for tag in PRIMITIVES}
     row_tag_counts: list[int] = []
     samples: list[dict[str, Any]] = []
@@ -609,6 +630,8 @@ def selection_report(rows: Sequence[dict[str, str]], args: argparse.Namespace) -
     distinct = sum(1 for count in primitive_counts.values() if count > 0)
     return {
         "model": args.model,
+        "input_rows": len(raw_rows),
+        "duplicate_input_rows": duplicate_input_rows,
         "selected_rows": len(rows),
         "max_rows": args.max_rows,
         "offset": args.offset,
@@ -630,6 +653,8 @@ def write_selection_report(report: dict[str, Any], json_path: Path | None, md_pa
         lines = [
             "# Frontier Source Selection Report",
             "",
+            f"- input rows: {report['input_rows']}",
+            f"- duplicate input rows skipped: {report['duplicate_input_rows']}",
             f"- selected rows: {report['selected_rows']}",
             f"- stratify primitives: {report['stratify_primitives']}",
             f"- distinct expected primitives: {report['distinct_expected_primitives']}",
@@ -649,8 +674,9 @@ def write_selection_report(report: dict[str, Any], json_path: Path | None, md_pa
 
 def main_from_args(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
-    rows = select_rows(load_rows(args), args.offset, args.max_rows, args.seed, args.stratify_primitives)
-    selected_report = selection_report(rows, args)
+    input_rows = load_rows(args)
+    rows = select_rows(input_rows, args.offset, args.max_rows, args.seed, args.stratify_primitives)
+    selected_report = selection_report(rows, args, input_rows)
     write_selection_report(selected_report, args.selection_report_json, args.selection_report_md)
     if args.selection_only:
         print(json.dumps(selected_report, indent=2, ensure_ascii=False, sort_keys=True))

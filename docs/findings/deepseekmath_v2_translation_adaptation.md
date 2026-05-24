@@ -436,6 +436,8 @@ ${DATA_DIR}/deepseek_v4_pro_source_selection_gate.json
 
 Default gate values require enough rows for SFT, all five expected primitive families, average expected primitives per row >= `2.5`, and at least one selected row for every primitive tag. Disable with `RUN_FRONTIER_SELECTION_GATE=false` only when debugging the wrapper itself.
 
+The builder also dedupes exact source/reference pairs after the seeded shuffle and before primitive-balanced row selection. The selection report records `input_rows` and `duplicate_input_rows`, so repeated augmented examples do not waste DeepSeek calls or make the primitive curriculum look more diverse than it is.
+
 This is a small but important step toward the actual "DeepSeekMath for language" target: the synthetic trace should teach reusable translation primitives, not just a fixed response shape. If the first frontier batch fails this gate, inspect `deepseek_v4_pro_thinking_report.md` for missing expected tags before spending GPU time.
 
 For a faster smoke:

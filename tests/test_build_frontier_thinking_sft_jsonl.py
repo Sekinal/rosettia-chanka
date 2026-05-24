@@ -151,6 +151,18 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         self.assertIn("[ENTIDADES]", selected_tags)
         self.assertIn("[TERMINOLOGIA]", selected_tags)
 
+    def test_select_rows_dedupes_before_spending_frontier_calls(self):
+        rows = [
+            {"source": "Hola.", "target": "Rimaykullayki."},
+            {"source": "Hola.", "target": "Rimaykullayki."},
+            {"source": "Hay 3 documentos.", "target": "Kimsa qillqakuna kan."},
+        ]
+
+        selected = builder.select_rows(rows, offset=0, max_rows=3, seed=7, stratify_primitives=True)
+
+        self.assertEqual(len(selected), 2)
+        self.assertEqual(len({builder.row_key(row["source"], row["target"]) for row in selected}), 2)
+
     def test_select_rows_can_keep_seeded_random_slice(self):
         rows = [
             {"source": "Hola.", "target": "Rimaykullayki."},
@@ -169,9 +181,11 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         ]
         args = builder.parse_args(["--output-jsonl", "out.jsonl", "--max-rows", "2"])
 
-        payload = builder.selection_report(rows, args)
+        payload = builder.selection_report(rows, args, input_rows=rows + [rows[0]])
 
         self.assertEqual(payload["selected_rows"], 2)
+        self.assertEqual(payload["input_rows"], 3)
+        self.assertEqual(payload["duplicate_input_rows"], 1)
         self.assertGreaterEqual(payload["expected_primitive_counts"]["[SIGNIFICADO]"], 2)
         self.assertGreaterEqual(payload["expected_primitive_counts"]["[ENTIDADES]"], 1)
         self.assertEqual(len(payload["samples"]), 2)
@@ -207,6 +221,7 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
 
         self.assertEqual(payload["selected_rows"], 2)
         self.assertIn("[ENTIDADES]", payload["expected_primitive_counts"])
+        self.assertIn("duplicate input rows skipped", markdown)
         self.assertIn("Frontier Source Selection Report", markdown)
 
     def test_parse_and_gate_audit_json(self):
