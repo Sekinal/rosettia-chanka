@@ -109,8 +109,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=None,
         help=(
-            "Save only model/tokenizer files at checkpoints. Defaults to true for full fine-tuning "
-            "because optimizer states can exceed model checkpoint size."
+            "Save only model/tokenizer files at checkpoints. Defaults to true because optimizer "
+            "states from adapter-continuation runs can exceed model checkpoint size."
         ),
     )
     parser.add_argument(
@@ -245,7 +245,7 @@ def split_rows(
 
 def configure_step_schedule(args: argparse.Namespace, train_row_count: int) -> None:
     if getattr(args, "save_only_model", None) is None:
-        args.save_only_model = args.training_mode == "full"
+        args.save_only_model = True
     if args.eval_steps is not None and args.save_steps is not None:
         return
 

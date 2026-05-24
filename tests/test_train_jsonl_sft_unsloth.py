@@ -187,7 +187,7 @@ class TrainJsonlSftUnslothTests(unittest.TestCase):
 
         self.assertEqual(terminology, [("madre abandonada", "saqisqa mama")])
 
-    def test_step_schedule_uses_max_steps_when_present(self):
+    def test_step_schedule_uses_save_only_model_by_default(self):
         args = argparse.Namespace(
             training_mode="lora",
             eval_steps=None,
@@ -203,7 +203,7 @@ class TrainJsonlSftUnslothTests(unittest.TestCase):
 
         self.assertEqual(args.eval_steps, 8)
         self.assertEqual(args.save_steps, 8)
-        self.assertFalse(args.save_only_model)
+        self.assertTrue(args.save_only_model)
 
     def test_step_schedule_saves_only_model_for_full_finetuning(self):
         args = argparse.Namespace(
