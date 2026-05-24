@@ -13,6 +13,9 @@ FRONTIER_SUMMARY_JSON="${FRONTIER_SUMMARY_JSON:-${DATA_DIR}/deepseek_v4_pro_thin
 THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/deepseek_v4_pro_thinking_sft_${STAMP}}"
 THINKING_SFT_ADAPTER="${THINKING_SFT_ADAPTER:-${THINKING_SFT_OUTPUT_DIR}/final_lora}"
 GSPO_OUTPUT_DIR="${GSPO_OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_deepseek_seeded_${STAMP}}"
+GSPO_PREDICTIONS_JSONL="${GSPO_PREDICTIONS_JSONL:-${GSPO_OUTPUT_DIR}/chanka_gspo/final_predictions.jsonl}"
+GSPO_META_JSONL="${GSPO_META_JSONL:-${GSPO_OUTPUT_DIR}/chanka_gspo/meta_hardcases_from_gspo_eval.jsonl}"
+GSPO_META_SUMMARY_JSON="${GSPO_META_SUMMARY_JSON:-${GSPO_OUTPUT_DIR}/chanka_gspo/meta_hardcases_from_gspo_eval.summary.json}"
 TERMINOLOGY_FILE="${TERMINOLOGY_FILE:-clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet}"
 SFT_EVAL_DIR="${SFT_EVAL_DIR:-${THINKING_SFT_OUTPUT_DIR}/sft_only_eval}"
 SFT_EVAL_JSON="${SFT_EVAL_JSON:-${SFT_EVAL_DIR}/metrics.json}"
@@ -20,6 +23,7 @@ SFT_EVAL_PREDICTIONS="${SFT_EVAL_PREDICTIONS:-${SFT_EVAL_DIR}/predictions.jsonl}
 SFT_META_JSONL="${SFT_META_JSONL:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.jsonl}"
 SFT_META_SUMMARY_JSON="${SFT_META_SUMMARY_JSON:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.summary.json}"
 MINE_SFT_META="${MINE_SFT_META:-true}"
+MINE_GSPO_META="${MINE_GSPO_META:-true}"
 TRAIN_SFT_META_VERIFIER="${TRAIN_SFT_META_VERIFIER:-true}"
 SFT_META_DATA_DIR="${SFT_META_DATA_DIR:-${SFT_EVAL_DIR}/self_verifiable_meta_data}"
 SFT_META_OUTPUT_DIR="${SFT_META_OUTPUT_DIR:-outputs/chanka_translation_meta_verifier_deepseek_sft_${STAMP}}"
@@ -218,6 +222,7 @@ fi
 BASE_MODEL="$THINKING_SFT_ADAPTER" \
 META_VERIFIER_ADAPTER="$META_VERIFIER_ADAPTER" \
 OUTPUT_DIR="$GSPO_OUTPUT_DIR" \
+PREDICTIONS_JSONL="$GSPO_PREDICTIONS_JSONL" \
 MAX_STEPS="${GSPO_MAX_STEPS:-8}" \
 EVAL_STEPS="${GSPO_EVAL_STEPS:-8}" \
 SAVE_STEPS="${GSPO_SAVE_STEPS:-8}" \
@@ -227,3 +232,18 @@ TRAINER_EVAL="${GSPO_TRAINER_EVAL:-false}" \
 FINAL_METRICS_MAX_SAMPLES="${GSPO_FINAL_METRICS_MAX_SAMPLES:-16}" \
 FINAL_GENERATION_BATCH_SIZE="${GSPO_FINAL_GENERATION_BATCH_SIZE:-8}" \
 experiments/gspo/run_2511_self_verifiable_thinking_translation.sh
+
+if is_truthy "$MINE_GSPO_META" && [[ -f "$GSPO_PREDICTIONS_JSONL" ]]; then
+  GSPO_META_ARGS=()
+  if [[ -n "${GSPO_META_MAX_RECORDS:-}" ]]; then
+    GSPO_META_ARGS+=(--max-records "$GSPO_META_MAX_RECORDS")
+  fi
+  "$PYTHON" scripts/build_meta_verifier_from_self_outputs.py \
+    --self-predictions-jsonl "$GSPO_PREDICTIONS_JSONL" \
+    --output-jsonl "$GSPO_META_JSONL" \
+    --summary-json "$GSPO_META_SUMMARY_JSON" \
+    --min-quality-gap "${GSPO_META_MIN_QUALITY_GAP:-0.20}" \
+    "${GSPO_META_ARGS[@]}"
+elif is_truthy "$MINE_GSPO_META"; then
+  echo "No GSPO predictions JSONL found at $GSPO_PREDICTIONS_JSONL; skipping post-GSPO meta hardcase mining."
+fi

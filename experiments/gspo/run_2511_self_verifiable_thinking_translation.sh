@@ -8,6 +8,7 @@ STAMP="${STAMP:-$(date -u +%Y%m%d-self-verifiable-thinking)}"
 BASE_MODEL="${BASE_MODEL:-outputs/full_sft_sweeps/20260523-qwen35-4b-full-sft-lr-followups/lr_2em6_48steps/chanka/checkpoint-36}"
 OUTPUT_DIR="${OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_${STAMP}}"
 METRICS_JSON="${METRICS_JSON:-${OUTPUT_DIR}/chanka_gspo/final_metrics.json}"
+PREDICTIONS_JSONL="${PREDICTIONS_JSONL:-${OUTPUT_DIR}/chanka_gspo/final_predictions.jsonl}"
 TERMINOLOGY_FILE="${TERMINOLOGY_FILE:-clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet}"
 META_VERIFIER_ADAPTER="${META_VERIFIER_ADAPTER:-}"
 
@@ -82,6 +83,7 @@ fi
   --meta-verifier-max-seq-length "${META_VERIFIER_MAX_SEQ_LENGTH:-768}" \
   --meta-verifier-max-new-tokens "${META_VERIFIER_MAX_NEW_TOKENS:-96}" \
   --meta-verifier-batch-size "${META_VERIFIER_BATCH_SIZE:-2}" \
-  --metrics-json "$METRICS_JSON"
+  --metrics-json "$METRICS_JSON" \
+  --predictions-jsonl "$PREDICTIONS_JSONL"
 
 cat "$METRICS_JSON"

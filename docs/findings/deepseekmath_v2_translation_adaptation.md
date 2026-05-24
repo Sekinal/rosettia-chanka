@@ -246,6 +246,8 @@ The chain can now close that loop inside the same run. With `TRAIN_SFT_META_VERI
 
 This is still not proof that RL improves translation. It is the first version of the actual DeepSeekMath-style feedback loop for language, because the verifier is updated from student self-analysis failures instead of remaining a static synthetic judge.
 
+After GSPO, the loop now writes the RL model's final structured predictions and mines them too. `scripts/train_gspo_chanka_unsloth.py --predictions-jsonl` emits source/reference/prediction/raw/self-verification rows, `run_2511_self_verifiable_thinking_translation.sh` writes `final_predictions.jsonl`, and the DeepSeek V4 Pro chain turns that into `meta_hardcases_from_gspo_eval.jsonl` when `MINE_GSPO_META=true`. Those post-GSPO hard cases should be treated as the seed for the next iteration's meta-verifier, because they reflect the failure modes created by the actual RL policy rather than only the SFT head-start.
+
 ## SFT-Seeded GSPO Negative Result
 
 The deterministic primitive-thinking SFT seed did not fix the RL collapse:

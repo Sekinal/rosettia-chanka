@@ -166,6 +166,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Paper-inspired reward profile to test independently.",
     )
     parser.add_argument("--metrics-json", type=Path, default=None)
+    parser.add_argument(
+        "--predictions-jsonl",
+        type=Path,
+        default=None,
+        help="Optional JSONL path for final generated predictions. Useful for mining real self-verification failures.",
+    )
     parser.add_argument("--wandb-project", default=None)
     parser.add_argument(
         "--verifier-adapter-path",
@@ -1749,6 +1755,37 @@ def latest_eval_metrics(log_history: list[dict[str, float]]) -> dict[str, float]
     return {}
 
 
+def write_predictions_jsonl(
+    path: Path,
+    rows: Sequence[dict[str, str]],
+    predictions: Sequence[str],
+    raw_predictions: Sequence[str] | None = None,
+    self_verification: bool = False,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    raw_predictions = raw_predictions or []
+    with path.open("w") as handle:
+        for index, (row, prediction) in enumerate(zip(rows, predictions, strict=True)):
+            raw_prediction = raw_predictions[index] if index < len(raw_predictions) else prediction
+            parsed = parse_self_verification_output(raw_prediction) if self_verification else None
+            handle.write(
+                json.dumps(
+                    {
+                        "source": row["source"],
+                        "reference": row["target"],
+                        "prediction": prediction,
+                        "raw_prediction": raw_prediction,
+                        "self_verification": parsed,
+                        "source_name": row.get("source_name"),
+                        "variant": row.get("variant"),
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+                + "\n"
+            )
+
+
 def make_jsonl_log_callback(path: Path):
     from transformers import TrainerCallback
 
@@ -2039,6 +2076,14 @@ def main() -> None:
 
     metrics_path = args.metrics_json or (run_dir / "final_metrics.json")
     metrics_path.write_text(json.dumps(metrics, indent=2, sort_keys=True) + "\n")
+    if args.predictions_jsonl:
+        write_predictions_jsonl(
+            args.predictions_jsonl,
+            final_eval_rows,
+            predictions,
+            raw_predictions,
+            self_verification=use_self_verification_prompt,
+        )
 
 
 if __name__ == "__main__":

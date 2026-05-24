@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import json
+import tempfile
+from pathlib import Path
 import unittest
 from unittest import mock
 
@@ -34,12 +37,15 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
                 "16",
                 "--final-generation-batch-size",
                 "8",
+                "--predictions-jsonl",
+                "outputs/run/final_predictions.jsonl",
             ]
         )
 
         self.assertFalse(args.trainer_eval)
         self.assertEqual(args.final_metrics_max_samples, 16)
         self.assertEqual(args.final_generation_batch_size, 8)
+        self.assertEqual(args.predictions_jsonl, Path("outputs/run/final_predictions.jsonl"))
 
     def test_prompt_is_general_chanka_translation(self):
         messages = train_gspo.prompt_messages("Buenos dias.")
@@ -534,6 +540,38 @@ suffix"""
         self.assertEqual(diagnostics["self_verification_missing_score_rate"], 50.0)
         self.assertGreater(diagnostics["self_verification_avg_thinking_score"], 0.0)
         self.assertIn("self_verification_avg_thinking_primitives", diagnostics)
+
+    def test_write_predictions_jsonl_preserves_structured_self_verification(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "predictions.jsonl"
+            train_gspo.write_predictions_jsonl(
+                path,
+                [
+                    {
+                        "source": "Buenos dias.",
+                        "target": "Allin punchaw.",
+                        "source_name": "manual",
+                        "variant": "quy/chanka",
+                    }
+                ],
+                ["Allin punchaw."],
+                [
+                    "Analisis de traduccion: [SIGNIFICADO] conserva. "
+                    "Traduccion final: Allin punchaw. "
+                    "Autoevaluacion: no veo errores. "
+                    "Puntaje: \\boxed{0.95}"
+                ],
+                self_verification=True,
+            )
+
+            payload = json.loads(path.read_text().strip())
+
+        self.assertEqual(payload["source"], "Buenos dias.")
+        self.assertEqual(payload["reference"], "Allin punchaw.")
+        self.assertEqual(payload["prediction"], "Allin punchaw.")
+        self.assertEqual(payload["self_verification"]["translation"], "Allin punchaw.")
+        self.assertEqual(payload["self_verification"]["self_score"], 0.95)
+        self.assertTrue(payload["self_verification"]["has_thinking_format"])
 
     def test_reference_rerank_metric_profile_penalizes_source_copy(self):
         with mock.patch.object(train_gspo, "sentence_chrfpp", return_value=0.7), mock.patch.object(
