@@ -8,6 +8,7 @@ STAMP="${STAMP:-$(date -u +%Y%m%d-deepseek-v4-pro-thinking)}"
 BASE_ADAPTER="${BASE_ADAPTER:-outputs/full_sft_sweeps/20260523-qwen35-4b-full-sft-lr-followups/lr_2em6_48steps/chanka/checkpoint-36}"
 DATA_DIR="${DATA_DIR:-outputs/frontier_thinking_data_${STAMP}}"
 FRONTIER_JSONL="${FRONTIER_JSONL:-${DATA_DIR}/deepseek_v4_pro_thinking_sft.jsonl}"
+FRONTIER_FAILURES_JSONL="${FRONTIER_FAILURES_JSONL:-${DATA_DIR}/deepseek_v4_pro_thinking_failures.jsonl}"
 THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/deepseek_v4_pro_thinking_sft_${STAMP}}"
 THINKING_SFT_ADAPTER="${THINKING_SFT_ADAPTER:-${THINKING_SFT_OUTPUT_DIR}/final_lora}"
 GSPO_OUTPUT_DIR="${GSPO_OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_deepseek_seeded_${STAMP}}"
@@ -41,9 +42,16 @@ fi
 if [[ -n "${FRONTIER_AUDIT_MIN_SCORE:-}" ]]; then
   FRONTIER_ARGS+=(--audit-min-score "$FRONTIER_AUDIT_MIN_SCORE")
 fi
+if [[ "${FRONTIER_RESUME:-true}" == "false" || "${FRONTIER_RESUME:-true}" == "0" || "${FRONTIER_RESUME:-true}" == "no" ]]; then
+  FRONTIER_ARGS+=(--no-resume)
+fi
+if [[ "${FRONTIER_RETRY_FAILURES:-false}" == "true" || "${FRONTIER_RETRY_FAILURES:-false}" == "1" || "${FRONTIER_RETRY_FAILURES:-false}" == "yes" ]]; then
+  FRONTIER_ARGS+=(--retry-failures)
+fi
 
 "$PYTHON" scripts/build_frontier_thinking_sft_jsonl.py \
   --output-jsonl "$FRONTIER_JSONL" \
+  --failures-jsonl "$FRONTIER_FAILURES_JSONL" \
   --model "${FRONTIER_MODEL:-deepseek-v4-pro}" \
   --reasoning-effort "${FRONTIER_REASONING_EFFORT:-max}" \
   --max-rows "${FRONTIER_MAX_ROWS:-128}" \

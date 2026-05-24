@@ -227,6 +227,8 @@ python scripts/build_frontier_thinking_sft_jsonl.py \
 
 The audit pass returns `pass`, `score`, and `reason`, and rejects rows below `--audit-min-score`. This matters because the deterministic seed showed that primitive tags alone are not enough: the trace must make reliable, translation-grounded checks.
 
+The builder writes incrementally now: accepted rows are appended directly to the output JSONL, rejected/error rows go to a failures JSONL, and `--resume` is enabled by default. This is important for API work because a timeout halfway through should not waste already-paid frontier calls. Use `--retry-failures` only after changing the prompt/model or when the failures were transient API errors.
+
 The chained experiment now evaluates SFT-only before RL. It runs `scripts/evaluate_gspo_checkpoint.py --self-verification-thinking-output` after the frontier SFT and only enters GSPO if `MIN_SFT_CHRF_FOR_GSPO` and `MIN_SFT_FORMAT_FOR_GSPO` are met. If the SFT head-start already collapses translation quality or format adherence, the script exits without spending time on another GSPO collapse.
 
 ## SFT-Seeded GSPO Negative Result

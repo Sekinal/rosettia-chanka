@@ -40,6 +40,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--dataset-file", default=gspo.CHANKA_FILE)
     parser.add_argument("--source-jsonl", type=Path, default=None)
     parser.add_argument("--output-jsonl", type=Path, required=True)
+    parser.add_argument("--failures-jsonl", type=Path, default=None)
     parser.add_argument("--summary-json", type=Path, default=None)
     parser.add_argument("--api-key-env", default="DEEPSEEK_API_KEY")
     parser.add_argument("--base-url", default="https://api.deepseek.com")
@@ -55,6 +56,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-retries", type=int, default=3)
     parser.add_argument("--max-output-tokens", type=int, default=512)
     parser.add_argument("--min-primitive-tags", type=int, default=2)
+    parser.add_argument(
+        "--resume",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Skip rows already present in output/failure JSONL and append new results.",
+    )
+    parser.add_argument(
+        "--retry-failures",
+        action="store_true",
+        help="With --resume, retry rows from the failures JSONL instead of skipping them.",
+    )
     parser.add_argument(
         "--audit",
         action="store_true",
@@ -109,6 +121,10 @@ def select_rows(rows: Sequence[dict[str, str]], offset: int, max_rows: int | Non
     if max_rows is not None:
         selected = selected[:max_rows]
     return selected
+
+
+def row_key(source: str, reference: str) -> str:
+    return f"{gspo.normalize_text(source).lower()}\t{gspo.normalize_text(reference).lower()}"
 
 
 def prompt_messages(source: str, reference: str) -> list[dict[str, str]]:
@@ -311,8 +327,41 @@ def write_jsonl(path: Path, records: Sequence[dict[str, Any]]) -> None:
             handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
 
 
-def main() -> None:
-    args = parse_args()
+def append_jsonl(path: Path, record: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def existing_keys(path: Path) -> set[str]:
+    if not path.exists():
+        return set()
+    keys: set[str] = set()
+    for record in iter_jsonl(path):
+        key = record.get("row_key")
+        if isinstance(key, str) and key:
+            keys.add(key)
+            continue
+        source = str(record.get("source") or "")
+        reference = str(record.get("reference") or record.get("target") or "")
+        if source and reference:
+            keys.add(row_key(source, reference))
+    return keys
+
+
+def failure_record(index: int, row: dict[str, str], reason: str, **extra: Any) -> dict[str, Any]:
+    return {
+        "index": index,
+        "row_key": row_key(row["source"], row["target"]),
+        "source": row["source"],
+        "reference": row["target"],
+        "reason": reason,
+        **extra,
+    }
+
+
+def main_from_args(argv: Sequence[str] | None = None) -> None:
+    args = parse_args(argv)
     rows = select_rows(load_rows(args), args.offset, args.max_rows, args.seed)
     if args.dry_run:
         dry_payload = request_payload(args, rows[0]["source"], rows[0]["target"])
@@ -342,60 +391,84 @@ def main() -> None:
     if not api_key:
         raise SystemExit(f"Missing API key. Set {args.api_key_env} in the environment.")
 
+    failures_path = args.failures_jsonl or args.output_jsonl.with_suffix(".failures.jsonl")
+    accepted_keys = existing_keys(args.output_jsonl) if args.resume else set()
+    failed_keys = existing_keys(failures_path) if args.resume and not args.retry_failures else set()
+    completed_keys = accepted_keys.union(failed_keys)
+    if not args.resume:
+        for path in (args.output_jsonl, failures_path):
+            if path.exists():
+                path.unlink()
+
     records: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
+    skipped_rows = 0
     for index, row in enumerate(rows, start=1):
+        key = row_key(row["source"], row["target"])
+        if key in completed_keys:
+            skipped_rows += 1
+            continue
         try:
             response = call_chat_completion(args, api_key, row["source"], row["target"])
             parsed = parse_frontier_json(response_content(response))
             if not record_passes(parsed, args.min_primitive_tags):
-                failures.append({"index": index, "source": row["source"], "reason": "failed_quality_filter", "parsed": parsed})
+                failure = failure_record(index, row, "failed_quality_filter", parsed=parsed)
+                failures.append(failure)
+                append_jsonl(failures_path, failure)
+                completed_keys.add(key)
                 continue
             audit: dict[str, Any] | None = None
             if args.audit:
                 audit = audit_record(args, api_key, row["source"], row["target"], parsed)
                 if not audit_passes(audit, args.audit_min_score):
-                    failures.append(
-                        {
-                            "index": index,
-                            "source": row["source"],
-                            "reason": "failed_frontier_audit",
-                            "parsed": parsed,
-                            "audit": audit,
-                        }
-                    )
+                    failure = failure_record(index, row, "failed_frontier_audit", parsed=parsed, audit=audit)
+                    failures.append(failure)
+                    append_jsonl(failures_path, failure)
+                    completed_keys.add(key)
                     continue
-            records.append(
-                {
-                    "source": row["source"],
-                    "reference": row["target"],
-                    "target": build_target(parsed, row["target"], args.allow_model_translation),
-                    "frontier_model": args.model,
-                    "frontier_analysis": parsed["analysis"],
-                    "frontier_translation": parsed["translation"],
-                    "frontier_score": parsed["score"],
-                    "frontier_audit": audit,
-                    "source_name": row.get("source_name"),
-                    "variant": row.get("variant"),
-                    "task": "frontier_synthetic_thinking_translation_generation",
-                }
-            )
+            record = {
+                "row_key": key,
+                "source": row["source"],
+                "reference": row["target"],
+                "target": build_target(parsed, row["target"], args.allow_model_translation),
+                "frontier_model": args.model,
+                "frontier_analysis": parsed["analysis"],
+                "frontier_translation": parsed["translation"],
+                "frontier_score": parsed["score"],
+                "frontier_audit": audit,
+                "source_name": row.get("source_name"),
+                "variant": row.get("variant"),
+                "task": "frontier_synthetic_thinking_translation_generation",
+            }
+            records.append(record)
+            append_jsonl(args.output_jsonl, record)
+            completed_keys.add(key)
         except Exception as exc:  # noqa: BLE001 - keep batch generation moving.
-            failures.append({"index": index, "source": row["source"], "reason": repr(exc)})
+            failure = failure_record(index, row, repr(exc))
+            failures.append(failure)
+            append_jsonl(failures_path, failure)
+            completed_keys.add(key)
         if args.sleep_seconds > 0:
             time.sleep(args.sleep_seconds)
 
-    write_jsonl(args.output_jsonl, records)
     summary = {
         "model": args.model,
         "requested_rows": len(rows),
-        "written_rows": len(records),
-        "failed_rows": len(failures),
+        "new_written_rows": len(records),
+        "new_failed_rows": len(failures),
+        "skipped_rows": skipped_rows,
+        "existing_accepted_rows": len(accepted_keys),
+        "existing_failed_rows": len(failed_keys),
+        "total_written_rows": len(existing_keys(args.output_jsonl)),
+        "total_failed_rows": len(existing_keys(failures_path)),
         "audit": args.audit,
         "audit_model": (args.audit_model or args.model) if args.audit else None,
         "audit_min_score": args.audit_min_score if args.audit else None,
         "allow_model_translation": args.allow_model_translation,
+        "resume": args.resume,
+        "retry_failures": args.retry_failures,
         "output_jsonl": str(args.output_jsonl),
+        "failures_jsonl": str(failures_path),
     }
     summary_path = args.summary_json or args.output_jsonl.with_suffix(".summary.json")
     summary_path.parent.mkdir(parents=True, exist_ok=True)
@@ -404,4 +477,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main_from_args()

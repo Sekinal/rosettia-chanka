@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from scripts import build_frontier_thinking_sft_jsonl as builder
 
@@ -96,6 +97,66 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
 
         self.assertEqual(rows[0]["source"], "Hola")
         self.assertEqual(rows[0]["target"], "Rimaykullayki")
+
+    def test_main_resumes_and_appends_incrementally(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            source_jsonl = tmp / "rows.jsonl"
+            output_jsonl = tmp / "out.jsonl"
+            failures_jsonl = tmp / "failures.jsonl"
+            source_jsonl.write_text(
+                '{"source":"Buenos dias.","reference":"Allin punchaw."}\n'
+                '{"source":"Hola","reference":"Rimaykullayki"}\n'
+            )
+            output_jsonl.write_text(
+                json.dumps(
+                    {
+                        "row_key": builder.row_key("Buenos dias.", "Allin punchaw."),
+                        "source": "Buenos dias.",
+                        "reference": "Allin punchaw.",
+                    }
+                )
+                + "\n"
+            )
+            response = {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "analysis": "[SIGNIFICADO] conserva saludo; [ANTI_COPIA] evita copia.",
+                                    "translation": "Rimaykullayki",
+                                    "self_evaluation": "Riesgo bajo.",
+                                    "score": 0.94,
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+
+            with mock.patch.dict("os.environ", {"DEEPSEEK_API_KEY": "test"}, clear=False), mock.patch.object(
+                builder, "call_chat_completion", return_value=response
+            ) as mocked_call:
+                builder.main_from_args(
+                    [
+                        "--source-jsonl",
+                        str(source_jsonl),
+                        "--output-jsonl",
+                        str(output_jsonl),
+                        "--failures-jsonl",
+                        str(failures_jsonl),
+                        "--max-rows",
+                        "2",
+                    ]
+                )
+
+            rows = list(builder.iter_jsonl(output_jsonl))
+
+        self.assertEqual(mocked_call.call_count, 1)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[-1]["source"], "Hola")
+        self.assertFalse(failures_jsonl.exists())
 
 
 if __name__ == "__main__":
