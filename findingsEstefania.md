@@ -674,3 +674,196 @@ Interpretation:
 - The gradient spikes are worth watching before enabling DoRA for GSPO. They remained finite under LoRA, but DoRA should be compared only after this LoRA checkpoint is preserved.
 - The exact source-copy rate in final corpus metrics is high enough to inspect qualitative samples before trusting the reward alone. The next run should report a small fixed sample set of source, reference, and generation at every checkpoint.
 - Keep Chanka judicial data restricted to GSPO/RL. Do not use it for SFT.
+
+## 2026-05-25: Qwen3.5 9B Remote Smoke Tests
+
+Purpose: start testing Qwen3.5 9B on the A100 host before committing to longer runs.
+
+Remote execution target:
+
+- Host: `root@154.54.100.193 -p 20295`.
+- GPU: NVIDIA A100-SXM4-80GB, 81,920 MiB.
+- Repo path: `/root/rosettia-chanka`.
+- Environment: remote `.venv` with Torch 2.10.0+cu128, Transformers 5.5.0, TRL 0.24.0, Unsloth 2026.5.7, bitsandbytes 0.49.2.
+- Flash Attention 2 was unavailable; Unsloth used XFormers.
+
+Remote validation:
+
+- `python -m unittest discover -s tests -v`
+- Result: 299 tests passed.
+
+Broad-stage 9B LoRA smoke:
+
+- Model: `unsloth/Qwen3.5-9B`.
+- Output: `outputs/qwen35_9b_tests/20260525-broad-smoke`.
+- Final adapter: `outputs/qwen35_9b_tests/20260525-broad-smoke/broad/final_lora`.
+- Stage: broad.
+- Train/eval rows: 32/8.
+- Max sequence length: 256.
+- LoRA r/alpha: 64/128.
+- Effective batch: 8 via batch 1 and grad accumulation 8.
+- Max steps: 2.
+- Trainable parameters: 116,391,936 / 9,526,205,680, or 1.22%.
+- Step 1 train loss / grad norm: 3.194 / 4.033.
+- Step 1 eval loss: 2.846.
+- Step 2 train loss / grad norm: 2.534 / 3.608.
+- Step 2 eval loss: 2.746.
+- Final explicit eval loss: 2.727.
+- Train runtime: 68.18s.
+- Peak sampled VRAM: 19,871 MiB.
+- p95 sampled VRAM: 19,801 MiB.
+- Average sampled VRAM: 10,998 MiB.
+
+Chanka terminology continuation smoke:
+
+- Starting adapter: `outputs/qwen35_9b_tests/20260525-broad-smoke/broad/final_lora`.
+- Output: `outputs/qwen35_9b_tests/20260525-chanka-term-smoke`.
+- Final adapter: `outputs/qwen35_9b_tests/20260525-chanka-term-smoke/chanka/final_lora`.
+- Stage: Chanka, terminology top-1 prompt.
+- Terminology file: `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet`.
+- Terminology entries loaded: 128.
+- Train/eval rows: 32/8.
+- Terminology-matched train/eval rows: 3/0.
+- Max sequence length: 128.
+- Effective batch: 8 via batch 1 and grad accumulation 8.
+- Max steps: 2.
+- Step 1 train loss / grad norm: 2.452 / 7.720.
+- Step 1 eval loss: 2.330.
+- Step 2 train loss / grad norm: 2.366 / 5.781.
+- Step 2 eval loss: 2.214.
+- Final explicit eval loss: 2.160.
+- Train runtime: 42.0s.
+- Peak sampled VRAM: 19,801 MiB.
+- p95 sampled VRAM: 19,801 MiB.
+- Average sampled VRAM: 15,612 MiB.
+
+Interpretation:
+
+- Qwen3.5 9B LoRA is mechanically safe on the A100 with large VRAM headroom at batch 1 / GA 8.
+- Gradients were finite in both 2-step smokes. The Chanka terminology continuation has higher gradient norms than the broad smoke but no immediate instability.
+- The A100 can support a more serious 9B run. The next useful test should not be another tiny smoke; it should either run a longer broad curriculum slice with external generation evaluation, or reproduce the current best deployable experiment shape by generating a 9B candidate pool and training a matched listwise selector.
+- These smoke metrics are infrastructure checks only. They are not quality evidence against or for 9B yet.
+
+## 2026-05-25: Qwen3.5 9B Broad LoRA, 2 Epochs
+
+Purpose: test whether training for more than one epoch on the 4,096-row broad slice continues improving or begins to overfit.
+
+Run:
+
+- Remote execution target: `root@154.54.100.193 -p 20295`.
+- Output: `outputs/qwen35_9b_tests/20260525-broad4096-seq512-b2-ga8-2epochs`.
+- Final adapter: `outputs/qwen35_9b_tests/20260525-broad4096-seq512-b2-ga8-2epochs/broad/final_lora`.
+- Model: `unsloth/Qwen3.5-9B`.
+- Stage: broad.
+- Train/eval rows: 4,096/512.
+- Epochs: 2.0, 512 optimizer steps.
+- Max sequence length: 512.
+- LoRA r/alpha: 64/128.
+- Effective batch: 16 via per-device batch 2 and gradient accumulation 8.
+- Learning rate: 2e-5.
+- Eval/checkpoint cadence: every 32 steps.
+- Retained checkpoints: `checkpoint-416`, `checkpoint-448`, `checkpoint-480`, `checkpoint-512`.
+
+Eval loss curve:
+
+- Step 32, epoch 0.125: 2.280.
+- Step 64, epoch 0.250: 2.010.
+- Step 96, epoch 0.375: 1.869.
+- Step 128, epoch 0.500: 1.763.
+- Step 160, epoch 0.625: 1.697.
+- Step 192, epoch 0.750: 1.637.
+- Step 224, epoch 0.875: 1.592.
+- Step 256, epoch 1.000: 1.547.
+- Step 288, epoch 1.125: 1.525.
+- Step 320, epoch 1.250: 1.507.
+- Step 352, epoch 1.375: 1.481.
+- Step 384, epoch 1.500: 1.466.
+- Step 416, epoch 1.625: 1.451.
+- Step 448, epoch 1.750: 1.441.
+- Step 480, epoch 1.875: 1.432.
+- Step 512, epoch 2.000: 1.427.
+- Final explicit eval loss: 1.4276.
+
+Training and stability:
+
+- Train runtime: 6,072s, about 101.2 minutes.
+- Final train loss log: 1.306.
+- Mean train loss across logs: 1.6422.
+- Mean grad norm: 5.5825.
+- p95 grad norm: 7.213.
+- Max grad norm: 8.978.
+- Gradients stayed finite. There was one visible high spike near step 448, but the following gradient norms returned to the 6-8 range.
+
+VRAM:
+
+- Samples: 3,030.
+- Peak sampled VRAM: 21,049 MiB.
+- p95 sampled VRAM: 20,257 MiB.
+- Average sampled VRAM: 20,017 MiB.
+- GPU memory after run: 0 MiB used.
+
+Interpretation:
+
+- More than one epoch helped on this validation slice. Eval loss improved continuously through the final checkpoint, from 1.547 at 1 epoch to 1.427 at 2 epochs.
+- The improvement is slowing. The second epoch gained about 0.120 eval loss total, but the final quarter epoch gained only about 0.014.
+- Use `checkpoint-512` or `final_lora` as the current broad-stage 9B LoRA checkpoint unless external generation metrics contradict it.
+- This is still broad SFT only. It should not be treated as the Chanka/GSPO result, and judicial Chanka data should remain reserved for GSPO/RL.
+- The next serious comparison should add generation metrics on fixed validation samples, especially chrF++ and BLEU, before deciding whether longer broad SFT is worth more compute.
+
+## 2026-05-25: Qwen3.5 9B Broad Checkpoint -> Chanka GSPO Canary
+
+Purpose: test whether the 9B broad LoRA checkpoint can beat the best standalone 4B full-SFT checkpoint after a Chanka GSPO pass. Baseline target from the 4B checkpoint is chrF++ `44.4295` and BLEU `18.0014`.
+
+Run:
+
+- Remote execution target: `root@154.54.100.193 -p 20295`.
+- Starting adapter: `outputs/qwen35_9b_tests/20260525-broad4096-seq512-b2-ga8-2epochs/broad/final_lora`.
+- Output: `outputs/qwen35_9b_tests/20260525-chanka-gspo-ref-rerank-24steps`.
+- Reward profile: `reference_rerank_vibe_v1`.
+- Note: the hard learned-verifier checkpoint used by the older 4B GSPO launcher was not present on this A100 host, so this run used the reference-rerank reward instead of `learned_verifier_vibe_2511`.
+- Dataset: clean Chanka judicial parallel corpus, used only for GSPO/RL.
+- Train/eval rows during GSPO: 384/64.
+- Max steps: 24.
+- Eval/checkpoint cadence: every 8 steps.
+- Max prompt/completion length: 96/80.
+- Terminology: `clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet`, top-k 1.
+- Terminology-matched rows: 48 train / 8 validation.
+- Per-device train/eval batch: 4/4.
+- Gradient accumulation: 4.
+- Num generations: 4.
+- Learning rate: 3e-7, warmup 0.
+- Overlong guard: max words 48, ratio threshold 2.75.
+
+Trainer reward:
+
+- Step 8 eval reward: 0.1613.
+- Step 16 eval reward: 0.1620.
+- Step 24 eval reward: 0.1634.
+- Train reward logs: 0.1420, 0.1573, 0.1722, 0.1977, 0.1620, 0.1764.
+- Mean grad norm: 14.6667.
+- Max grad norm: 18.89.
+- Completions were short, about 15-19 tokens, with 0 clipping.
+
+VRAM:
+
+- Peak sampled VRAM: 39,059 MiB.
+- p95 sampled VRAM: 38,871 MiB.
+- Average sampled VRAM: 25,583 MiB.
+- GPU memory after run: 0 MiB used.
+
+Canonical full held-out reload eval, 158 rows, batch size 1:
+
+| Adapter | chrF++ | BLEU | token F1 | TER |
+| --- | ---: | ---: | ---: | ---: |
+| 9B broad seed, before GSPO | 27.5314 | 2.6680 | 12.5258 | 117.7419 |
+| GSPO checkpoint-8 | 27.2250 | 2.4716 | 12.0345 | 121.8894 |
+| GSPO checkpoint-16 | 27.7565 | 2.6741 | 12.2937 | 118.4332 |
+| GSPO checkpoint-24 / final | 27.6404 | 2.5716 | 12.0852 | 119.8157 |
+| 4B full-SFT baseline checkpoint | 44.4295 | 18.0014 | 29.9850 | 81.5668 |
+
+Interpretation:
+
+- This 9B broad-only -> GSPO canary does not beat the 4B checkpoint. It is far below the 4B baseline on chrF++ and BLEU.
+- GSPO barely changed the broad 9B seed: best chrF++ moved from 27.5314 to 27.7565, while BLEU moved from 2.6680 to 2.6741 and token F1 decreased.
+- The problem is not VRAM or runtime. The A100 has enough memory. The weak point is the starting policy: broad-only 9B has not learned enough Chanka surface form to make a short reference-rerank GSPO pass competitive.
+- Do not scale this exact 9B broad-only GSPO recipe. A fairer next 9B contender needs either a non-judicial clean Chanka/terminology SFT seed if allowed, a stronger candidate-rerank path, or the learned-verifier checkpoint restored on this host before trying the older `learned_verifier_vibe_2511` recipe.
