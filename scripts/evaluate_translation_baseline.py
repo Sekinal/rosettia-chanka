@@ -376,6 +376,17 @@ def generate_translategemma(args: argparse.Namespace, rows: list[dict[str, str]]
         device_map="auto",
         torch_dtype=torch_dtype(args.torch_dtype),
     )
+
+    # TranslateGemma's chat template uses BCP-47 hyphenated language codes
+    # (e.g. "spa-Latn") and looks them up in an internal dict. The standard
+    # arg form is the underscore variant (NLLB style). Convert here so users
+    # don't have to know the convention.
+    def to_bcp47(code: str) -> str:
+        return code.replace("_", "-") if code else code
+
+    source_lang = to_bcp47(args.source_lang)
+    target_lang = to_bcp47(args.target_lang)
+
     predictions: list[str] = []
     for row in rows:
         messages = [
@@ -384,8 +395,8 @@ def generate_translategemma(args: argparse.Namespace, rows: list[dict[str, str]]
                 "content": [
                     {
                         "type": "text",
-                        "source_lang_code": args.source_lang,
-                        "target_lang_code": args.target_lang,
+                        "source_lang_code": source_lang,
+                        "target_lang_code": target_lang,
                         "text": row["source"],
                     }
                 ],

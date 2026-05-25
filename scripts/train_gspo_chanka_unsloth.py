@@ -436,6 +436,7 @@ def prompt_messages(
     self_verification: bool = False,
     self_verification_thinking: bool = False,
     self_verification_compact: bool = False,
+    engineered_reasoning: bool = False,
 ) -> list[dict[str, str]]:
     user_content = (
         "Traduce del español al quechua chanka. Usa una traducción directa, "
@@ -465,7 +466,17 @@ def prompt_messages(
             "no fuerces terminos irrelevantes.\n"
             + "\n".join(glossary_lines)
         )
-    if self_verification:
+    if engineered_reasoning:
+        user_content += (
+            "\n\nRazona paso a paso en espanol como un linguista del quechua chanka. "
+            "Identifica el significado, glosa palabra por palabra hacia chanka, "
+            "explica las reglas morfologicas relevantes (sufijos de caso, persona, "
+            "tiempo, evidencial), y termina con la traduccion final.\n"
+            "Formato obligatorio: razonamiento natural en espanol, luego una linea "
+            "que comience con 'Final:' seguida solo de la traduccion al quechua chanka, "
+            "y por ultimo 'Puntaje: \\boxed{<0.0 a 1.0>}'."
+        )
+    elif self_verification:
         if self_verification_compact:
             user_content += (
                 "\n\nFormato obligatorio compacto, exactamente 3 lineas y termina tras el puntaje:\n"

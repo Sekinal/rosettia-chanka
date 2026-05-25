@@ -57,6 +57,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Include the bounded Analisis de traduccion field in the self-verifying output prompt.",
     )
     parser.add_argument(
+        "--engineered-reasoning-output",
+        action="store_true",
+        help="Prompt for step-by-step morphological reasoning in Spanish, then extract Final: line as the translation.",
+    )
+    parser.add_argument(
         "--terminology-file",
         default=None,
         help="Optional dataset-repo parquet file with glossary entries for terminology-conditioned prompting.",
@@ -205,6 +210,7 @@ def generate_predictions_with_progress(
     few_shot_max_candidates: int = 128,
     self_verification_output: bool = False,
     self_verification_thinking_output: bool = False,
+    engineered_reasoning_output: bool = False,
 ) -> tuple[list[dict[str, str]], list[str], list[str], list[list[tuple[str, str]]], list[list[tuple[str, str]]]]:
     import torch
 
@@ -245,6 +251,7 @@ def generate_predictions_with_progress(
                         few_shots,
                         self_verification=self_verification_output,
                         self_verification_thinking=self_verification_thinking_output,
+                        engineered_reasoning=engineered_reasoning_output,
                     ),
                     tokenize=False,
                     add_generation_prompt=True,
@@ -273,7 +280,7 @@ def generate_predictions_with_progress(
                 prediction = gspo.strip_chat_artifacts(prediction)
             else:
                 prediction = gspo.normalize_text(prediction)
-            if self_verification_output:
+            if self_verification_output or engineered_reasoning_output:
                 prediction = gspo.extract_translation_from_structured_output(prediction)
             generated_rows.append(row)
             predictions.append(prediction)
@@ -347,6 +354,7 @@ def main() -> None:
         args.few_shot_max_candidates,
         self_verification_output,
         args.self_verification_thinking_output,
+        engineered_reasoning_output=args.engineered_reasoning_output,
     )
     references = [row["target"] for row in generated_rows]
     sources = [row["source"] for row in generated_rows]

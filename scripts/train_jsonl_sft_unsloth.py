@@ -106,6 +106,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--lora-r", type=int, default=64)
     parser.add_argument("--lora-alpha", type=int, default=128)
     parser.add_argument("--lora-dropout", type=float, default=0.0)
+    parser.add_argument(
+        "--lora-layers-to-transform",
+        type=str,
+        default=None,
+        help="Comma-separated 0-indexed decoder layer ids to apply LoRA to. Default: all layers.",
+    )
     parser.add_argument("--weight-decay", type=float, default=0.01)
     parser.add_argument(
         "--optim",
@@ -292,18 +298,21 @@ def prompt_flags_for_row(
     prompt_self_verification: bool,
     prompt_self_verification_thinking: bool,
     prompt_self_verification_compact: bool,
-) -> tuple[bool, bool, bool]:
+) -> tuple[bool, bool, bool, bool]:
+    """Returns (self_verification, self_verification_thinking, self_verification_compact, engineered_reasoning)."""
     prompt_mode = row.get("prompt_mode", "").strip().lower()
     if prompt_mode in {"", "global", "default"}:
-        return prompt_self_verification, prompt_self_verification_thinking, prompt_self_verification_compact
+        return prompt_self_verification, prompt_self_verification_thinking, prompt_self_verification_compact, False
     if prompt_mode == "direct":
-        return False, False, False
+        return False, False, False, False
     if prompt_mode in {"self_verification", "self-verification", "verify"}:
-        return True, False, False
+        return True, False, False, False
     if prompt_mode in {"thinking", "bounded_thinking", "self_verification_thinking"}:
-        return False, True, False
+        return False, True, False, False
     if prompt_mode in {"compact", "compact_thinking", "self_verification_compact"}:
-        return False, False, True
+        return False, False, True, False
+    if prompt_mode.startswith("engineered_reasoning"):
+        return False, False, False, True
     raise ValueError(f"Unsupported prompt_mode={prompt_mode!r} for source={row.get('source', '')!r}")
 
 
@@ -316,7 +325,7 @@ def format_example(
     prompt_self_verification_thinking: bool = False,
     prompt_self_verification_compact: bool = False,
 ) -> dict[str, str]:
-    row_self_verification, row_thinking, row_compact = prompt_flags_for_row(
+    row_self_verification, row_thinking, row_compact, row_engineered = prompt_flags_for_row(
         row,
         prompt_self_verification,
         prompt_self_verification_thinking,
@@ -329,6 +338,7 @@ def format_example(
             self_verification=row_self_verification or row_thinking or row_compact,
             self_verification_thinking=row_thinking or row_compact,
             self_verification_compact=row_compact,
+            engineered_reasoning=row_engineered,
         ),
         {"role": "assistant", "content": row["target"]},
     ]
@@ -376,6 +386,10 @@ def trainable_parameter_count(model: Any) -> int:
 
 
 def attach_fresh_lora(model: Any, args: argparse.Namespace, fast_language_model: Any) -> Any:
+    extra: dict[str, Any] = {}
+    if getattr(args, "lora_layers_to_transform", None):
+        layers = [int(s) for s in str(args.lora_layers_to_transform).split(",") if s.strip()]
+        extra["layers_to_transform"] = layers
     return fast_language_model.get_peft_model(
         model,
         r=args.lora_r,
@@ -394,6 +408,7 @@ def attach_fresh_lora(model: Any, args: argparse.Namespace, fast_language_model:
         use_gradient_checkpointing="unsloth",
         random_state=args.seed,
         max_seq_length=args.max_seq_length,
+        **extra,
         **train_sft.adapter_flags(args.adapter_method),
     )
 
