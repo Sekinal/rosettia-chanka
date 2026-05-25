@@ -31,6 +31,8 @@ GSPO_PROMOTION_JSON="${GSPO_PROMOTION_JSON:-${GSPO_OUTPUT_DIR}/chanka_gspo/promo
 GSPO_CYCLE_MANIFEST_JSON="${GSPO_CYCLE_MANIFEST_JSON:-${GSPO_OUTPUT_DIR}/cycle_manifest.json}"
 GSPO_META_JSONL="${GSPO_META_JSONL:-${GSPO_OUTPUT_DIR}/chanka_gspo/meta_hardcases_from_gspo_eval.jsonl}"
 GSPO_META_SUMMARY_JSON="${GSPO_META_SUMMARY_JSON:-${GSPO_OUTPUT_DIR}/chanka_gspo/meta_hardcases_from_gspo_eval.summary.json}"
+STAGED_STATUS_JSON="${STAGED_STATUS_JSON:-${DATA_DIR}/deepseekmath_staged_status.json}"
+STAGED_STATUS_MD="${STAGED_STATUS_MD:-${DATA_DIR}/deepseekmath_staged_status.md}"
 TERMINOLOGY_FILE="${TERMINOLOGY_FILE:-clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet}"
 SFT_EVAL_DIR="${SFT_EVAL_DIR:-${THINKING_SFT_OUTPUT_DIR}/sft_only_eval}"
 SFT_EVAL_JSON="${SFT_EVAL_JSON:-${SFT_EVAL_DIR}/metrics.json}"
@@ -91,6 +93,24 @@ is_truthy() {
 is_falsey() {
   [[ "$1" == "false" || "$1" == "0" || "$1" == "no" ]]
 }
+
+write_staged_status() {
+  local exit_status=$?
+  set +e
+  "$PYTHON" scripts/summarize_deepseekmath_staged_run.py \
+    --frontier-dir "$DATA_DIR" \
+    --sft-dir "$THINKING_SFT_OUTPUT_DIR" \
+    --gspo-dir "$GSPO_OUTPUT_DIR" \
+    --no-discover \
+    --output-json "$STAGED_STATUS_JSON" \
+    --output-md "$STAGED_STATUS_MD" \
+    >/dev/null
+  if [[ -f "$STAGED_STATUS_MD" ]]; then
+    echo "Staged status: $STAGED_STATUS_MD"
+  fi
+  return "$exit_status"
+}
+trap write_staged_status EXIT
 
 write_sft_seed_manifest() {
   SFT_MANIFEST_BASELINE_ARGS=()

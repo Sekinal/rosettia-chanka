@@ -221,10 +221,17 @@ def next_action(frontier: dict[str, Any], sft: dict[str, Any], gspo: dict[str, A
             }
         if frontier.get("dir") and frontier.get("paid_gate_passed") is not True:
             frontier_dir = frontier.get("dir")
+            artifacts = frontier.get("artifacts") if isinstance(frontier.get("artifacts"), dict) else {}
+            report = artifacts.get("report_json") if isinstance(artifacts.get("report_json"), dict) else {}
+            reason = (
+                "A frontier report exists, but the paid-smoke data gate has not passed."
+                if report.get("exists")
+                else "Frontier directory exists, but no paid-smoke data gate has passed yet."
+            )
             return {
                 "stage": "frontier_generation",
                 "command": f"DATA_DIR={frontier_dir} experiments/gspo/run_deepseek_v4_pro_paid_generation_smoke.sh",
-                "reason": "A frontier report exists, but the paid-smoke data gate has not passed.",
+                "reason": reason,
             }
         return {
             "stage": "frontier_generation",

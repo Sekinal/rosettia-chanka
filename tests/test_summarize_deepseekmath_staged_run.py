@@ -101,6 +101,7 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
 
         self.assertEqual(report["next_action"]["stage"], "frontier_generation")
         self.assertTrue(report["blocked"])
+        self.assertIn("no paid-smoke data gate", report["next_action"]["reason"])
 
     def test_recommends_sft_after_frontier_ready(self):
         with tempfile.TemporaryDirectory() as tmpdir:
