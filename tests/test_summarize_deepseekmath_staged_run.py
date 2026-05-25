@@ -103,6 +103,53 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
         self.assertIn("run_deepseek_v4_pro_sft_from_frontier_data.sh", report["next_action"]["command"])
         self.assertFalse(report["blocked"])
 
+    def test_frontier_report_without_paid_gate_does_not_unlock_sft(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            frontier = root / "frontier"
+            write_json(
+                frontier / "deepseek_v4_pro_thinking_report.json",
+                {
+                    "summary": {"api_requests_used": 16, "max_api_requests": 16},
+                    "gate_metrics": {
+                        "written_rows": 8,
+                        "failed_rows": 0,
+                        "accept_rate": 1.0,
+                        "distinct_primitives": 5,
+                        "expected_primitive_coverage": 1.0,
+                    },
+                },
+            )
+
+            report = summarize.build_report(
+                summarize.parse_args(
+                    ["--frontier-dir", str(frontier), "--output-json", str(root / "status.json")]
+                )
+            )
+
+        self.assertFalse(report["frontier"]["ready"])
+        self.assertIsNone(report["frontier"]["paid_gate_passed"])
+        self.assertEqual(report["next_action"]["stage"], "frontier_generation")
+        self.assertIn("DATA_DIR=", report["next_action"]["command"])
+        self.assertIn("paid-smoke data gate has not passed", report["next_action"]["reason"])
+
+    def test_frontier_report_with_failed_paid_gate_does_not_unlock_sft(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            frontier = root / "frontier"
+            write_frontier(frontier, gate_passed=False)
+
+            report = summarize.build_report(
+                summarize.parse_args(
+                    ["--frontier-dir", str(frontier), "--output-json", str(root / "status.json")]
+                )
+            )
+
+        self.assertFalse(report["frontier"]["ready"])
+        self.assertFalse(report["frontier"]["paid_gate_passed"])
+        self.assertEqual(report["next_action"]["stage"], "frontier_generation")
+        self.assertIn("run_deepseek_v4_pro_paid_generation_smoke.sh", report["next_action"]["command"])
+
     def test_discovers_preapi_ready_frontier_dir(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -120,6 +167,35 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
         self.assertIn("DATA_DIR=", report["next_action"]["command"])
         self.assertIn("Pre-API readiness passed", report["next_action"]["reason"])
         self.assertFalse(report["blocked"])
+
+    def test_discovery_prefers_paid_gate_over_newer_ungated_report(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            output_root = root / "outputs"
+            paid_frontier = output_root / "paid_frontier"
+            ungated_frontier = output_root / "ungated_frontier"
+            write_frontier(paid_frontier)
+            write_json(
+                ungated_frontier / "deepseek_v4_pro_thinking_report.json",
+                {
+                    "summary": {"api_requests_used": 16, "max_api_requests": 16},
+                    "gate_metrics": {
+                        "written_rows": 8,
+                        "failed_rows": 0,
+                        "accept_rate": 1.0,
+                        "distinct_primitives": 5,
+                        "expected_primitive_coverage": 1.0,
+                    },
+                },
+            )
+
+            report = summarize.build_report(
+                summarize.parse_args(["--output-root", str(output_root), "--output-json", str(root / "status.json")])
+            )
+
+        self.assertEqual(report["discovery"]["frontier_dir"], str(paid_frontier))
+        self.assertTrue(report["frontier"]["ready"])
+        self.assertEqual(report["next_action"]["stage"], "sft_seed")
 
     def test_discovers_latest_sft_and_gspo_manifests(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -92,7 +92,7 @@ def discover_dirs(args: argparse.Namespace) -> tuple[Path | None, Path | None, P
 
     frontier_dir = args.frontier_dir
     if frontier_dir is None:
-        frontier_dir = newest_dir_with_file(args.output_root, "deepseek_v4_pro_thinking_report.json")
+        frontier_dir = newest_dir_with_file(args.output_root, "deepseek_v4_pro_paid_smoke_gate.json")
     if frontier_dir is None:
         frontier_dir = newest_dir_with_file(args.output_root, "deepseek_v4_pro_preapi_readiness.json")
 
@@ -139,7 +139,7 @@ def summarize_frontier(frontier_dir: Path | None) -> dict[str, Any]:
     gate_passed = bool(paid_gate.get("passed")) if isinstance(paid_gate, dict) else None
     accepted_rows = metric(metrics, "written_rows")
     expected_coverage = metric(metrics, "expected_primitive_coverage")
-    ready = bool(report) and accepted_rows > 0 and gate_passed is not False
+    ready = bool(report) and accepted_rows > 0 and gate_passed is True
     preapi_ready = preapi.get("ready_for_api") if isinstance(preapi, dict) else None
     return {
         "dir": str(frontier_dir) if frontier_dir else None,
@@ -209,6 +209,13 @@ def next_action(frontier: dict[str, Any], sft: dict[str, Any], gspo: dict[str, A
                 "stage": "frontier_generation",
                 "command": f"DATA_DIR={frontier_dir} experiments/gspo/run_deepseek_v4_pro_paid_generation_smoke.sh",
                 "reason": "Pre-API readiness passed, but no accepted paid frontier report exists yet.",
+            }
+        if frontier.get("dir") and frontier.get("paid_gate_passed") is not True:
+            frontier_dir = frontier.get("dir")
+            return {
+                "stage": "frontier_generation",
+                "command": f"DATA_DIR={frontier_dir} experiments/gspo/run_deepseek_v4_pro_paid_generation_smoke.sh",
+                "reason": "A frontier report exists, but the paid-smoke data gate has not passed.",
             }
         return {
             "stage": "frontier_generation",
