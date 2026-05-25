@@ -166,6 +166,7 @@ def cycle_summary(cycle_dir: Path | None, manifest_path: Path | None) -> dict[st
     artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else {}
     policy_artifact = artifacts.get("policy_adapter") if isinstance(artifacts, dict) else None
     hardcases = manifest.get("output_hardcases") if isinstance(manifest, dict) else {}
+    hardcase_artifact = artifacts.get("output_hardcases") if isinstance(artifacts, dict) else None
     return {
         "dir": str(cycle_dir) if cycle_dir else None,
         "manifest": str(manifest_path) if manifest_path else None,
@@ -185,6 +186,14 @@ def cycle_summary(cycle_dir: Path | None, manifest_path: Path | None) -> dict[st
         },
         "promotion_reasons": promotion.get("reasons", []) if isinstance(promotion, dict) else [],
         "output_hardcases": hardcases,
+        "output_hardcases_path": (
+            str(hardcase_artifact.get("path"))
+            if isinstance(hardcase_artifact, dict) and hardcase_artifact.get("path")
+            else None
+        ),
+        "output_hardcases_exists": (
+            bool(hardcase_artifact.get("exists")) if isinstance(hardcase_artifact, dict) else False
+        ),
         "artifacts": artifacts if isinstance(artifacts, dict) else {},
     }
 
@@ -247,6 +256,21 @@ def next_action(frontier: dict[str, Any], sft: dict[str, Any], gspo: dict[str, A
             "stage": "promoted_policy",
             "command": f"BASE_MODEL={gspo.get('policy_adapter')} experiments/gspo/run_hardcase_meta_then_followup_gspo_cycle.sh",
             "reason": "Initial GSPO is promoted and has a checked policy adapter.",
+        }
+    hardcase_count = 0
+    if isinstance(gspo.get("output_hardcases"), dict):
+        try:
+            hardcase_count = int(gspo["output_hardcases"].get("valid_records", 0) or 0)
+        except (TypeError, ValueError):
+            hardcase_count = 0
+    if gspo.get("output_hardcases_path") and gspo.get("output_hardcases_exists") and hardcase_count > 0:
+        return {
+            "stage": "hardcase_iteration",
+            "command": (
+                f"GSPO_META_JSONL={gspo.get('output_hardcases_path')} "
+                "experiments/gspo/run_next_meta_verifier_from_hardcases.sh"
+            ),
+            "reason": "GSPO was not promoted; train the next meta-verifier from its mined hardcases.",
         }
     return {
         "stage": "hardcase_iteration",

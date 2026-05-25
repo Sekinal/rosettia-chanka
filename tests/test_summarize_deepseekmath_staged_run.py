@@ -41,10 +41,19 @@ def write_preapi(root: Path) -> None:
     )
 
 
-def write_cycle(root: Path, stage: str, promoted: bool, policy_exists: bool = True) -> None:
+def write_cycle(
+    root: Path,
+    stage: str,
+    promoted: bool,
+    policy_exists: bool = True,
+    hardcases: int = 12,
+) -> None:
     adapter = root / "final_lora"
     if policy_exists:
         adapter.mkdir(parents=True)
+    hardcase_path = root / "meta_hardcases.jsonl"
+    if hardcases:
+        hardcase_path.write_text("{}\n" * hardcases)
     write_json(
         root / "cycle_manifest.json",
         {
@@ -65,8 +74,13 @@ def write_cycle(root: Path, stage: str, promoted: bool, policy_exists: bool = Tr
                 "policy_adapter": {"path": str(adapter), "exists": policy_exists},
                 "metrics": {"path": "metrics.json", "exists": True},
                 "promotion": {"path": "promotion.json", "exists": True},
+                "output_hardcases": {
+                    "path": str(hardcase_path),
+                    "exists": bool(hardcases),
+                    "is_file": bool(hardcases),
+                },
             },
-            "output_hardcases": {"valid_records": 12},
+            "output_hardcases": {"valid_records": hardcases},
         },
     )
 
@@ -216,6 +230,8 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
         self.assertEqual(report["discovery"]["sft_dir"], str(sft))
         self.assertEqual(report["discovery"]["gspo_dir"], str(gspo))
         self.assertEqual(report["next_action"]["stage"], "hardcase_iteration")
+        self.assertIn("GSPO_META_JSONL=", report["next_action"]["command"])
+        self.assertIn(str(gspo / "meta_hardcases.jsonl"), report["next_action"]["command"])
 
     def test_recommends_gspo_after_sft_seed_exists(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -267,6 +283,35 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
             )
 
         self.assertEqual(report["next_action"]["stage"], "hardcase_iteration")
+        self.assertIn("GSPO_META_JSONL=", report["next_action"]["command"])
+
+    def test_failed_gspo_without_hardcases_uses_generic_hardcase_command(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            frontier = root / "frontier"
+            sft = root / "sft"
+            gspo = root / "gspo"
+            write_frontier(frontier)
+            write_cycle(sft, "sft_seed", promoted=False)
+            write_cycle(gspo, "initial_gspo", promoted=False, hardcases=0)
+
+            report = summarize.build_report(
+                summarize.parse_args(
+                    [
+                        "--frontier-dir",
+                        str(frontier),
+                        "--sft-dir",
+                        str(sft),
+                        "--gspo-dir",
+                        str(gspo),
+                        "--output-json",
+                        str(root / "status.json"),
+                    ]
+                )
+            )
+
+        self.assertEqual(report["next_action"]["stage"], "hardcase_iteration")
+        self.assertNotIn("GSPO_META_JSONL=", report["next_action"]["command"])
 
     def test_writes_markdown_with_next_command(self):
         with tempfile.TemporaryDirectory() as tmpdir:
