@@ -252,10 +252,11 @@ def next_action(frontier: dict[str, Any], sft: dict[str, Any], gspo: dict[str, A
             "reason": "SFT seed exists, but no initial GSPO cycle manifest was found.",
         }
     if gspo.get("promoted") and gspo.get("policy_adapter_exists"):
+        manifest = gspo.get("manifest") or "<gspo_cycle_manifest>"
         return {
             "stage": "promoted_policy",
-            "command": f"BASE_MODEL={gspo.get('policy_adapter')} experiments/gspo/run_hardcase_meta_then_followup_gspo_cycle.sh",
-            "reason": "Initial GSPO is promoted and has a checked policy adapter.",
+            "command": f"BASE_CYCLE_MANIFEST={manifest} experiments/gspo/run_hardcase_meta_then_followup_gspo_cycle.sh",
+            "reason": "Initial GSPO is promoted; continue from its manifest so lineage and hardcases are preserved.",
         }
     hardcase_count = 0
     if isinstance(gspo.get("output_hardcases"), dict):

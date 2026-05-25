@@ -285,6 +285,37 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
         self.assertEqual(report["next_action"]["stage"], "hardcase_iteration")
         self.assertIn("GSPO_META_JSONL=", report["next_action"]["command"])
 
+    def test_promoted_gspo_recommends_manifest_based_followup(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            frontier = root / "frontier"
+            sft = root / "sft"
+            gspo = root / "gspo"
+            write_frontier(frontier)
+            write_cycle(sft, "sft_seed", promoted=False)
+            write_cycle(gspo, "initial_gspo", promoted=True)
+
+            report = summarize.build_report(
+                summarize.parse_args(
+                    [
+                        "--frontier-dir",
+                        str(frontier),
+                        "--sft-dir",
+                        str(sft),
+                        "--gspo-dir",
+                        str(gspo),
+                        "--output-json",
+                        str(root / "status.json"),
+                    ]
+                )
+            )
+
+        self.assertEqual(report["next_action"]["stage"], "promoted_policy")
+        self.assertIn("BASE_CYCLE_MANIFEST=", report["next_action"]["command"])
+        self.assertIn(str(gspo / "cycle_manifest.json"), report["next_action"]["command"])
+        self.assertNotIn("BASE_MODEL=", report["next_action"]["command"])
+        self.assertIn("lineage and hardcases", report["next_action"]["reason"])
+
     def test_failed_gspo_without_hardcases_uses_generic_hardcase_command(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
