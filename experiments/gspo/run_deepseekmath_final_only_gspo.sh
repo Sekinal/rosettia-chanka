@@ -38,11 +38,17 @@ SPEED_ARGS=()
 if [[ "$TRAINER_EVAL" == "false" || "$TRAINER_EVAL" == "0" || "$TRAINER_EVAL" == "no" ]]; then
   SPEED_ARGS+=(--no-trainer-eval)
 fi
+if [[ "${MASK_TRUNCATED_COMPLETIONS:-true}" == "false" || "${MASK_TRUNCATED_COMPLETIONS:-true}" == "0" || "${MASK_TRUNCATED_COMPLETIONS:-true}" == "no" ]]; then
+  SPEED_ARGS+=(--no-mask-truncated-completions)
+fi
 if [[ -n "${FINAL_METRICS_MAX_SAMPLES:-}" ]]; then
   SPEED_ARGS+=(--final-metrics-max-samples "$FINAL_METRICS_MAX_SAMPLES")
 fi
 if [[ -n "${FINAL_GENERATION_BATCH_SIZE:-}" ]]; then
   SPEED_ARGS+=(--final-generation-batch-size "$FINAL_GENERATION_BATCH_SIZE")
+fi
+if [[ "${STOP_ON_FINAL_PUNCTUATION:-false}" == "true" || "${STOP_ON_FINAL_PUNCTUATION:-false}" == "1" || "${STOP_ON_FINAL_PUNCTUATION:-false}" == "yes" ]]; then
+  SPEED_ARGS+=(--stop-on-final-punctuation)
 fi
 
 ATTACH_ARGS=()

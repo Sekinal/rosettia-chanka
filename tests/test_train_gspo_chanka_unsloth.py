@@ -938,6 +938,31 @@ suffix"""
 
         self.assertIsNone(train_gspo.score_box_stop_token_id(Tokenizer()))
 
+    def test_final_punctuation_stop_token_ids_keep_single_token_stops(self):
+        class Tokenizer:
+            def encode(self, text, add_special_tokens=False):
+                mapping = {
+                    ".": [11],
+                    "?": [12],
+                    "!": [13],
+                    "\n": [14],
+                }
+                return mapping[text]
+
+        self.assertEqual(train_gspo.final_punctuation_stop_token_ids(Tokenizer()), [11, 12, 13, 14])
+
+    def test_final_punctuation_stop_token_ids_skip_multi_token_stops(self):
+        class Tokenizer:
+            def encode(self, text, add_special_tokens=False):
+                if text == "?":
+                    return [12, 99]
+                return [ord(text[0])]
+
+        stops = train_gspo.final_punctuation_stop_token_ids(Tokenizer())
+
+        self.assertNotIn(12, stops)
+        self.assertIn(ord("."), stops)
+
 
 if __name__ == "__main__":
     unittest.main()

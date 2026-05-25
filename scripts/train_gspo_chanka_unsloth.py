@@ -194,6 +194,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=False,
         help="For structured self-verification runs, stop generation when the single-token '}' closing a boxed score is emitted.",
     )
+    parser.add_argument(
+        "--stop-on-final-punctuation",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="For final-only translation runs, stop generation on single-token sentence punctuation such as '.', '?' or '!'.",
+    )
     parser.add_argument("--beta", type=float, default=0.0)
     parser.add_argument("--epsilon", type=float, default=0.2)
     parser.add_argument("--loss-type", choices=["dapo", "dr_grpo", "grpo", "bnpo"], default="dapo")
@@ -546,6 +552,27 @@ def score_box_stop_token_id(tokenizer: Any) -> int | None:
     if len(token_ids) != 1:
         return None
     return int(token_ids[0])
+
+
+def single_token_id(tokenizer: Any, text: str) -> int | None:
+    text_tokenizer = generation_text_tokenizer(tokenizer)
+    try:
+        token_ids = text_tokenizer.encode(text, add_special_tokens=False)
+    except TypeError:
+        token_ids = text_tokenizer.encode(text)
+    if len(token_ids) != 1:
+        return None
+    return int(token_ids[0])
+
+
+def final_punctuation_stop_token_ids(tokenizer: Any) -> list[int]:
+    """Return single-token stop ids that usually mark the end of one translation."""
+    stop_ids: list[int] = []
+    for text in (".", "?", "!", "\n"):
+        token_id = single_token_id(tokenizer, text)
+        if token_id is not None and token_id not in stop_ids:
+            stop_ids.append(token_id)
+    return stop_ids
 
 
 def source_contains_term(source: str, source_term: str) -> bool:
@@ -2138,6 +2165,13 @@ def main() -> None:
         else:
             policy_eos_token_id = stop_token_id
             print(f"Score-box stop token: enabled id={stop_token_id!r}")
+    if args.stop_on_final_punctuation:
+        stop_token_ids = final_punctuation_stop_token_ids(text_tokenizer)
+        if not stop_token_ids:
+            print("Final punctuation stop tokens: unavailable; using current EOS")
+        else:
+            policy_eos_token_id = stop_token_ids
+            print(f"Final punctuation stop tokens: enabled ids={stop_token_ids!r}")
     print(f"Validation: every {args.eval_steps} steps")
     print(f"Trainer eval: {args.trainer_eval}")
     print(f"Saving: every {args.save_steps} steps")
@@ -2205,7 +2239,10 @@ def main() -> None:
         ),
     )
     configure_left_padded_generation(model, tokenizer)
-    if isinstance(policy_eos_token_id, int) and policy_eos_token_id != text_tokenizer.eos_token_id:
+    if (
+        isinstance(policy_eos_token_id, int)
+        and policy_eos_token_id != text_tokenizer.eos_token_id
+    ):
         trainer.eos_token_id = policy_eos_token_id
 
     trainer.train(
