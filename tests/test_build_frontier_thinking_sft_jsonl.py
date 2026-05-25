@@ -383,6 +383,22 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         self.assertTrue(builder.audit_passes(audit, min_score=0.75))
         self.assertFalse(builder.audit_passes(audit, min_score=0.9))
 
+    def test_response_content_reports_empty_thinking_only_response_without_leaking_reasoning(self):
+        response = {
+            "choices": [
+                {
+                    "finish_reason": "length",
+                    "message": {
+                        "content": "",
+                        "reasoning_content": "private hidden reasoning text",
+                    },
+                }
+            ]
+        }
+
+        with self.assertRaisesRegex(ValueError, "finish_reason='length'.*reasoning_content_chars=29"):
+            builder.response_content(response)
+
     def test_load_source_jsonl_accepts_reference_field(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "rows.jsonl"

@@ -234,7 +234,31 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
         self.assertIn("GSPO_META_JSONL=", report["next_action"]["command"])
         self.assertIn(str(gspo / "meta_hardcases.jsonl"), report["next_action"]["command"])
 
-    def test_recommends_gspo_after_sft_seed_exists(self):
+    def test_recommends_gspo_after_promoted_sft_seed_exists(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            frontier = root / "frontier"
+            sft = root / "sft"
+            write_frontier(frontier)
+            write_cycle(sft, "sft_seed", promoted=True)
+
+            report = summarize.build_report(
+                summarize.parse_args(
+                    [
+                        "--frontier-dir",
+                        str(frontier),
+                        "--sft-dir",
+                        str(sft),
+                        "--output-json",
+                        str(root / "status.json"),
+                    ]
+                )
+            )
+
+        self.assertEqual(report["next_action"]["stage"], "initial_gspo")
+        self.assertIn("run_deepseek_v4_pro_gspo_from_sft_seed.sh", report["next_action"]["command"])
+
+    def test_failed_sft_seed_recommends_sft_hardcase_iteration(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             frontier = root / "frontier"
@@ -255,8 +279,33 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
                 )
             )
 
-        self.assertEqual(report["next_action"]["stage"], "initial_gspo")
-        self.assertIn("run_deepseek_v4_pro_gspo_from_sft_seed.sh", report["next_action"]["command"])
+        self.assertEqual(report["next_action"]["stage"], "hardcase_iteration")
+        self.assertIn("SFT_META_JSONL=", report["next_action"]["command"])
+        self.assertIn(str(sft / "meta_hardcases.jsonl"), report["next_action"]["command"])
+
+    def test_failed_sft_seed_without_hardcases_recommends_inspection(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            frontier = root / "frontier"
+            sft = root / "sft"
+            write_frontier(frontier)
+            write_cycle(sft, "sft_seed", promoted=False, hardcases=0)
+
+            report = summarize.build_report(
+                summarize.parse_args(
+                    [
+                        "--frontier-dir",
+                        str(frontier),
+                        "--sft-dir",
+                        str(sft),
+                        "--output-json",
+                        str(root / "status.json"),
+                    ]
+                )
+            )
+
+        self.assertEqual(report["next_action"]["stage"], "inspect_sft_seed")
+        self.assertIn("not promoted", report["next_action"]["reason"])
 
     def test_recommends_hardcase_iteration_after_failed_gspo(self):
         with tempfile.TemporaryDirectory() as tmpdir:

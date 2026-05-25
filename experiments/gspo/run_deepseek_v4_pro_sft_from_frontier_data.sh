@@ -161,7 +161,7 @@ if [[ "$RUN_SFT_BASELINE_EVAL" == "true" || "$RUN_SFT_BASELINE_EVAL" == "1" || "
       --output-json "$SFT_BASELINE_METRICS_JSON" \
       --predictions-jsonl "$SFT_BASELINE_PREDICTIONS" \
       --max-seq-length "${SFT_EVAL_MAX_SEQ_LENGTH:-384}" \
-      --max-completion-length "${SFT_EVAL_MAX_COMPLETION_LENGTH:-112}" \
+      --max-completion-length "${SFT_EVAL_MAX_COMPLETION_LENGTH:-256}" \
       --batch-size "${SFT_EVAL_BATCH_SIZE:-8}" \
       --max-eval-samples "${SFT_EVAL_MAX_ROWS:-64}" \
       --self-verification-thinking-output \
@@ -202,7 +202,7 @@ fi
   --output-json "$SFT_EVAL_JSON" \
   --predictions-jsonl "$SFT_EVAL_PREDICTIONS" \
   --max-seq-length "${SFT_EVAL_MAX_SEQ_LENGTH:-384}" \
-  --max-completion-length "${SFT_EVAL_MAX_COMPLETION_LENGTH:-112}" \
+  --max-completion-length "${SFT_EVAL_MAX_COMPLETION_LENGTH:-256}" \
   --batch-size "${SFT_EVAL_BATCH_SIZE:-8}" \
   --max-eval-samples "${SFT_EVAL_MAX_ROWS:-64}" \
   --self-verification-thinking-output \

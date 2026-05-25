@@ -165,7 +165,7 @@ if is_truthy "${RUN_FRONTIER_SELECTION_REPORT:-true}"; then
     --max-rows "${FRONTIER_MAX_ROWS:-128}" \
     --offset "${FRONTIER_OFFSET:-0}" \
     --max-retries "${FRONTIER_MAX_RETRIES:-3}" \
-    --max-output-tokens "${FRONTIER_MAX_OUTPUT_TOKENS:-512}" \
+    --max-output-tokens "${FRONTIER_MAX_OUTPUT_TOKENS:-32768}" \
     --few-shot-count "${FRONTIER_FEW_SHOT_COUNT:-2}" \
     --selection-only \
     "${FRONTIER_STRATIFY_ARGS[@]}" \
@@ -285,7 +285,7 @@ FRONTIER_ARGS+=("${FRONTIER_STRATIFY_ARGS[@]}")
   --offset "${FRONTIER_OFFSET:-0}" \
   --sleep-seconds "${FRONTIER_SLEEP_SECONDS:-0}" \
   --max-retries "${FRONTIER_MAX_RETRIES:-3}" \
-  --max-output-tokens "${FRONTIER_MAX_OUTPUT_TOKENS:-512}" \
+  --max-output-tokens "${FRONTIER_MAX_OUTPUT_TOKENS:-32768}" \
   --max-api-requests "${FRONTIER_MAX_API_REQUESTS:-0}" \
   --few-shot-count "${FRONTIER_FEW_SHOT_COUNT:-2}" \
   "${FRONTIER_ARGS[@]}"

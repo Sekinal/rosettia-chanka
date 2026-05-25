@@ -76,7 +76,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--sleep-seconds", type=float, default=0.0)
     parser.add_argument("--timeout-seconds", type=float, default=120.0)
     parser.add_argument("--max-retries", type=int, default=3)
-    parser.add_argument("--max-output-tokens", type=int, default=512)
+    parser.add_argument("--max-output-tokens", type=int, default=32768)
+    parser.add_argument("--audit-max-output-tokens", type=int, default=1024)
+    parser.add_argument(
+        "--audit-disable-thinking",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Disable thinking mode for audit calls; the audit is a cheap JSON filter, not training data.",
+    )
     parser.add_argument(
         "--max-api-requests",
         type=int,
@@ -524,10 +531,16 @@ def response_content(response: dict[str, Any]) -> str:
     choices = response.get("choices") or []
     if not choices:
         raise ValueError("Response has no choices")
-    message = choices[0].get("message") or {}
+    choice = choices[0]
+    message = choice.get("message") or {}
     content = message.get("content")
     if not isinstance(content, str) or not content.strip():
-        raise ValueError("Response has empty content")
+        reasoning_content = message.get("reasoning_content")
+        reasoning_chars = len(reasoning_content) if isinstance(reasoning_content, str) else 0
+        raise ValueError(
+            "Response has empty content "
+            f"(finish_reason={choice.get('finish_reason')!r}, reasoning_content_chars={reasoning_chars})"
+        )
     return content.strip()
 
 
@@ -600,11 +613,14 @@ def audit_passes(audit: dict[str, Any], min_score: float) -> bool:
 
 
 def audit_record(args: argparse.Namespace, api_key: str, source: str, reference: str, parsed: dict[str, Any]) -> dict[str, Any]:
+    audit_args = args
+    if args.audit_disable_thinking:
+        audit_args = argparse.Namespace(**{**vars(args), "disable_thinking": True})
     payload = chat_payload(
-        args,
+        audit_args,
         args.audit_model or args.model,
         audit_messages(source, reference, parsed),
-        min(args.max_output_tokens, 256),
+        args.audit_max_output_tokens,
     )
     response = call_chat_payload(args, api_key, payload)
     return parse_audit_json(response_content(response))
@@ -1018,6 +1034,8 @@ def main_from_args(argv: Sequence[str] | None = None) -> None:
         "audit": args.audit,
         "audit_model": (args.audit_model or args.model) if args.audit else None,
         "audit_min_score": args.audit_min_score if args.audit else None,
+        "audit_disable_thinking": args.audit_disable_thinking if args.audit else None,
+        "audit_max_output_tokens": args.audit_max_output_tokens if args.audit else None,
         "allow_model_translation": args.allow_model_translation,
         "require_expected_primitives": args.require_expected_primitives,
         "stratify_primitives": args.stratify_primitives,

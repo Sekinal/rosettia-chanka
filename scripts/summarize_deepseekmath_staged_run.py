@@ -252,6 +252,27 @@ def next_action(frontier: dict[str, Any], sft: dict[str, Any], gspo: dict[str, A
             "reason": "SFT manifest exists but the policy adapter artifact is missing.",
         }
     if not gspo.get("exists"):
+        if sft.get("promoted") is False:
+            hardcase_count = 0
+            if isinstance(sft.get("output_hardcases"), dict):
+                try:
+                    hardcase_count = int(sft["output_hardcases"].get("valid_records", 0) or 0)
+                except (TypeError, ValueError):
+                    hardcase_count = 0
+            if sft.get("output_hardcases_path") and sft.get("output_hardcases_exists") and hardcase_count > 0:
+                return {
+                    "stage": "hardcase_iteration",
+                    "command": (
+                        f"SFT_META_JSONL={sft.get('output_hardcases_path')} "
+                        "experiments/gspo/run_next_meta_verifier_from_hardcases.sh"
+                    ),
+                    "reason": "SFT seed was not promoted; train the next meta-verifier from its mined hardcases.",
+                }
+            return {
+                "stage": "inspect_sft_seed",
+                "command": f"cat {sft.get('manifest') or '<sft_cycle_manifest>'}",
+                "reason": "SFT seed was not promoted and no usable SFT hardcases were found.",
+            }
         sft_dir = sft.get("dir") or "<sft_output_dir>"
         return {
             "stage": "initial_gspo",
