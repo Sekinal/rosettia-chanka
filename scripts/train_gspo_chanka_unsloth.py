@@ -45,6 +45,7 @@ REWARD_PROFILES = (
     "learned_verifier_vibe_2511",
     "learned_verifier_ensemble_vibe_2511",
     "learned_verifier_bleu_margin_vibe_2511",
+    "deepseekmath_final_verifier_2511",
     "self_verifiable_translation_2511",
     "self_verifiable_thinking_translation_2511",
     "self_verifiable_compact_thinking_translation_2511",
@@ -1482,6 +1483,52 @@ def learned_verifier_ensemble_rewards(
     return rewards
 
 
+def deepseekmath_final_verifier_rewards(
+    scorer: LearnedVerifierScorer,
+    hypotheses: list[str],
+    references: list[str],
+    sources: list[str | None],
+    overlong_max_words: int | None = None,
+    overlong_ratio_threshold: float = 0.0,
+    overlong_penalty_weight: float = 1.0,
+) -> list[float]:
+    """Final-only DeepSeekMath-language reward.
+
+    The policy action is only the Chanka translation. Grammar/error analysis is
+    delegated to the learned verifier so the sampler is not forced to generate
+    long structured traces during RL.
+    """
+    verifier_scores = scorer.score_many(sources, references, hypotheses)
+    rewards: list[float] = []
+    for verifier_score, hypothesis, reference, source in zip(verifier_scores, hypotheses, references, sources, strict=True):
+        chrf = sentence_chrfpp(hypothesis, reference)
+        bleu = sentence_bleu(hypothesis, reference)
+        f1 = token_f1(hypothesis, reference)
+        precision = token_precision(hypothesis, reference)
+        length_score = length_ratio_score(hypothesis, reference)
+        true_score = bounded_translation_quality_score(hypothesis, reference, source)
+        shape_score = (0.65 * length_score) + (0.35 * precision)
+        guard_penalty = (
+            0.30 * source_copy_ratio(hypothesis, source)
+            + 0.55 * spanish_leakage_penalty(hypothesis)
+            + 0.28 * repetition_penalty(hypothesis)
+            + 0.90 * chat_artifact_penalty(hypothesis)
+            + overlong_penalty_weight
+            * overlong_completion_penalty(
+                hypothesis,
+                reference,
+                max_words=overlong_max_words,
+                ratio_threshold=overlong_ratio_threshold,
+            )
+        )
+        if exact_source_copy(hypothesis, source):
+            guard_penalty += 0.60
+        metric_floor = (0.45 * chrf) + (0.25 * f1) + (0.15 * bleu) + (0.15 * length_score)
+        reward = (0.48 * verifier_score) + (0.30 * true_score) + (0.14 * metric_floor) + (0.08 * shape_score)
+        rewards.append(reward - guard_penalty)
+    return rewards
+
+
 def add_vibethinker_diversity_bonus(rewards: list[float], hypotheses: list[str], sources: list[str | None]) -> list[float]:
     grouped: dict[str | None, list[int]] = {}
     for index, source in enumerate(sources):
@@ -1589,6 +1636,7 @@ def make_reward_fn(
         "learned_verifier_vibe_2511",
         "learned_verifier_ensemble_vibe_2511",
         "learned_verifier_bleu_margin_vibe_2511",
+        "deepseekmath_final_verifier_2511",
     }
     if profile in learned_profiles:
         if verifier_adapter_path is None:
@@ -1651,6 +1699,19 @@ def make_reward_fn(
                 overlong_penalty_weight=overlong_penalty_weight,
             )
             return add_vibethinker_diversity_bonus(rewards, hypotheses, sources)
+        if profile == "deepseekmath_final_verifier_2511":
+            assert verifier_scorer is not None
+            sources = list(source) if source is not None else [None] * len(target)
+            hypotheses = [completion_text(completion) for completion in completions]
+            return deepseekmath_final_verifier_rewards(
+                verifier_scorer,
+                hypotheses,
+                list(target),
+                sources,
+                overlong_max_words=overlong_max_words,
+                overlong_ratio_threshold=overlong_ratio_threshold,
+                overlong_penalty_weight=overlong_penalty_weight,
+            )
         if profile == "learned_verifier_ensemble_vibe_2511":
             assert verifier_scorer is not None
             assert secondary_verifier_scorer is not None

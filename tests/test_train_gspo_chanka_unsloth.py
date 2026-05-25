@@ -507,12 +507,37 @@ suffix"""
             "learned_verifier_2511",
             "learned_verifier_vibe_2511",
             "learned_verifier_bleu_margin_vibe_2511",
+            "deepseekmath_final_verifier_2511",
             "reference_rerank_vibe_v1",
             "self_verifiable_translation_2511",
             "self_verifiable_thinking_translation_2511",
         }
 
         self.assertTrue(expected.issubset(set(train_gspo.REWARD_PROFILES)))
+
+    def test_deepseekmath_final_verifier_reward_keeps_policy_final_only(self):
+        class Scorer:
+            def score_many(self, sources, references, hypotheses):
+                return [0.95 if "Allin" in hypothesis else 0.20 for hypothesis in hypotheses]
+
+        with mock.patch.object(train_gspo, "sentence_chrfpp", side_effect=[0.8, 0.8, 0.2, 0.2]), mock.patch.object(
+            train_gspo, "sentence_bleu", side_effect=[0.4, 0.4, 0.0, 0.0]
+        ):
+            rewards = train_gspo.deepseekmath_final_verifier_rewards(
+                Scorer(),
+                [
+                    "Allin punchaw kamachiq.",
+                    "Analisis: user assistant <think> Buenos dias autoridad.",
+                ],
+                ["Allin punchaw kamachiq.", "Allin punchaw kamachiq."],
+                ["Buenos dias autoridad.", "Buenos dias autoridad."],
+            )
+
+        self.assertGreater(rewards[0], rewards[1])
+
+    def test_deepseekmath_final_verifier_profile_requires_verifier(self):
+        with self.assertRaisesRegex(ValueError, "verifier"):
+            train_gspo.make_reward_fn("deepseekmath_final_verifier_2511")
 
     def test_rosettia_guard_penalizes_source_copy(self):
         with mock.patch.object(train_gspo, "sentence_chrfpp", return_value=0.65), mock.patch.object(
