@@ -93,6 +93,7 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
                     [
                         "--frontier-dir",
                         str(Path(tmpdir) / "frontier"),
+                        "--no-discover",
                         "--output-json",
                         str(Path(tmpdir) / "status.json"),
                     ]
@@ -110,7 +111,7 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
 
             report = summarize.build_report(
                 summarize.parse_args(
-                    ["--frontier-dir", str(frontier), "--output-json", str(Path(tmpdir) / "status.json")]
+                    ["--frontier-dir", str(frontier), "--no-discover", "--output-json", str(Path(tmpdir) / "status.json")]
                 )
             )
 
@@ -138,7 +139,7 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
 
             report = summarize.build_report(
                 summarize.parse_args(
-                    ["--frontier-dir", str(frontier), "--output-json", str(root / "status.json")]
+                    ["--frontier-dir", str(frontier), "--no-discover", "--output-json", str(root / "status.json")]
                 )
             )
 
@@ -156,7 +157,7 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
 
             report = summarize.build_report(
                 summarize.parse_args(
-                    ["--frontier-dir", str(frontier), "--output-json", str(root / "status.json")]
+                    ["--frontier-dir", str(frontier), "--no-discover", "--output-json", str(root / "status.json")]
                 )
             )
 
@@ -249,6 +250,7 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
                         str(frontier),
                         "--sft-dir",
                         str(sft),
+                        "--no-discover",
                         "--output-json",
                         str(root / "status.json"),
                     ]
@@ -273,6 +275,7 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
                         str(frontier),
                         "--sft-dir",
                         str(sft),
+                        "--no-discover",
                         "--output-json",
                         str(root / "status.json"),
                     ]
@@ -298,6 +301,7 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
                         str(frontier),
                         "--sft-dir",
                         str(sft),
+                        "--no-discover",
                         "--output-json",
                         str(root / "status.json"),
                     ]
@@ -326,6 +330,7 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
                         str(sft),
                         "--gspo-dir",
                         str(gspo),
+                        "--no-discover",
                         "--output-json",
                         str(root / "status.json"),
                     ]
@@ -354,6 +359,7 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
                         str(sft),
                         "--gspo-dir",
                         str(gspo),
+                        "--no-discover",
                         "--output-json",
                         str(root / "status.json"),
                     ]
@@ -385,6 +391,7 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
                         str(sft),
                         "--gspo-dir",
                         str(gspo),
+                        "--no-discover",
                         "--output-json",
                         str(root / "status.json"),
                     ]
@@ -402,7 +409,7 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
             write_frontier(frontier)
             report = summarize.build_report(
                 summarize.parse_args(
-                    ["--frontier-dir", str(frontier), "--output-json", str(root / "status.json")]
+                    ["--frontier-dir", str(frontier), "--no-discover", "--output-json", str(root / "status.json")]
                 )
             )
 
