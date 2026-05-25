@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import collections
 import json
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -20,6 +22,57 @@ PRIMITIVES = (
     "[TERMINOLOGIA]",
     "[ANTI_COPIA]",
 )
+
+TAG_WORDS = {tag.strip("[]").lower() for tag in PRIMITIVES}
+STOPWORDS = {
+    "a",
+    "al",
+    "de",
+    "del",
+    "el",
+    "en",
+    "es",
+    "la",
+    "las",
+    "lo",
+    "los",
+    "por",
+    "que",
+    "se",
+    "un",
+    "una",
+    "y",
+}
+TRANSLATION_SPECIFIC_TERMS = {
+    "adicion",
+    "anticopia",
+    "calco",
+    "caso",
+    "chanka",
+    "copia",
+    "entidad",
+    "entidades",
+    "espanol",
+    "final",
+    "forma",
+    "frase",
+    "gramatica",
+    "literal",
+    "mantiene",
+    "natural",
+    "nombre",
+    "numero",
+    "omite",
+    "preserva",
+    "quechua",
+    "referencia",
+    "significado",
+    "sufijo",
+    "termino",
+    "terminologia",
+    "traduccion",
+    "verbo",
+}
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -53,6 +106,27 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=0.0,
         help="Require this fraction of rows with expected_primitives to include all expected tags. Disabled at 0.",
     )
+    parser.add_argument(
+        "--min-analysis-words",
+        type=int,
+        default=0,
+        help="Require accepted rows to have at least this many non-tag analysis words. Disabled at 0.",
+    )
+    parser.add_argument(
+        "--min-analysis-word-row-rate",
+        type=float,
+        default=0.0,
+        help="Require this fraction of accepted rows to meet --min-analysis-words. Disabled at 0.",
+    )
+    parser.add_argument(
+        "--min-specific-analysis-rate",
+        type=float,
+        default=0.0,
+        help=(
+            "Require this fraction of accepted rows to include row-specific source/reference tokens "
+            "or translation-specific technical terms. Disabled at 0."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -72,6 +146,47 @@ def count_jsonl(path: Path | None) -> int:
     return sum(1 for _ in iter_jsonl(path))
 
 
+def strip_accents(text: str) -> str:
+    return "".join(
+        char for char in unicodedata.normalize("NFKD", text) if not unicodedata.combining(char)
+    ).lower()
+
+
+def tokens(text: str) -> list[str]:
+    normalized = strip_accents(text)
+    return [
+        token
+        for token in re.findall(r"[a-záéíóúüñ]+", normalized, flags=re.IGNORECASE)
+        if token and token not in TAG_WORDS and token not in STOPWORDS
+    ]
+
+
+def analysis_text(record: dict[str, Any]) -> str:
+    text = str(record.get("frontier_analysis") or "")
+    if text:
+        return text
+    target = str(record.get("target") or "")
+    match = re.search(
+        r"analisis de traduccion\s*:\s*(.*?)(?:traduccion final\s*:|autoevaluacion\s*:|puntaje\s*:|$)",
+        target,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if match:
+        return match.group(1).strip()
+    return target
+
+
+def is_specific_analysis(record: dict[str, Any], analysis_tokens: set[str]) -> bool:
+    if analysis_tokens.intersection(TRANSLATION_SPECIFIC_TERMS):
+        return True
+    source_reference_tokens = {
+        token
+        for token in tokens(f"{record.get('source') or ''} {record.get('reference') or ''}")
+        if len(token) >= 4
+    }
+    return bool(analysis_tokens.intersection(source_reference_tokens))
+
+
 def primitive_counts(path: Path | None) -> dict[str, Any]:
     if path is None or not path.exists():
         return {
@@ -79,17 +194,24 @@ def primitive_counts(path: Path | None) -> dict[str, Any]:
             "primitive_tag_total": 0,
             "primitive_tag_counts": {},
             "primitive_row_tag_counts": [],
+            "analysis_word_counts": [],
+            "specific_analysis_rows": 0,
         }
     tag_counts: collections.Counter[str] = collections.Counter()
     missing_expected_counts: collections.Counter[str] = collections.Counter()
     row_tag_counts: list[int] = []
+    analysis_word_counts: list[int] = []
+    specific_analysis_rows = 0
     expected_rows = 0
     expected_covered_rows = 0
     for record in iter_jsonl(path):
-        text = str(record.get("frontier_analysis") or record.get("target") or "")
+        text = analysis_text(record)
         present = [tag for tag in PRIMITIVES if tag in text]
         row_tag_counts.append(len(present))
         tag_counts.update(present)
+        row_analysis_tokens = set(tokens(text))
+        analysis_word_counts.append(len(row_analysis_tokens))
+        specific_analysis_rows += int(is_specific_analysis(record, row_analysis_tokens))
         expected = record.get("expected_primitives")
         if isinstance(expected, list) and expected:
             expected_rows += 1
@@ -103,6 +225,8 @@ def primitive_counts(path: Path | None) -> dict[str, Any]:
         "primitive_tag_total": sum(row_tag_counts),
         "primitive_tag_counts": dict(tag_counts),
         "primitive_row_tag_counts": row_tag_counts,
+        "analysis_word_counts": analysis_word_counts,
+        "specific_analysis_rows": specific_analysis_rows,
         "expected_primitive_rows": expected_rows,
         "expected_primitive_covered_rows": expected_covered_rows,
         "missing_expected_primitive_counts": dict(missing_expected_counts),
@@ -122,14 +246,21 @@ def load_counts(args: argparse.Namespace) -> dict[str, int]:
     return {"written": written, "failed": failed, "requested": written + failed}
 
 
-def gate_metrics(counts: dict[str, int], primitives: dict[str, Any] | None = None, min_tags_per_row: int = 0) -> dict[str, float]:
+def gate_metrics(
+    counts: dict[str, int],
+    primitives: dict[str, Any] | None = None,
+    min_tags_per_row: int = 0,
+    min_analysis_words: int = 0,
+) -> dict[str, float]:
     attempted = counts["written"] + counts["failed"]
     accept_rate = counts["written"] / max(1, attempted)
     primitives = primitives or {}
     primitive_rows = int(primitives.get("primitive_rows", 0))
     row_tag_counts = list(primitives.get("primitive_row_tag_counts", []))
+    analysis_word_counts = list(primitives.get("analysis_word_counts", []))
     primitive_tag_total = int(primitives.get("primitive_tag_total", 0))
     primitive_tag_counts = dict(primitives.get("primitive_tag_counts", {}))
+    specific_analysis_rows = int(primitives.get("specific_analysis_rows", 0))
     expected_rows = int(primitives.get("expected_primitive_rows", 0))
     expected_covered_rows = int(primitives.get("expected_primitive_covered_rows", 0))
     metrics = {
@@ -144,12 +275,19 @@ def gate_metrics(counts: dict[str, int], primitives: dict[str, Any] | None = Non
         "expected_primitive_rows": float(expected_rows),
         "expected_primitive_covered_rows": float(expected_covered_rows),
         "expected_primitive_coverage": expected_covered_rows / max(1, expected_rows),
+        "avg_analysis_words": sum(analysis_word_counts) / max(1, len(analysis_word_counts)),
+        "specific_analysis_rate": specific_analysis_rows / max(1, primitive_rows),
     }
     if min_tags_per_row > 0:
         rows_with_min_tags = sum(1 for count in row_tag_counts if count >= min_tags_per_row)
         metrics["primitive_row_rate"] = rows_with_min_tags / max(1, primitive_rows)
     else:
         metrics["primitive_row_rate"] = 0.0
+    if min_analysis_words > 0:
+        rows_with_min_analysis_words = sum(1 for count in analysis_word_counts if count >= min_analysis_words)
+        metrics["analysis_word_row_rate"] = rows_with_min_analysis_words / max(1, len(analysis_word_counts))
+    else:
+        metrics["analysis_word_row_rate"] = 0.0
     for tag in PRIMITIVES:
         metrics[f"primitive_{tag.strip('[]').lower()}_rows"] = float(primitive_tag_counts.get(tag, 0))
     return metrics
@@ -163,6 +301,9 @@ def check_gate(
     min_primitive_row_rate: float = 0.0,
     min_distinct_primitives: int = 0,
     min_expected_primitive_coverage: float = 0.0,
+    min_analysis_words: int = 0,
+    min_analysis_word_row_rate: float = 0.0,
+    min_specific_analysis_rate: float = 0.0,
 ) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     if metrics["written_rows"] < min_written_rows:
@@ -182,6 +323,16 @@ def check_gate(
             "expected_primitive_coverage "
             f"{metrics['expected_primitive_coverage']:.4f} < {min_expected_primitive_coverage:.4f}"
         )
+    if min_analysis_words > 0 and metrics["avg_analysis_words"] < min_analysis_words:
+        reasons.append(f"avg_analysis_words {metrics['avg_analysis_words']:.4f} < {min_analysis_words:.4f}")
+    if min_analysis_word_row_rate > 0 and metrics["analysis_word_row_rate"] < min_analysis_word_row_rate:
+        reasons.append(
+            f"analysis_word_row_rate {metrics['analysis_word_row_rate']:.4f} < {min_analysis_word_row_rate:.4f}"
+        )
+    if min_specific_analysis_rate > 0 and metrics["specific_analysis_rate"] < min_specific_analysis_rate:
+        reasons.append(
+            f"specific_analysis_rate {metrics['specific_analysis_rate']:.4f} < {min_specific_analysis_rate:.4f}"
+        )
     return not reasons, reasons
 
 
@@ -191,6 +342,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         load_counts(args),
         primitive_counts(args.output_jsonl),
         min_tags_per_row=args.min_primitive_tags_per_row,
+        min_analysis_words=args.min_analysis_words,
     )
     passed, reasons = check_gate(
         metrics,
@@ -200,6 +352,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.min_primitive_row_rate,
         args.min_distinct_primitives,
         args.min_expected_primitive_coverage,
+        args.min_analysis_words,
+        args.min_analysis_word_row_rate,
+        args.min_specific_analysis_rate,
     )
     report = {
         **metrics,
@@ -209,6 +364,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "min_primitive_row_rate": args.min_primitive_row_rate,
         "min_distinct_primitives": args.min_distinct_primitives,
         "min_expected_primitive_coverage": args.min_expected_primitive_coverage,
+        "min_analysis_words": args.min_analysis_words,
+        "min_analysis_word_row_rate": args.min_analysis_word_row_rate,
+        "min_specific_analysis_rate": args.min_specific_analysis_rate,
         "passed": passed,
         "reasons": reasons,
     }

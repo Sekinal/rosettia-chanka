@@ -147,6 +147,82 @@ class CheckFrontierThinkingDataTests(unittest.TestCase):
         self.assertEqual(primitives["missing_expected_primitive_counts"]["[ENTIDADES]"], 1)
         self.assertIn("expected_primitive_coverage 0.0000 < 1.0000", reasons)
 
+    def test_analysis_content_gate_passes_on_specific_trace(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "out.jsonl"
+            output.write_text(
+                json.dumps(
+                    {
+                        "source": "Hay 3 documentos judiciales.",
+                        "reference": "Kimsa qillqa kasqan.",
+                        "frontier_analysis": (
+                            "[ENTIDADES] conserva el numero 3; "
+                            "[GRAMATICA] revisa forma chanka natural y sufijo verbal."
+                        ),
+                        "expected_primitives": ["[ENTIDADES]", "[GRAMATICA]"],
+                    }
+                )
+                + "\n"
+            )
+
+            primitives = checker.primitive_counts(output)
+            metrics = checker.gate_metrics(
+                {"written": 1, "failed": 0, "requested": 1},
+                primitives,
+                min_tags_per_row=2,
+                min_analysis_words=6,
+            )
+            passed, reasons = checker.check_gate(
+                metrics,
+                min_written_rows=1,
+                min_accept_rate=0.5,
+                min_primitive_tags_per_row=2,
+                min_primitive_row_rate=1.0,
+                min_analysis_words=6,
+                min_analysis_word_row_rate=1.0,
+                min_specific_analysis_rate=1.0,
+            )
+
+        self.assertTrue(passed)
+        self.assertEqual(reasons, [])
+        self.assertGreaterEqual(metrics["avg_analysis_words"], 6)
+        self.assertEqual(metrics["analysis_word_row_rate"], 1.0)
+        self.assertEqual(metrics["specific_analysis_rate"], 1.0)
+
+    def test_analysis_content_gate_fails_on_vacuous_tag_trace(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "out.jsonl"
+            output.write_text(
+                json.dumps(
+                    {
+                        "source": "Hay 3 documentos judiciales.",
+                        "reference": "Kimsa qillqa kasqan.",
+                        "frontier_analysis": "[SIGNIFICADO] correcto; [GRAMATICA] correcto.",
+                        "expected_primitives": ["[SIGNIFICADO]", "[GRAMATICA]"],
+                    }
+                )
+                + "\n"
+            )
+
+            metrics = checker.gate_metrics(
+                {"written": 1, "failed": 0, "requested": 1},
+                checker.primitive_counts(output),
+                min_tags_per_row=2,
+                min_analysis_words=6,
+            )
+            passed, reasons = checker.check_gate(
+                metrics,
+                min_written_rows=1,
+                min_accept_rate=0.5,
+                min_analysis_words=6,
+                min_analysis_word_row_rate=1.0,
+                min_specific_analysis_rate=1.0,
+            )
+
+        self.assertFalse(passed)
+        self.assertIn("avg_analysis_words 1.0000 < 6.0000", reasons)
+        self.assertIn("analysis_word_row_rate 0.0000 < 1.0000", reasons)
+
 
 if __name__ == "__main__":
     unittest.main()

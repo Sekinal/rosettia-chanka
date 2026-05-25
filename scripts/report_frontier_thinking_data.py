@@ -116,7 +116,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         )
     )
     primitives = gate.primitive_counts(args.output_jsonl)
-    metrics = gate.gate_metrics(counts, primitives, min_tags_per_row=2)
+    metrics = gate.gate_metrics(counts, primitives, min_tags_per_row=2, min_analysis_words=6)
     return {
         "summary": load_summary(args.summary_json),
         "counts": counts,
@@ -154,6 +154,9 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         f"- avg primitive tags: {metrics['avg_primitive_tags']:.4f}",
         f"- distinct primitives: {metrics['distinct_primitives']:.0f}",
         f"- expected primitive coverage: {metrics.get('expected_primitive_coverage', 0.0):.4f}",
+        f"- avg analysis words: {metrics.get('avg_analysis_words', 0.0):.4f}",
+        f"- analysis word row rate: {metrics.get('analysis_word_row_rate', 0.0):.4f}",
+        f"- specific analysis rate: {metrics.get('specific_analysis_rate', 0.0):.4f}",
         "",
         "## Primitive Tags",
         "",
