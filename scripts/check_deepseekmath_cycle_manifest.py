@@ -21,6 +21,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-json", type=Path, default=None)
     parser.add_argument("--require-promoted", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--require-policy-adapter", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--expected-stage", type=str, default=None)
+    parser.add_argument("--expected-policy-adapter", type=str, default=None)
     parser.add_argument("--max-missing-artifacts", type=int, default=0)
     parser.add_argument("--min-chrf", type=float, default=35.0)
     parser.add_argument("--min-bleu", type=float, default=8.0)
@@ -45,6 +47,12 @@ def report_for(record: dict[str, Any], args: argparse.Namespace) -> dict[str, An
 
     if args.require_promoted and not bool(record.get("promoted")):
         reasons.append("cycle is not promoted")
+    if args.expected_stage is not None and record.get("stage") != args.expected_stage:
+        reasons.append(f"stage {record.get('stage')} != {args.expected_stage}")
+    if args.expected_policy_adapter is not None and str(record.get("policy_adapter")) != args.expected_policy_adapter:
+        reasons.append(
+            f"policy_adapter {record.get('policy_adapter')} != {args.expected_policy_adapter}"
+        )
     if len(missing_artifacts) > args.max_missing_artifacts:
         reasons.append(f"missing artifacts {len(missing_artifacts)} > {args.max_missing_artifacts}: {', '.join(missing_artifacts)}")
     if args.require_policy_adapter and not artifact_exists(record, "policy_adapter"):
@@ -79,6 +87,35 @@ def report_for(record: dict[str, Any], args: argparse.Namespace) -> dict[str, An
         "thresholds": {
             "require_promoted": args.require_promoted,
             "require_policy_adapter": args.require_policy_adapter,
+            "expected_stage": args.expected_stage,
+            "expected_policy_adapter": args.expected_policy_adapter,
+            "max_missing_artifacts": args.max_missing_artifacts,
+            "min_chrf": args.min_chrf,
+            "min_bleu": args.min_bleu,
+            "min_token_f1": args.min_token_f1,
+        },
+    }
+
+
+def missing_manifest_report(args: argparse.Namespace, reason: str) -> dict[str, Any]:
+    return {
+        "passed": False,
+        "reasons": [reason],
+        "manifest_json": str(args.manifest_json),
+        "stamp": None,
+        "stage": None,
+        "promoted": False,
+        "policy_adapter": None,
+        "policy_adapter_exists": False,
+        "missing_artifacts": [],
+        "artifact_missing_count": 0,
+        "promotion_reasons": [],
+        "metrics": {"chrf++": 0.0, "bleu": 0.0, "token_f1": 0.0, "ter": 0.0},
+        "thresholds": {
+            "require_promoted": args.require_promoted,
+            "require_policy_adapter": args.require_policy_adapter,
+            "expected_stage": args.expected_stage,
+            "expected_policy_adapter": args.expected_policy_adapter,
             "max_missing_artifacts": args.max_missing_artifacts,
             "min_chrf": args.min_chrf,
             "min_bleu": args.min_bleu,
@@ -89,8 +126,15 @@ def report_for(record: dict[str, Any], args: argparse.Namespace) -> dict[str, An
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    record = summarize.load_manifest(args.manifest_json)
-    report = report_for(record, args)
+    if not args.manifest_json.exists():
+        report = missing_manifest_report(args, f"manifest JSON not found: {args.manifest_json}")
+    else:
+        try:
+            record = summarize.load_manifest(args.manifest_json)
+        except (json.JSONDecodeError, OSError) as exc:
+            report = missing_manifest_report(args, f"manifest JSON invalid: {exc}")
+        else:
+            report = report_for(record, args)
     rendered = json.dumps(report, indent=2, sort_keys=True)
     if args.output_json:
         args.output_json.parent.mkdir(parents=True, exist_ok=True)

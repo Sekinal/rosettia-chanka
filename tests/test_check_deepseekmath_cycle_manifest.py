@@ -8,7 +8,13 @@ from pathlib import Path
 from scripts import check_deepseekmath_cycle_manifest as check_cycle
 
 
-def write_manifest(root: Path, *, promoted: bool, policy_exists: bool = True) -> Path:
+def write_manifest(
+    root: Path,
+    *,
+    promoted: bool,
+    policy_exists: bool = True,
+    stage: str = "initial_gspo",
+) -> Path:
     policy = root / "policy_adapter"
     if policy_exists:
         policy.mkdir()
@@ -27,7 +33,7 @@ def write_manifest(root: Path, *, promoted: bool, policy_exists: bool = True) ->
         json.dumps(
             {
                 "stamp": "cycle",
-                "stage": "initial_gspo",
+                "stage": stage,
                 "promoted": promoted,
                 "policy_adapter": str(policy),
                 "metrics": json.loads(metrics.read_text()),
@@ -70,6 +76,62 @@ class CheckDeepSeekMathCycleManifestTests(unittest.TestCase):
         self.assertFalse(report["passed"])
         self.assertIn("cycle is not promoted", report["reasons"])
         self.assertIn("policy_adapter artifact is missing", report["reasons"])
+
+    def test_expected_stage_and_policy_adapter_are_enforced(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            path = write_manifest(root, promoted=False, stage="initial_gspo")
+            args = check_cycle.parse_args(
+                [
+                    "--manifest-json",
+                    str(path),
+                    "--no-require-promoted",
+                    "--expected-stage",
+                    "sft_seed",
+                    "--expected-policy-adapter",
+                    str(root / "other_adapter"),
+                ]
+            )
+            record = check_cycle.summarize.load_manifest(path)
+            report = check_cycle.report_for(record, args)
+
+        self.assertFalse(report["passed"])
+        self.assertIn("stage initial_gspo != sft_seed", report["reasons"])
+        self.assertIn(
+            f"policy_adapter {root / 'policy_adapter'} != {root / 'other_adapter'}",
+            report["reasons"],
+        )
+
+    def test_sft_seed_manifest_can_pass_without_promotion_when_expected(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            path = write_manifest(root, promoted=False, stage="sft_seed")
+            args = check_cycle.parse_args(
+                [
+                    "--manifest-json",
+                    str(path),
+                    "--no-require-promoted",
+                    "--expected-stage",
+                    "sft_seed",
+                    "--expected-policy-adapter",
+                    str(root / "policy_adapter"),
+                ]
+            )
+            record = check_cycle.summarize.load_manifest(path)
+            report = check_cycle.report_for(record, args)
+
+        self.assertTrue(report["passed"])
+        self.assertEqual(report["reasons"], [])
+
+    def test_missing_manifest_returns_structured_failure(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "missing.json"
+            args = check_cycle.parse_args(["--manifest-json", str(path)])
+            report = check_cycle.missing_manifest_report(args, f"manifest JSON not found: {path}")
+
+        self.assertFalse(report["passed"])
+        self.assertIn("manifest JSON not found", report["reasons"][0])
+        self.assertEqual(report["manifest_json"], str(path))
 
 
 if __name__ == "__main__":

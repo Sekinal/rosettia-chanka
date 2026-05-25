@@ -16,6 +16,8 @@ SFT_EVAL_DIR="${SFT_EVAL_DIR:-${THINKING_SFT_OUTPUT_DIR}/sft_only_eval}"
 SFT_EVAL_JSON="${SFT_EVAL_JSON:-${SFT_EVAL_DIR}/metrics.json}"
 SFT_META_JSONL="${SFT_META_JSONL:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.jsonl}"
 SFT_META_SUMMARY_JSON="${SFT_META_SUMMARY_JSON:-${SFT_EVAL_DIR}/meta_hardcases_from_sft_eval.summary.json}"
+SFT_CYCLE_MANIFEST_JSON="${SFT_CYCLE_MANIFEST_JSON:-${THINKING_SFT_OUTPUT_DIR}/cycle_manifest.json}"
+SFT_MANIFEST_GATE_JSON="${SFT_MANIFEST_GATE_JSON:-${THINKING_SFT_OUTPUT_DIR}/sft_seed_manifest_gate.json}"
 
 META_VERIFIER_V3="${META_VERIFIER_V3:-outputs/chanka_translation_meta_verifier_v3_thinking_20260523-meta-v3-thinking/final_meta_verifier_lora}"
 META_VERIFIER_V2="${META_VERIFIER_V2:-outputs/chanka_translation_meta_verifier_v2_20260523-meta-v2-self/final_meta_verifier_lora}"
@@ -40,6 +42,7 @@ STAGED_STATUS_MD="${STAGED_STATUS_MD:-${GSPO_OUTPUT_DIR}/deepseekmath_staged_sta
 MIN_SFT_CHRF_FOR_GSPO="${MIN_SFT_CHRF_FOR_GSPO:-35}"
 MIN_SFT_FORMAT_FOR_GSPO="${MIN_SFT_FORMAT_FOR_GSPO:-60}"
 RUN_SFT_GATE="${RUN_SFT_GATE:-true}"
+RUN_SFT_MANIFEST_GATE="${RUN_SFT_MANIFEST_GATE:-true}"
 RUN_GSPO_PROMOTION_GATE="${RUN_GSPO_PROMOTION_GATE:-true}"
 REQUIRE_GSPO_PROMOTION="${REQUIRE_GSPO_PROMOTION:-false}"
 MINE_GSPO_META="${MINE_GSPO_META:-true}"
@@ -79,6 +82,17 @@ fi
 if [[ ! -f "$SFT_EVAL_JSON" ]]; then
   echo "SFT metrics not found: $SFT_EVAL_JSON" >&2
   exit 2
+fi
+if is_truthy "$RUN_SFT_MANIFEST_GATE"; then
+  "$PYTHON" scripts/check_deepseekmath_cycle_manifest.py \
+    --manifest-json "$SFT_CYCLE_MANIFEST_JSON" \
+    --output-json "$SFT_MANIFEST_GATE_JSON" \
+    --no-require-promoted \
+    --expected-stage sft_seed \
+    --expected-policy-adapter "$THINKING_SFT_ADAPTER" \
+    --min-chrf "$MIN_SFT_CHRF_FOR_GSPO" \
+    --min-bleu "${MIN_SFT_BLEU_FOR_GSPO:-0}" \
+    --min-token-f1 "${MIN_SFT_TOKEN_F1_FOR_GSPO:-0}"
 fi
 
 if [[ -z "$META_VERIFIER_ADAPTER" ]]; then
