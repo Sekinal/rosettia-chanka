@@ -223,6 +223,76 @@ class CheckFrontierThinkingDataTests(unittest.TestCase):
         self.assertIn("avg_analysis_words 1.0000 < 6.0000", reasons)
         self.assertIn("analysis_word_row_rate 0.0000 < 1.0000", reasons)
 
+    def test_audit_gate_passes_when_all_rows_are_audited_and_pass(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "out.jsonl"
+            output.write_text(
+                json.dumps(
+                    {
+                        "frontier_analysis": "[SIGNIFICADO] conserva documentos; [GRAMATICA] revisa forma chanka natural.",
+                        "frontier_audit": {"pass": True, "score": 0.85, "reason": "specific"},
+                    }
+                )
+                + "\n"
+                + json.dumps(
+                    {
+                        "frontier_analysis": "[ENTIDADES] conserva Quinua; [ANTI_COPIA] evita copiar calle literal.",
+                        "frontier_audit": {"pass": True, "score": 0.95, "reason": "specific"},
+                    }
+                )
+                + "\n"
+            )
+
+            primitives = checker.primitive_counts(output)
+            metrics = checker.gate_metrics({"written": 2, "failed": 0, "requested": 2}, primitives)
+            passed, reasons = checker.check_gate(
+                metrics,
+                min_written_rows=2,
+                min_accept_rate=0.5,
+                min_audited_row_rate=1.0,
+                min_audit_pass_rate=1.0,
+                min_avg_audit_score=0.75,
+            )
+
+        self.assertTrue(passed)
+        self.assertEqual(reasons, [])
+        self.assertEqual(metrics["audited_row_rate"], 1.0)
+        self.assertEqual(metrics["audit_pass_rate"], 1.0)
+        self.assertAlmostEqual(metrics["avg_audit_score"], 0.9)
+
+    def test_audit_gate_fails_when_rows_are_unaudited_or_low_score(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "out.jsonl"
+            output.write_text(
+                json.dumps(
+                    {
+                        "frontier_analysis": "[SIGNIFICADO] conserva documentos; [GRAMATICA] revisa forma chanka natural.",
+                        "frontier_audit": {"pass": True, "score": 0.60, "reason": "weak"},
+                    }
+                )
+                + "\n"
+                + json.dumps({"frontier_analysis": "[ENTIDADES] conserva Quinua."})
+                + "\n"
+            )
+
+            metrics = checker.gate_metrics(
+                {"written": 2, "failed": 0, "requested": 2},
+                checker.primitive_counts(output),
+            )
+            passed, reasons = checker.check_gate(
+                metrics,
+                min_written_rows=2,
+                min_accept_rate=0.5,
+                min_audited_row_rate=1.0,
+                min_audit_pass_rate=1.0,
+                min_avg_audit_score=0.75,
+            )
+
+        self.assertFalse(passed)
+        self.assertIn("audited_row_rate 0.5000 < 1.0000", reasons)
+        self.assertIn("audit_pass_rate 0.5000 < 1.0000", reasons)
+        self.assertIn("avg_audit_score 0.6000 < 0.7500", reasons)
+
 
 if __name__ == "__main__":
     unittest.main()

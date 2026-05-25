@@ -127,6 +127,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "or translation-specific technical terms. Disabled at 0."
         ),
     )
+    parser.add_argument(
+        "--min-audited-row-rate",
+        type=float,
+        default=0.0,
+        help="Require this fraction of accepted rows to include a frontier_audit object. Disabled at 0.",
+    )
+    parser.add_argument(
+        "--min-audit-pass-rate",
+        type=float,
+        default=0.0,
+        help="Require this fraction of accepted rows to have frontier_audit.pass=true. Disabled at 0.",
+    )
+    parser.add_argument(
+        "--min-avg-audit-score",
+        type=float,
+        default=0.0,
+        help="Require average frontier_audit.score across audited rows. Disabled at 0.",
+    )
     return parser.parse_args(argv)
 
 
@@ -196,6 +214,9 @@ def primitive_counts(path: Path | None) -> dict[str, Any]:
             "primitive_row_tag_counts": [],
             "analysis_word_counts": [],
             "specific_analysis_rows": 0,
+            "audited_rows": 0,
+            "audit_pass_rows": 0,
+            "audit_scores": [],
         }
     tag_counts: collections.Counter[str] = collections.Counter()
     missing_expected_counts: collections.Counter[str] = collections.Counter()
@@ -204,6 +225,9 @@ def primitive_counts(path: Path | None) -> dict[str, Any]:
     specific_analysis_rows = 0
     expected_rows = 0
     expected_covered_rows = 0
+    audited_rows = 0
+    audit_pass_rows = 0
+    audit_scores: list[float] = []
     for record in iter_jsonl(path):
         text = analysis_text(record)
         present = [tag for tag in PRIMITIVES if tag in text]
@@ -220,6 +244,14 @@ def primitive_counts(path: Path | None) -> dict[str, Any]:
                 missing_expected_counts.update(missing)
             else:
                 expected_covered_rows += 1
+        audit = record.get("frontier_audit")
+        if isinstance(audit, dict):
+            audited_rows += 1
+            audit_pass_rows += int(bool(audit.get("pass")))
+            try:
+                audit_scores.append(float(audit.get("score", 0.0)))
+            except (TypeError, ValueError):
+                pass
     return {
         "primitive_rows": len(row_tag_counts),
         "primitive_tag_total": sum(row_tag_counts),
@@ -230,6 +262,9 @@ def primitive_counts(path: Path | None) -> dict[str, Any]:
         "expected_primitive_rows": expected_rows,
         "expected_primitive_covered_rows": expected_covered_rows,
         "missing_expected_primitive_counts": dict(missing_expected_counts),
+        "audited_rows": audited_rows,
+        "audit_pass_rows": audit_pass_rows,
+        "audit_scores": audit_scores,
     }
 
 
@@ -263,6 +298,9 @@ def gate_metrics(
     specific_analysis_rows = int(primitives.get("specific_analysis_rows", 0))
     expected_rows = int(primitives.get("expected_primitive_rows", 0))
     expected_covered_rows = int(primitives.get("expected_primitive_covered_rows", 0))
+    audited_rows = int(primitives.get("audited_rows", 0))
+    audit_pass_rows = int(primitives.get("audit_pass_rows", 0))
+    audit_scores = list(primitives.get("audit_scores", []))
     metrics = {
         "written_rows": float(counts["written"]),
         "failed_rows": float(counts["failed"]),
@@ -277,6 +315,11 @@ def gate_metrics(
         "expected_primitive_coverage": expected_covered_rows / max(1, expected_rows),
         "avg_analysis_words": sum(analysis_word_counts) / max(1, len(analysis_word_counts)),
         "specific_analysis_rate": specific_analysis_rows / max(1, primitive_rows),
+        "audited_rows": float(audited_rows),
+        "audit_pass_rows": float(audit_pass_rows),
+        "audited_row_rate": audited_rows / max(1, primitive_rows),
+        "audit_pass_rate": audit_pass_rows / max(1, primitive_rows),
+        "avg_audit_score": sum(audit_scores) / max(1, len(audit_scores)),
     }
     if min_tags_per_row > 0:
         rows_with_min_tags = sum(1 for count in row_tag_counts if count >= min_tags_per_row)
@@ -304,6 +347,9 @@ def check_gate(
     min_analysis_words: int = 0,
     min_analysis_word_row_rate: float = 0.0,
     min_specific_analysis_rate: float = 0.0,
+    min_audited_row_rate: float = 0.0,
+    min_audit_pass_rate: float = 0.0,
+    min_avg_audit_score: float = 0.0,
 ) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     if metrics["written_rows"] < min_written_rows:
@@ -333,6 +379,12 @@ def check_gate(
         reasons.append(
             f"specific_analysis_rate {metrics['specific_analysis_rate']:.4f} < {min_specific_analysis_rate:.4f}"
         )
+    if min_audited_row_rate > 0 and metrics["audited_row_rate"] < min_audited_row_rate:
+        reasons.append(f"audited_row_rate {metrics['audited_row_rate']:.4f} < {min_audited_row_rate:.4f}")
+    if min_audit_pass_rate > 0 and metrics["audit_pass_rate"] < min_audit_pass_rate:
+        reasons.append(f"audit_pass_rate {metrics['audit_pass_rate']:.4f} < {min_audit_pass_rate:.4f}")
+    if min_avg_audit_score > 0 and metrics["avg_audit_score"] < min_avg_audit_score:
+        reasons.append(f"avg_audit_score {metrics['avg_audit_score']:.4f} < {min_avg_audit_score:.4f}")
     return not reasons, reasons
 
 
@@ -355,6 +407,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.min_analysis_words,
         args.min_analysis_word_row_rate,
         args.min_specific_analysis_rate,
+        args.min_audited_row_rate,
+        args.min_audit_pass_rate,
+        args.min_avg_audit_score,
     )
     report = {
         **metrics,
@@ -367,6 +422,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "min_analysis_words": args.min_analysis_words,
         "min_analysis_word_row_rate": args.min_analysis_word_row_rate,
         "min_specific_analysis_rate": args.min_specific_analysis_rate,
+        "min_audited_row_rate": args.min_audited_row_rate,
+        "min_audit_pass_rate": args.min_audit_pass_rate,
+        "min_avg_audit_score": args.min_avg_audit_score,
         "passed": passed,
         "reasons": reasons,
     }
