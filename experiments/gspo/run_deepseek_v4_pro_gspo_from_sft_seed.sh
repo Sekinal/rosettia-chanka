@@ -33,6 +33,9 @@ GSPO_PROMOTION_JSON="${GSPO_PROMOTION_JSON:-${GSPO_OUTPUT_DIR}/chanka_gspo/promo
 GSPO_CYCLE_MANIFEST_JSON="${GSPO_CYCLE_MANIFEST_JSON:-${GSPO_OUTPUT_DIR}/cycle_manifest.json}"
 GSPO_META_JSONL="${GSPO_META_JSONL:-${GSPO_OUTPUT_DIR}/chanka_gspo/meta_hardcases_from_gspo_eval.jsonl}"
 GSPO_META_SUMMARY_JSON="${GSPO_META_SUMMARY_JSON:-${GSPO_OUTPUT_DIR}/chanka_gspo/meta_hardcases_from_gspo_eval.summary.json}"
+FRONTIER_DATA_DIR="${FRONTIER_DATA_DIR:-${DATA_DIR:-}}"
+STAGED_STATUS_JSON="${STAGED_STATUS_JSON:-${GSPO_OUTPUT_DIR}/deepseekmath_staged_status.json}"
+STAGED_STATUS_MD="${STAGED_STATUS_MD:-${GSPO_OUTPUT_DIR}/deepseekmath_staged_status.md}"
 
 MIN_SFT_CHRF_FOR_GSPO="${MIN_SFT_CHRF_FOR_GSPO:-35}"
 MIN_SFT_FORMAT_FOR_GSPO="${MIN_SFT_FORMAT_FOR_GSPO:-60}"
@@ -46,6 +49,28 @@ cd "$ROOT_DIR"
 is_truthy() {
   [[ "$1" == "true" || "$1" == "1" || "$1" == "yes" ]]
 }
+
+write_staged_status() {
+  local exit_status=$?
+  set +e
+  STAGED_FRONTIER_ARGS=()
+  if [[ -n "$FRONTIER_DATA_DIR" ]]; then
+    STAGED_FRONTIER_ARGS+=(--frontier-dir "$FRONTIER_DATA_DIR")
+  fi
+  "$PYTHON" scripts/summarize_deepseekmath_staged_run.py \
+    "${STAGED_FRONTIER_ARGS[@]}" \
+    --sft-dir "$THINKING_SFT_OUTPUT_DIR" \
+    --gspo-dir "$GSPO_OUTPUT_DIR" \
+    --no-discover \
+    --output-json "$STAGED_STATUS_JSON" \
+    --output-md "$STAGED_STATUS_MD" \
+    >/dev/null
+  if [[ -f "$STAGED_STATUS_MD" ]]; then
+    echo "Staged status: $STAGED_STATUS_MD"
+  fi
+  return "$exit_status"
+}
+trap write_staged_status EXIT
 
 if [[ ! -d "$THINKING_SFT_ADAPTER" ]]; then
   echo "SFT adapter not found: $THINKING_SFT_ADAPTER" >&2
@@ -214,6 +239,7 @@ echo "Initial GSPO output: $GSPO_OUTPUT_DIR"
 echo "Initial GSPO metrics: $GSPO_METRICS_JSON"
 echo "Initial GSPO meta hardcases: $GSPO_META_JSONL"
 echo "Initial GSPO cycle manifest: $GSPO_CYCLE_MANIFEST_JSON"
+echo "Staged status report: $STAGED_STATUS_MD"
 
 if [[ "$GSPO_PROMOTION_FAILED" -eq 1 ]] && is_truthy "$REQUIRE_GSPO_PROMOTION"; then
   exit 1
