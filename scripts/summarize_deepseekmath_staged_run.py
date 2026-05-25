@@ -292,6 +292,22 @@ def next_action(
         }
     if not sft.get("exists"):
         frontier_dir = frontier.get("dir") or "<frontier_data_dir>"
+        accepted_rows = int(frontier.get("accepted_rows") or 0)
+        if frontier.get("dir") and accepted_rows >= min_frontier_rows_for_serious_sft:
+            stamp = safe_stamp_from_frontier(str(frontier_dir), accepted_rows)
+            return {
+                "stage": "sft_seed",
+                "command": (
+                    f"DATA_DIR={frontier_dir} "
+                    f"STAMP={stamp} "
+                    f"MIN_FRONTIER_ROWS_FOR_SFT={accepted_rows} "
+                    "experiments/gspo/run_deepseek_v4_pro_sft_from_frontier_data.sh"
+                ),
+                "reason": (
+                    "Frontier data has enough accepted rows for a serious SFT seed, "
+                    "and no SFT seed manifest was found."
+                ),
+            }
         return {
             "stage": "sft_seed",
             "command": f"DATA_DIR={frontier_dir} experiments/gspo/run_deepseek_v4_pro_sft_from_frontier_data.sh",

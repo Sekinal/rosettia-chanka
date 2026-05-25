@@ -132,6 +132,28 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
         self.assertIn("run_deepseek_v4_pro_sft_from_frontier_data.sh", report["next_action"]["command"])
         self.assertFalse(report["blocked"])
 
+    def test_large_frontier_without_sft_recommends_reproducible_sft_seed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            frontier = Path(tmpdir) / "frontier_thinking_data_20260525-paid-smoke-32768"
+            write_frontier(frontier, accepted_rows=64)
+
+            report = summarize.build_report(
+                summarize.parse_args(
+                    [
+                        "--frontier-dir",
+                        str(frontier),
+                        "--no-discover",
+                        "--output-json",
+                        str(Path(tmpdir) / "status.json"),
+                    ]
+                )
+            )
+
+        self.assertEqual(report["next_action"]["stage"], "sft_seed")
+        self.assertIn("STAMP=20260525-paid-smoke-32768-sft-r64", report["next_action"]["command"])
+        self.assertIn("MIN_FRONTIER_ROWS_FOR_SFT=64", report["next_action"]["command"])
+        self.assertIn("enough accepted rows", report["next_action"]["reason"])
+
     def test_frontier_report_without_paid_gate_does_not_unlock_sft(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
