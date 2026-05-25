@@ -59,6 +59,7 @@ RUN_SFT_PROMOTION_GATE="${RUN_SFT_PROMOTION_GATE:-true}"
 RUN_GSPO_PROMOTION_GATE="${RUN_GSPO_PROMOTION_GATE:-true}"
 REQUIRE_SFT_PROMOTION="${REQUIRE_SFT_PROMOTION:-false}"
 REQUIRE_GSPO_PROMOTION="${REQUIRE_GSPO_PROMOTION:-false}"
+AUTO_FRONTIER_SFT_SCHEDULE="${AUTO_FRONTIER_SFT_SCHEDULE:-true}"
 MIN_SFT_CHRF_FOR_GSPO="${MIN_SFT_CHRF_FOR_GSPO:-35}"
 MIN_SFT_FORMAT_FOR_GSPO="${MIN_SFT_FORMAT_FOR_GSPO:-60}"
 MIN_FRONTIER_ROWS_FOR_SFT="${MIN_FRONTIER_ROWS_FOR_SFT:-64}"
@@ -346,7 +347,7 @@ if is_truthy "$RUN_SFT_BASELINE_EVAL"; then
       --output-json "$SFT_BASELINE_METRICS_JSON" \
       --predictions-jsonl "$SFT_BASELINE_PREDICTIONS" \
       --max-seq-length "${SFT_EVAL_MAX_SEQ_LENGTH:-384}" \
-      --max-completion-length "${SFT_EVAL_MAX_COMPLETION_LENGTH:-112}" \
+      --max-completion-length "${SFT_EVAL_MAX_COMPLETION_LENGTH:-256}" \
       --batch-size "${SFT_EVAL_BATCH_SIZE:-8}" \
       --max-eval-samples "${SFT_EVAL_MAX_ROWS:-64}" \
       --self-verification-thinking-output \
@@ -357,6 +358,35 @@ if is_truthy "$RUN_SFT_BASELINE_EVAL"; then
     echo "Reusing existing SFT baseline metrics: $SFT_BASELINE_METRICS_JSON"
   fi
 fi
+
+FRONTIER_ACCEPTED_ROWS="$(grep -cve '^[[:space:]]*$' "$FRONTIER_JSONL")"
+if is_truthy "$AUTO_FRONTIER_SFT_SCHEDULE"; then
+  if [[ -z "${SFT_MAX_STEPS:-}" ]]; then
+    if [[ "$FRONTIER_ACCEPTED_ROWS" -lt 16 ]]; then
+      SFT_MAX_STEPS=8
+    else
+      SFT_MAX_STEPS=$(( (FRONTIER_ACCEPTED_ROWS * 3 + 7) / 8 ))
+      if [[ "$SFT_MAX_STEPS" -lt 16 ]]; then
+        SFT_MAX_STEPS=16
+      elif [[ "$SFT_MAX_STEPS" -gt 64 ]]; then
+        SFT_MAX_STEPS=64
+      fi
+    fi
+  fi
+  if [[ -z "${SFT_EVAL_STEPS:-}" ]]; then
+    SFT_EVAL_STEPS=$(( SFT_MAX_STEPS / 4 ))
+    if [[ "$SFT_EVAL_STEPS" -lt 4 ]]; then
+      SFT_EVAL_STEPS=4
+    fi
+  fi
+  if [[ -z "${SFT_SAVE_STEPS:-}" ]]; then
+    SFT_SAVE_STEPS="$SFT_EVAL_STEPS"
+  fi
+  if [[ -z "${SFT_LEARNING_RATE:-}" ]]; then
+    SFT_LEARNING_RATE="1e-6"
+  fi
+fi
+echo "Frontier SFT schedule: rows=$FRONTIER_ACCEPTED_ROWS max_steps=${SFT_MAX_STEPS:-32} eval_steps=${SFT_EVAL_STEPS:-8} save_steps=${SFT_SAVE_STEPS:-8} lr=${SFT_LEARNING_RATE:-2e-6}"
 
 "$PYTHON" scripts/train_jsonl_sft_unsloth.py \
   --jsonl "$FRONTIER_JSONL" \
@@ -387,7 +417,7 @@ fi
   --output-json "$SFT_EVAL_JSON" \
   --predictions-jsonl "$SFT_EVAL_PREDICTIONS" \
   --max-seq-length "${SFT_EVAL_MAX_SEQ_LENGTH:-384}" \
-  --max-completion-length "${SFT_EVAL_MAX_COMPLETION_LENGTH:-112}" \
+  --max-completion-length "${SFT_EVAL_MAX_COMPLETION_LENGTH:-256}" \
   --batch-size "${SFT_EVAL_BATCH_SIZE:-8}" \
   --max-eval-samples "${SFT_EVAL_MAX_ROWS:-64}" \
   --self-verification-thinking-output \

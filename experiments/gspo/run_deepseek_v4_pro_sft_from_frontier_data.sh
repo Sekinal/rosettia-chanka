@@ -66,6 +66,7 @@ RUN_SFT_BASELINE_EVAL="${RUN_SFT_BASELINE_EVAL:-true}"
 RUN_SFT_PROMOTION_GATE="${RUN_SFT_PROMOTION_GATE:-true}"
 MINE_SFT_META="${MINE_SFT_META:-true}"
 REQUIRE_SFT_PROMOTION="${REQUIRE_SFT_PROMOTION:-false}"
+AUTO_FRONTIER_SFT_SCHEDULE="${AUTO_FRONTIER_SFT_SCHEDULE:-true}"
 
 cd "$ROOT_DIR"
 
@@ -172,6 +173,35 @@ if [[ "$RUN_SFT_BASELINE_EVAL" == "true" || "$RUN_SFT_BASELINE_EVAL" == "1" || "
     echo "Reusing existing SFT baseline metrics: $SFT_BASELINE_METRICS_JSON"
   fi
 fi
+
+FRONTIER_ACCEPTED_ROWS="$(grep -cve '^[[:space:]]*$' "$FRONTIER_JSONL")"
+if [[ "$AUTO_FRONTIER_SFT_SCHEDULE" == "true" || "$AUTO_FRONTIER_SFT_SCHEDULE" == "1" || "$AUTO_FRONTIER_SFT_SCHEDULE" == "yes" ]]; then
+  if [[ -z "${SFT_MAX_STEPS:-}" ]]; then
+    if [[ "$FRONTIER_ACCEPTED_ROWS" -lt 16 ]]; then
+      SFT_MAX_STEPS=8
+    else
+      SFT_MAX_STEPS=$(( (FRONTIER_ACCEPTED_ROWS * 3 + 7) / 8 ))
+      if [[ "$SFT_MAX_STEPS" -lt 16 ]]; then
+        SFT_MAX_STEPS=16
+      elif [[ "$SFT_MAX_STEPS" -gt 64 ]]; then
+        SFT_MAX_STEPS=64
+      fi
+    fi
+  fi
+  if [[ -z "${SFT_EVAL_STEPS:-}" ]]; then
+    SFT_EVAL_STEPS=$(( SFT_MAX_STEPS / 4 ))
+    if [[ "$SFT_EVAL_STEPS" -lt 4 ]]; then
+      SFT_EVAL_STEPS=4
+    fi
+  fi
+  if [[ -z "${SFT_SAVE_STEPS:-}" ]]; then
+    SFT_SAVE_STEPS="$SFT_EVAL_STEPS"
+  fi
+  if [[ -z "${SFT_LEARNING_RATE:-}" ]]; then
+    SFT_LEARNING_RATE="1e-6"
+  fi
+fi
+echo "Frontier SFT schedule: rows=$FRONTIER_ACCEPTED_ROWS max_steps=${SFT_MAX_STEPS:-32} eval_steps=${SFT_EVAL_STEPS:-8} save_steps=${SFT_SAVE_STEPS:-8} lr=${SFT_LEARNING_RATE:-2e-6}"
 
 "$PYTHON" scripts/train_jsonl_sft_unsloth.py \
   --jsonl "$FRONTIER_JSONL" \
