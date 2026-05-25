@@ -35,6 +35,12 @@ class BuildSelfVerifiableTranslationDataTests(unittest.TestCase):
         self.assertIn("Final:", compact_target)
         self.assertIn("Puntaje:", compact_target)
         self.assertNotIn("Autoevaluacion:", compact_target)
+        compact_mixed = builder.compact_mixed_sft_records(generator_records)
+        self.assertEqual(len(compact_mixed), 2)
+        self.assertEqual(compact_mixed[0]["target"], rows[0]["target"])
+        self.assertEqual(compact_mixed[0]["prompt_mode"], "direct")
+        self.assertIn("Final:", compact_mixed[1]["target"])
+        self.assertEqual(compact_mixed[1]["prompt_mode"], "compact")
         self.assertEqual(len(meta_records), len(verifier_records) * 2)
         labels = [json.loads(record["label"]) for record in meta_records]
         self.assertGreater(max(label["score"] for label in labels), 0.9)

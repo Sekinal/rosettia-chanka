@@ -109,6 +109,28 @@ def compact_thinking_generator_target(reference: str) -> str:
     )
 
 
+def compact_mixed_sft_records(generator_records: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    mixed: list[dict[str, Any]] = []
+    for record in generator_records:
+        mixed.append(
+            {
+                **record,
+                "target": gspo.normalize_text(record["reference"]),
+                "task": "direct_translation_anchor",
+                "prompt_mode": "direct",
+            }
+        )
+        mixed.append(
+            {
+                **record,
+                "target": compact_thinking_generator_target(record["reference"]),
+                "task": "self_verifiable_compact_thinking_translation_generation",
+                "prompt_mode": "compact",
+            }
+        )
+    return mixed
+
+
 def build_records(rows: Iterable[dict[str, str]], seed: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     rng = random.Random(seed)
     base_rows = list(rows)
@@ -186,6 +208,8 @@ def main() -> None:
         args.output_dir / "self_verifiable_compact_thinking_generator_sft.jsonl",
         compact_thinking_generator_records,
     )
+    compact_mixed_records = compact_mixed_sft_records(generator_records)
+    write_jsonl(args.output_dir / "self_verifiable_compact_mixed_sft.jsonl", compact_mixed_records)
     summary = {
         "source_rows": len(rows),
         "verifier_records": len(verifier_records),
@@ -193,6 +217,7 @@ def main() -> None:
         "generator_records": len(generator_records),
         "thinking_generator_records": len(thinking_generator_records),
         "compact_thinking_generator_records": len(compact_thinking_generator_records),
+        "compact_mixed_sft_records": len(compact_mixed_records),
     }
     (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     print(json.dumps(summary, indent=2, sort_keys=True))

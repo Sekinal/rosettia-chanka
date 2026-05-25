@@ -35,6 +35,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Field to use as the assistant target. MBR files use 'prediction'.",
     )
     parser.add_argument("--reference-field", default="reference", help="Optional reference metadata field.")
+    parser.add_argument(
+        "--prompt-mode-field",
+        default="prompt_mode",
+        help=(
+            "Optional row field controlling prompt style. Supported values: direct, self_verification, "
+            "thinking, compact. Empty rows fall back to the global prompt flags."
+        ),
+    )
     parser.add_argument("--dataset-repo", default=gspo.DATASET_REPO)
     parser.add_argument(
         "--terminology-file",
@@ -219,6 +227,7 @@ def load_jsonl_rows(args: argparse.Namespace) -> list[dict[str, str]]:
                     "source_name": str(record.get("source_name") or path.name),
                     "variant": str(record.get("variant") or "quy/chanka_pseudo"),
                     "target_field": args.target_field,
+                    "prompt_mode": str(record.get(args.prompt_mode_field) or "").strip().lower(),
                 }
             )
     if not rows:
@@ -278,6 +287,26 @@ def terminology_for_row(
     return selected or None
 
 
+def prompt_flags_for_row(
+    row: dict[str, str],
+    prompt_self_verification: bool,
+    prompt_self_verification_thinking: bool,
+    prompt_self_verification_compact: bool,
+) -> tuple[bool, bool, bool]:
+    prompt_mode = row.get("prompt_mode", "").strip().lower()
+    if prompt_mode in {"", "global", "default"}:
+        return prompt_self_verification, prompt_self_verification_thinking, prompt_self_verification_compact
+    if prompt_mode == "direct":
+        return False, False, False
+    if prompt_mode in {"self_verification", "self-verification", "verify"}:
+        return True, False, False
+    if prompt_mode in {"thinking", "bounded_thinking", "self_verification_thinking"}:
+        return False, True, False
+    if prompt_mode in {"compact", "compact_thinking", "self_verification_compact"}:
+        return False, False, True
+    raise ValueError(f"Unsupported prompt_mode={prompt_mode!r} for source={row.get('source', '')!r}")
+
+
 def format_example(
     tokenizer,
     row: dict[str, str],
@@ -287,16 +316,19 @@ def format_example(
     prompt_self_verification_thinking: bool = False,
     prompt_self_verification_compact: bool = False,
 ) -> dict[str, str]:
+    row_self_verification, row_thinking, row_compact = prompt_flags_for_row(
+        row,
+        prompt_self_verification,
+        prompt_self_verification_thinking,
+        prompt_self_verification_compact,
+    )
     messages = [
         *gspo.prompt_messages(
             row["source"],
             terminology_for_row(row, terminology_entries, terminology_top_k),
-            self_verification=prompt_self_verification
-            or prompt_self_verification_thinking
-            or prompt_self_verification_compact,
-            self_verification_thinking=prompt_self_verification_thinking
-            or prompt_self_verification_compact,
-            self_verification_compact=prompt_self_verification_compact,
+            self_verification=row_self_verification or row_thinking or row_compact,
+            self_verification_thinking=row_thinking or row_compact,
+            self_verification_compact=row_compact,
         ),
         {"role": "assistant", "content": row["target"]},
     ]
@@ -310,6 +342,7 @@ def format_example(
         "source_name": row["source_name"],
         "variant": row["variant"],
         "target_field": row["target_field"],
+        "prompt_mode": row.get("prompt_mode", ""),
     }
 
 

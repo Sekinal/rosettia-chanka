@@ -58,7 +58,12 @@ class TrainJsonlSftUnslothTests(unittest.TestCase):
             write_jsonl(
                 path,
                 [
-                    {"source": "Buenos dias.", "prediction": "Allin punchaw.", "reference": "Allin punchaw"},
+                    {
+                        "source": "Buenos dias.",
+                        "prediction": "Allin punchaw.",
+                        "reference": "Allin punchaw",
+                        "prompt_mode": "compact",
+                    },
                     {"source": "Buenos dias.", "prediction": "Allin punchaw.", "reference": "Duplicate"},
                     {"source": "Sin salida", "prediction": "", "reference": "Mana"},
                 ],
@@ -72,6 +77,7 @@ class TrainJsonlSftUnslothTests(unittest.TestCase):
         self.assertEqual(rows[0]["target"], "Allin punchaw.")
         self.assertEqual(rows[0]["reference"], "Allin punchaw")
         self.assertEqual(rows[0]["target_field"], "prediction")
+        self.assertEqual(rows[0]["prompt_mode"], "compact")
 
     def test_load_jsonl_rows_can_keep_duplicates_for_oversampling(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -190,6 +196,40 @@ class TrainJsonlSftUnslothTests(unittest.TestCase):
         self.assertIn("Final:", formatted["text"])
         self.assertIn("No escribas Autoevaluacion", formatted["text"])
         self.assertIn("Allin punchaw.", formatted["text"])
+
+    def test_format_example_uses_row_prompt_mode_over_global_flags(self):
+        direct_tokenizer = DummyTokenizer()
+        compact_tokenizer = DummyTokenizer()
+        direct_row = {
+            "source": "Buenos dias.",
+            "target": "Allin punchaw.",
+            "reference": "",
+            "source_name": "mixed",
+            "variant": "quy/chanka_self",
+            "target_field": "target",
+            "prompt_mode": "direct",
+        }
+        compact_row = {
+            **direct_row,
+            "target": "Analisis: [SIGNIFICADO] conserva saludo.\nFinal: Allin punchaw.\nPuntaje: \\boxed{0.98}",
+            "prompt_mode": "compact",
+        }
+
+        direct_formatted = train_jsonl_sft.format_example(
+            direct_tokenizer,
+            direct_row,
+            prompt_self_verification_compact=True,
+        )
+        compact_formatted = train_jsonl_sft.format_example(compact_tokenizer, compact_row)
+
+        self.assertNotIn("Formato obligatorio compacto", direct_formatted["text"])
+        self.assertIn("Formato obligatorio compacto", compact_formatted["text"])
+        self.assertEqual(direct_formatted["prompt_mode"], "direct")
+        self.assertEqual(compact_formatted["prompt_mode"], "compact")
+
+    def test_prompt_flags_reject_unknown_row_prompt_mode(self):
+        with self.assertRaisesRegex(ValueError, "Unsupported prompt_mode"):
+            train_jsonl_sft.prompt_flags_for_row({"source": "x", "prompt_mode": "mystery"}, False, False, False)
 
     def test_build_dataset_can_count_terminology_matches(self):
         row = {
