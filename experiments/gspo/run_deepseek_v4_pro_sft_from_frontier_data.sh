@@ -39,6 +39,8 @@ SFT_CYCLE_MANIFEST_JSON="${SFT_CYCLE_MANIFEST_JSON:-${THINKING_SFT_OUTPUT_DIR}/c
 SFT_BASELINE_EVAL_DIR="${SFT_BASELINE_EVAL_DIR:-${THINKING_SFT_OUTPUT_DIR}/base_adapter_thinking_eval}"
 SFT_BASELINE_METRICS_JSON="${SFT_BASELINE_METRICS_JSON:-${SFT_BASELINE_EVAL_DIR}/metrics.json}"
 SFT_BASELINE_PREDICTIONS="${SFT_BASELINE_PREDICTIONS:-${SFT_BASELINE_EVAL_DIR}/predictions.jsonl}"
+STAGED_STATUS_JSON="${STAGED_STATUS_JSON:-${THINKING_SFT_OUTPUT_DIR}/deepseekmath_staged_status.json}"
+STAGED_STATUS_MD="${STAGED_STATUS_MD:-${THINKING_SFT_OUTPUT_DIR}/deepseekmath_staged_status.md}"
 
 MIN_FRONTIER_ROWS_FOR_SFT="${MIN_FRONTIER_ROWS_FOR_SFT:-8}"
 MIN_FRONTIER_ACCEPT_RATE="${MIN_FRONTIER_ACCEPT_RATE:-0.50}"
@@ -57,6 +59,27 @@ MINE_SFT_META="${MINE_SFT_META:-true}"
 REQUIRE_SFT_PROMOTION="${REQUIRE_SFT_PROMOTION:-false}"
 
 cd "$ROOT_DIR"
+
+write_staged_status() {
+  local exit_status=$?
+  set +e
+  STAGED_FRONTIER_ARGS=()
+  if [[ -n "$DATA_DIR" ]]; then
+    STAGED_FRONTIER_ARGS+=(--frontier-dir "$DATA_DIR")
+  fi
+  "$PYTHON" scripts/summarize_deepseekmath_staged_run.py \
+    "${STAGED_FRONTIER_ARGS[@]}" \
+    --sft-dir "$THINKING_SFT_OUTPUT_DIR" \
+    --no-discover \
+    --output-json "$STAGED_STATUS_JSON" \
+    --output-md "$STAGED_STATUS_MD" \
+    >/dev/null
+  if [[ -f "$STAGED_STATUS_MD" ]]; then
+    echo "Staged status: $STAGED_STATUS_MD"
+  fi
+  return "$exit_status"
+}
+trap write_staged_status EXIT
 
 if [[ ! -f "$FRONTIER_JSONL" ]]; then
   echo "Frontier JSONL not found: $FRONTIER_JSONL" >&2
@@ -222,6 +245,7 @@ echo "SFT metrics: $SFT_EVAL_JSON"
 echo "SFT predictions: $SFT_EVAL_PREDICTIONS"
 echo "SFT meta hardcases: $SFT_META_JSONL"
 echo "SFT cycle manifest: $SFT_CYCLE_MANIFEST_JSON"
+echo "Staged status report: $STAGED_STATUS_MD"
 
 if [[ "$SFT_PROMOTION_FAILED" -eq 1 && ("$REQUIRE_SFT_PROMOTION" == "true" || "$REQUIRE_SFT_PROMOTION" == "1" || "$REQUIRE_SFT_PROMOTION" == "yes") ]]; then
   exit 1
