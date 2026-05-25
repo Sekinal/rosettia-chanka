@@ -35,6 +35,8 @@ FRONTIER_FAILURES_JSONL="${FRONTIER_FAILURES_JSONL:-${DATA_DIR}/deepseek_v4_pro_
 FRONTIER_SUMMARY_JSON="${FRONTIER_SUMMARY_JSON:-${DATA_DIR}/deepseek_v4_pro_thinking_sft.summary.json}"
 FRONTIER_REPORT_MD="${FRONTIER_REPORT_MD:-${DATA_DIR}/deepseek_v4_pro_thinking_report.md}"
 PAID_SMOKE_GATE_JSON="${PAID_SMOKE_GATE_JSON:-${DATA_DIR}/deepseek_v4_pro_paid_smoke_gate.json}"
+STAGED_STATUS_JSON="${STAGED_STATUS_JSON:-${DATA_DIR}/deepseekmath_staged_status.json}"
+STAGED_STATUS_MD="${STAGED_STATUS_MD:-${DATA_DIR}/deepseekmath_staged_status.md}"
 
 is_truthy() {
   [[ "$1" == "true" || "$1" == "1" || "$1" == "yes" ]]
@@ -78,6 +80,24 @@ fi
 
 cd "$ROOT_DIR"
 
+write_staged_status() {
+  local exit_status=$?
+  set +e
+  if [[ -d "$DATA_DIR" ]]; then
+    "$PYTHON" scripts/summarize_deepseekmath_staged_run.py \
+      --frontier-dir "$DATA_DIR" \
+      --no-discover \
+      --output-json "$STAGED_STATUS_JSON" \
+      --output-md "$STAGED_STATUS_MD" \
+      >/dev/null
+    if [[ -f "$STAGED_STATUS_MD" ]]; then
+      echo "Staged status: $STAGED_STATUS_MD"
+    fi
+  fi
+  return "$exit_status"
+}
+trap write_staged_status EXIT
+
 echo "Starting DeepSeek V4 Pro paid generation smoke."
 echo "Rows: $FRONTIER_MAX_ROWS; max API requests: $FRONTIER_MAX_API_REQUESTS; SFT disabled."
 if is_falsey "$RUN_FRONTIER_GENERATION"; then
@@ -111,6 +131,7 @@ experiments/gspo/run_deepseek_v4_pro_thinking_sft_then_gspo.sh
 if is_falsey "$RUN_FRONTIER_GENERATION"; then
   echo "Pre-API paid-smoke dry run completed without frontier generation."
   echo "Pre-API readiness report: ${DATA_DIR}/deepseek_v4_pro_preapi_readiness.md"
+  echo "Staged status report: $STAGED_STATUS_MD"
   exit 0
 fi
 
@@ -135,6 +156,7 @@ set -e
 cat "$PAID_SMOKE_GATE_JSON"
 echo "Frontier data report: $FRONTIER_REPORT_MD"
 echo "Paid smoke gate: $PAID_SMOKE_GATE_JSON"
+echo "Staged status report: $STAGED_STATUS_MD"
 
 if [[ $gate_status -ne 0 ]]; then
   echo "Paid smoke generation completed, but the data gate failed. Inspect the report before spending GPU time." >&2
