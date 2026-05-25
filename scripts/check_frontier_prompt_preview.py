@@ -14,6 +14,13 @@ SECRET_MARKERS = (
     "DEEPSEEK_API_KEY",
     "Bearer ",
 )
+ANTI_VACUOUS_MARKERS = (
+    "Source terms to consider:",
+    "Reference terms to consider:",
+    "Do not write generic checks",
+    "Each tag must mention a concrete",
+    "at least six non-tag words",
+)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -41,6 +48,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Require response_format json_object in every generation payload.",
+    )
+    parser.add_argument(
+        "--require-anti-vacuous-instructions",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Require the prompt to include source/reference term hints and non-vacuous analysis instructions.",
     )
     return parser.parse_args(argv)
 
@@ -101,6 +114,7 @@ def gate_prompt_preview(
     require_all_selected: bool = True,
     require_thinking: bool = True,
     require_json_response: bool = True,
+    require_anti_vacuous_instructions: bool = True,
     expected_reasoning_effort: str | None = None,
 ) -> tuple[dict[str, Any], bool, list[str]]:
     reasons: list[str] = []
@@ -113,6 +127,7 @@ def gate_prompt_preview(
     bad_json_response_records = 0
     bad_reasoning_effort_records = 0
     bad_payload_shape_records = 0
+    missing_anti_vacuous_instruction_records = 0
 
     if len(records) < min_preview_rows:
         reasons.append(f"preview_rows {len(records)} < {min_preview_rows}")
@@ -172,6 +187,13 @@ def gate_prompt_preview(
         if not required_line:
             missing_expected_tags += 1
             reasons.append(f"record {index} prompt lacks required primitive tag instruction")
+        if require_anti_vacuous_instructions:
+            missing_markers = [marker for marker in ANTI_VACUOUS_MARKERS if marker not in prompt]
+            if missing_markers:
+                missing_anti_vacuous_instruction_records += 1
+                reasons.append(
+                    f"record {index} prompt missing anti-vacuous instructions: {', '.join(missing_markers)}"
+                )
 
         few_shot_row_keys = {str(key) for key in record.get("few_shot_row_keys") or []}
         if row_key and row_key in few_shot_row_keys:
@@ -199,6 +221,8 @@ def gate_prompt_preview(
         "bad_json_response_records": bad_json_response_records,
         "bad_reasoning_effort_records": bad_reasoning_effort_records,
         "bad_payload_shape_records": bad_payload_shape_records,
+        "require_anti_vacuous_instructions": require_anti_vacuous_instructions,
+        "missing_anti_vacuous_instruction_records": missing_anti_vacuous_instruction_records,
     }
     return metrics, not reasons, reasons
 
@@ -215,6 +239,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         require_all_selected=args.require_all_selected,
         require_thinking=args.require_thinking,
         require_json_response=args.require_json_response,
+        require_anti_vacuous_instructions=args.require_anti_vacuous_instructions,
         expected_reasoning_effort=args.expected_reasoning_effort,
     )
     payload = {

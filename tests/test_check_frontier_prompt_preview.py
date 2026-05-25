@@ -20,8 +20,12 @@ def preview_record(row_key: str = "hola\trimaykullayki") -> dict:
                 {
                     "role": "user",
                     "content": (
-                        "Required primitive tags for this row: "
-                        "[SIGNIFICADO], [GRAMATICA], [ANTI_COPIA]."
+                        "Required primitive tags for this row: [SIGNIFICADO], [GRAMATICA], [ANTI_COPIA].\n"
+                        "Source terms to consider: Hola.\n"
+                        "Reference terms to consider: Rimaykullayki.\n"
+                        "Do not write generic checks like 'correcto'. "
+                        "Each tag must mention a concrete source/reference token. "
+                        "Use at least six non-tag words in the analysis."
                     ),
                 },
             ],
@@ -47,6 +51,7 @@ class CheckFrontierPromptPreviewTests(unittest.TestCase):
         self.assertEqual(reasons, [])
         self.assertEqual(metrics["preview_rows"], 1)
         self.assertEqual(metrics["secret_marker_records"], 0)
+        self.assertEqual(metrics["missing_anti_vacuous_instruction_records"], 0)
 
     def test_gate_fails_on_missing_expected_tags_and_secret_marker(self):
         bad = preview_record()
@@ -63,6 +68,23 @@ class CheckFrontierPromptPreviewTests(unittest.TestCase):
         self.assertFalse(passed)
         self.assertIn("record 1 contains secret/auth marker", reasons)
         self.assertIn("record 1 required primitive line missing expected tags: [GRAMATICA], [ANTI_COPIA]", reasons)
+
+    def test_gate_fails_when_prompt_lacks_anti_vacuous_instructions(self):
+        bad = preview_record()
+        bad["generation_payload"]["messages"][1]["content"] = (
+            "Required primitive tags for this row: [SIGNIFICADO], [GRAMATICA], [ANTI_COPIA]."
+        )
+
+        metrics, passed, reasons = checker.gate_prompt_preview(
+            [bad],
+            expected_model="deepseek-v4-pro",
+            min_preview_rows=1,
+            selected_rows=1,
+        )
+
+        self.assertFalse(passed)
+        self.assertEqual(metrics["missing_anti_vacuous_instruction_records"], 1)
+        self.assertTrue(any("prompt missing anti-vacuous instructions" in reason for reason in reasons))
 
     def test_gate_fails_on_wrong_model_or_thinking_shape(self):
         bad = preview_record()
