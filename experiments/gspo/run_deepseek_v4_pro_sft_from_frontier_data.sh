@@ -231,6 +231,19 @@ SFT_MANIFEST_BASELINE_ARGS=()
 if [[ -f "$SFT_BASELINE_METRICS_JSON" ]]; then
   SFT_MANIFEST_BASELINE_ARGS+=(--baseline-metrics-json "$SFT_BASELINE_METRICS_JSON")
 fi
+SFT_MANIFEST_FRONTIER_ARGS=()
+if [[ -n "${FRONTIER_JSONL:-}" ]]; then
+  SFT_MANIFEST_FRONTIER_ARGS+=(--frontier-jsonl "$FRONTIER_JSONL")
+fi
+if [[ -n "${FRONTIER_REPORT_JSON:-}" ]]; then
+  SFT_MANIFEST_FRONTIER_ARGS+=(--frontier-report-json "$FRONTIER_REPORT_JSON")
+fi
+if [[ -n "${FRONTIER_SUMMARY_JSON:-}" ]]; then
+  SFT_MANIFEST_FRONTIER_ARGS+=(--frontier-summary-json "$FRONTIER_SUMMARY_JSON")
+fi
+if [[ -n "${FRONTIER_PAID_GATE_JSON:-}" ]]; then
+  SFT_MANIFEST_FRONTIER_ARGS+=(--frontier-paid-gate-json "$FRONTIER_PAID_GATE_JSON")
+fi
 
 SFT_PROMOTION_FAILED=0
 if [[ "$RUN_SFT_PROMOTION_GATE" == "true" || "$RUN_SFT_PROMOTION_GATE" == "1" || "$RUN_SFT_PROMOTION_GATE" == "yes" ]]; then
@@ -270,7 +283,8 @@ fi
   --promotion-json "$SFT_PROMOTION_JSON" \
   --predictions-jsonl "$SFT_EVAL_PREDICTIONS" \
   --output-hardcase-jsonl "$SFT_META_JSONL" \
-  "${SFT_MANIFEST_BASELINE_ARGS[@]}"
+  "${SFT_MANIFEST_BASELINE_ARGS[@]}" \
+  "${SFT_MANIFEST_FRONTIER_ARGS[@]}"
 
 echo "SFT metrics: $SFT_EVAL_JSON"
 echo "SFT predictions: $SFT_EVAL_PREDICTIONS"

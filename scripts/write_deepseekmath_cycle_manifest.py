@@ -37,6 +37,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--input-hardcase-jsonl", type=Path, action="append", default=[])
     parser.add_argument("--output-hardcase-jsonl", type=Path, default=None)
     parser.add_argument("--baseline-metrics-json", type=Path, default=None)
+    parser.add_argument("--frontier-jsonl", type=Path, default=None)
+    parser.add_argument("--frontier-report-json", type=Path, default=None)
+    parser.add_argument("--frontier-summary-json", type=Path, default=None)
+    parser.add_argument("--frontier-paid-gate-json", type=Path, default=None)
     return parser.parse_args(argv)
 
 
@@ -57,6 +61,13 @@ def file_record(path: Path | None) -> dict[str, Any] | None:
         "is_file": path.is_file() if exists else False,
         "bytes": path.stat().st_size if exists and path.is_file() else 0,
     }
+
+
+def count_lines(path: Path | None) -> int | None:
+    if path is None or not path.exists() or not path.is_file():
+        return None
+    with path.open() as handle:
+        return sum(1 for line in handle if line.strip())
 
 
 def manifest_for(args: argparse.Namespace) -> dict[str, Any]:
@@ -88,6 +99,17 @@ def manifest_for(args: argparse.Namespace) -> dict[str, Any]:
             "predictions": file_record(args.predictions_jsonl),
             "input_hardcases": [file_record(path) for path in args.input_hardcase_jsonl],
             "output_hardcases": file_record(args.output_hardcase_jsonl),
+            "frontier_jsonl": file_record(args.frontier_jsonl),
+            "frontier_report": file_record(args.frontier_report_json),
+            "frontier_summary": file_record(args.frontier_summary_json),
+            "frontier_paid_gate": file_record(args.frontier_paid_gate_json),
+        },
+        "frontier_data": {
+            "accepted_jsonl": file_record(args.frontier_jsonl),
+            "accepted_records": count_lines(args.frontier_jsonl),
+            "report_json": file_record(args.frontier_report_json),
+            "summary_json": file_record(args.frontier_summary_json),
+            "paid_gate_json": file_record(args.frontier_paid_gate_json),
         },
         "metrics": metrics,
         "promotion": promotion,

@@ -185,6 +185,7 @@ def cycle_summary(cycle_dir: Path | None, manifest_path: Path | None) -> dict[st
     metrics = manifest.get("metrics") if isinstance(manifest, dict) else None
     promotion = manifest.get("promotion") if isinstance(manifest, dict) else None
     artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else {}
+    frontier_data = manifest.get("frontier_data") if isinstance(manifest, dict) else {}
     policy_artifact = artifacts.get("policy_adapter") if isinstance(artifacts, dict) else None
     hardcases = manifest.get("output_hardcases") if isinstance(manifest, dict) else {}
     hardcase_artifact = artifacts.get("output_hardcases") if isinstance(artifacts, dict) else None
@@ -215,6 +216,7 @@ def cycle_summary(cycle_dir: Path | None, manifest_path: Path | None) -> dict[st
         "output_hardcases_exists": (
             bool(hardcase_artifact.get("exists")) if isinstance(hardcase_artifact, dict) else False
         ),
+        "frontier_data": frontier_data if isinstance(frontier_data, dict) else {},
         "artifacts": artifacts if isinstance(artifacts, dict) else {},
     }
 
@@ -229,6 +231,27 @@ def summarize_sft(sft_dir: Path | None) -> dict[str, Any]:
 def summarize_gspo(gspo_dir: Path | None) -> dict[str, Any]:
     manifest_path = gspo_dir / "cycle_manifest.json" if gspo_dir else None
     return cycle_summary(gspo_dir, manifest_path)
+
+
+def safe_stamp_from_frontier(frontier_dir: str | None, accepted_rows: int) -> str:
+    stem = Path(frontier_dir or "frontier").name
+    if stem.startswith("frontier_thinking_data_"):
+        stem = stem.removeprefix("frontier_thinking_data_")
+    safe = "".join(char if char.isalnum() or char in "._-" else "-" for char in stem).strip("-")
+    return f"{safe or 'frontier'}-sft-r{accepted_rows}"
+
+
+def sft_frontier_record_count(sft: dict[str, Any]) -> int | None:
+    frontier_data = sft.get("frontier_data")
+    if not isinstance(frontier_data, dict):
+        return None
+    value = frontier_data.get("accepted_records")
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def next_action(
@@ -305,6 +328,33 @@ def next_action(
                         f"for a serious SFT attempt ({accepted_rows} < {min_frontier_rows_for_serious_sft}); "
                         "resume paid frontier generation in the same data directory before retraining."
                     ),
+                }
+            trained_frontier_records = sft_frontier_record_count(sft)
+            if frontier.get("dir") and (
+                trained_frontier_records is None or trained_frontier_records < accepted_rows
+            ):
+                frontier_dir = frontier.get("dir")
+                stamp = safe_stamp_from_frontier(str(frontier_dir), accepted_rows)
+                if trained_frontier_records is None:
+                    reason = (
+                        "SFT seed was not promoted and its manifest has no frontier-data lineage; "
+                        "train a fresh SFT seed from the current accepted frontier set before more policy work."
+                    )
+                else:
+                    reason = (
+                        "SFT seed was not promoted and was trained on fewer accepted frontier rows "
+                        f"than are now available ({trained_frontier_records} < {accepted_rows}); "
+                        "train a fresh SFT seed from the expanded frontier set."
+                    )
+                return {
+                    "stage": "sft_seed",
+                    "command": (
+                        f"DATA_DIR={frontier_dir} "
+                        f"STAMP={stamp} "
+                        f"MIN_FRONTIER_ROWS_FOR_SFT={accepted_rows} "
+                        "experiments/gspo/run_deepseek_v4_pro_sft_from_frontier_data.sh"
+                    ),
+                    "reason": reason,
                 }
             hardcase_count = 0
             if isinstance(sft.get("output_hardcases"), dict):

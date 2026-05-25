@@ -29,7 +29,7 @@ ALLOWED_ACTIONS = {
     },
     "sft_seed": {
         "scripts": {"experiments/gspo/run_deepseek_v4_pro_sft_from_frontier_data.sh"},
-        "env": {"DATA_DIR"},
+        "env": {"DATA_DIR", "MIN_FRONTIER_ROWS_FOR_SFT", "STAMP", "THINKING_SFT_OUTPUT_DIR"},
     },
     "initial_gspo": {
         "scripts": {"experiments/gspo/run_deepseek_v4_pro_gspo_from_sft_seed.sh"},

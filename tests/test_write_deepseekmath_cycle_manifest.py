@@ -27,6 +27,10 @@ class WriteDeepSeekMathCycleManifestTests(unittest.TestCase):
             input_hardcases = root / "input.jsonl"
             output_hardcases = root / "output.jsonl"
             predictions = root / "predictions.jsonl"
+            frontier = root / "frontier.jsonl"
+            frontier_report = root / "frontier_report.json"
+            frontier_summary = root / "frontier_summary.json"
+            frontier_gate = root / "frontier_gate.json"
             meta_adapter = root / "meta" / "final"
             policy_adapter = root / "policy" / "final_lora"
             output = root / "manifest.json"
@@ -35,6 +39,10 @@ class WriteDeepSeekMathCycleManifestTests(unittest.TestCase):
             input_hardcases.write_text(json.dumps(hardcase("a")) + "\n" + json.dumps(hardcase("b")) + "\n")
             output_hardcases.write_text(json.dumps(hardcase("c")) + "\n")
             predictions.write_text('{"source":"a"}\n')
+            frontier.write_text('{"source":"a"}\n{"source":"b"}\n')
+            frontier_report.write_text(json.dumps({"gate_metrics": {"written_rows": 2}}))
+            frontier_summary.write_text(json.dumps({"total_written_rows": 2}))
+            frontier_gate.write_text(json.dumps({"passed": True}))
             meta_adapter.mkdir(parents=True)
             policy_adapter.mkdir(parents=True)
 
@@ -66,6 +74,14 @@ class WriteDeepSeekMathCycleManifestTests(unittest.TestCase):
                     str(input_hardcases),
                     "--output-hardcase-jsonl",
                     str(output_hardcases),
+                    "--frontier-jsonl",
+                    str(frontier),
+                    "--frontier-report-json",
+                    str(frontier_report),
+                    "--frontier-summary-json",
+                    str(frontier_summary),
+                    "--frontier-paid-gate-json",
+                    str(frontier_gate),
                 ]
             )
 
@@ -83,6 +99,9 @@ class WriteDeepSeekMathCycleManifestTests(unittest.TestCase):
         self.assertTrue(payload["artifacts"]["policy_adapter"]["is_dir"])
         self.assertTrue(payload["artifacts"]["meta_verifier_adapter"]["exists"])
         self.assertTrue(payload["artifacts"]["meta_verifier_adapter"]["is_dir"])
+        self.assertEqual(payload["frontier_data"]["accepted_records"], 2)
+        self.assertTrue(payload["frontier_data"]["accepted_jsonl"]["exists"])
+        self.assertTrue(payload["frontier_data"]["paid_gate_json"]["exists"])
 
 
 if __name__ == "__main__":

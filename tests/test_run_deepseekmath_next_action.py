@@ -65,6 +65,29 @@ class RunDeepSeekMathNextActionTests(unittest.TestCase):
         self.assertTrue(report["approved"])
         self.assertEqual(report["env"]["BASE_CYCLE_MANIFEST"], "outputs/gspo/cycle_manifest.json")
 
+    def test_approves_fresh_sft_command_with_lineage_stamp(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            script = "experiments/gspo/run_deepseek_v4_pro_sft_from_frontier_data.sh"
+            touch_script(root, script)
+
+            report = runner.validate_action(
+                status(
+                    "sft_seed",
+                    (
+                        "DATA_DIR=outputs/frontier "
+                        "STAMP=frontier-sft-r64 "
+                        "MIN_FRONTIER_ROWS_FOR_SFT=64 "
+                        f"{script}"
+                    ),
+                ),
+                root,
+            )
+
+        self.assertTrue(report["approved"])
+        self.assertEqual(report["env"]["STAMP"], "frontier-sft-r64")
+        self.assertEqual(report["env"]["MIN_FRONTIER_ROWS_FOR_SFT"], "64")
+
     def test_approves_hardcase_command(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
