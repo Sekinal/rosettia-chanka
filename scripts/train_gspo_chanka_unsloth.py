@@ -10,8 +10,11 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import random
 import re
+import sys
+import traceback
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -80,12 +83,49 @@ SPANISH_STOPWORDS = {
 
 def configure_left_padded_generation(model: Any, tokenizer: Any) -> None:
     """Align decoder-only batched generation with Qwen-style left padding."""
-    if getattr(tokenizer, "pad_token", None) is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    if hasattr(tokenizer, "padding_side"):
-        tokenizer.padding_side = "left"
-    model.generation_config.eos_token_id = tokenizer.eos_token_id
-    model.generation_config.pad_token_id = tokenizer.eos_token_id
+    text_tokenizer = generation_text_tokenizer(tokenizer)
+    for candidate in (tokenizer, text_tokenizer):
+        if getattr(candidate, "pad_token", None) is None and getattr(candidate, "eos_token", None) is not None:
+            candidate.pad_token = candidate.eos_token
+        if hasattr(candidate, "padding_side"):
+            candidate.padding_side = "left"
+    model.generation_config.eos_token_id = text_tokenizer.eos_token_id
+    model.generation_config.pad_token_id = text_tokenizer.eos_token_id
+
+
+def generation_text_tokenizer(tokenizer: Any) -> Any:
+    """Return the text tokenizer inside Unsloth/Qwen processor wrappers."""
+    return getattr(tokenizer, "tokenizer", tokenizer)
+
+
+def tokenize_generation_prompts(tokenizer: Any, prompts: list[str], **kwargs: Any) -> Any:
+    text_tokenizer = generation_text_tokenizer(tokenizer)
+    if hasattr(text_tokenizer, "padding_side"):
+        text_tokenizer.padding_side = "left"
+    return text_tokenizer(text=prompts, **kwargs)
+
+
+def install_generation_padding_trace() -> None:
+    """Print a stack trace for decoder-only right-padding warnings when requested."""
+    if os.environ.get("TRACE_GENERATION_PADDING") != "1":
+        return
+    from transformers.generation import utils as generation_utils
+
+    if getattr(generation_utils.logger, "_rosettia_padding_trace", False):
+        return
+    original_warning = generation_utils.logger.warning
+
+    def warning_with_stack(message: object, *args: Any, **kwargs: Any) -> Any:
+        if "right-padding was detected" in str(message):
+            print(
+                "\n[TRACE_GENERATION_PADDING] decoder-only right-padding warning call stack:",
+                file=sys.stderr,
+            )
+            traceback.print_stack(limit=18, file=sys.stderr)
+        return original_warning(message, *args, **kwargs)
+
+    generation_utils.logger.warning = warning_with_stack
+    generation_utils.logger._rosettia_padding_trace = True
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -426,10 +466,11 @@ def prompt_messages(
 
 def apply_chat_template_no_thinking(tokenizer, messages: list[dict[str, str]], **kwargs):
     """Apply chat templates with reasoning disabled when the tokenizer supports it."""
+    text_tokenizer = generation_text_tokenizer(tokenizer)
     try:
-        return tokenizer.apply_chat_template(messages, enable_thinking=False, **kwargs)
+        return text_tokenizer.apply_chat_template(messages, enable_thinking=False, **kwargs)
     except TypeError:
-        return tokenizer.apply_chat_template(messages, **kwargs)
+        return text_tokenizer.apply_chat_template(messages, **kwargs)
 
 
 def force_tokenizer_no_thinking_template(tokenizer) -> bool:
@@ -1122,7 +1163,7 @@ def verifier_prompt_text(tokenizer, source: str, reference: str, candidate: str)
             ),
         },
     ]
-    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    return apply_chat_template_no_thinking(tokenizer, messages, tokenize=False, add_generation_prompt=True)
 
 
 def meta_verifier_prompt_text(
@@ -1151,7 +1192,7 @@ def meta_verifier_prompt_text(
             ),
         },
     ]
-    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    return apply_chat_template_no_thinking(tokenizer, messages, tokenize=False, add_generation_prompt=True)
 
 
 def parse_verifier_score(text: str) -> float:
@@ -1193,8 +1234,10 @@ class LearnedVerifierScorer:
         for start in range(0, len(prompts), self.batch_size):
             batch_prompts = prompts[start : start + self.batch_size]
             configure_left_padded_generation(self.model, self.tokenizer)
-            inputs = self.tokenizer(
-                text=batch_prompts,
+            text_tokenizer = generation_text_tokenizer(self.tokenizer)
+            inputs = tokenize_generation_prompts(
+                self.tokenizer,
+                batch_prompts,
                 return_tensors="pt",
                 padding=True,
                 truncation=True,
@@ -1208,12 +1251,12 @@ class LearnedVerifierScorer:
                     do_sample=False,
                     temperature=None,
                     top_p=None,
-                    eos_token_id=self.tokenizer.eos_token_id,
-                    pad_token_id=self.tokenizer.eos_token_id,
+                    eos_token_id=text_tokenizer.eos_token_id,
+                    pad_token_id=text_tokenizer.eos_token_id,
                 )
             for row_index in range(len(batch_prompts)):
                 completion_ids = output_ids[row_index, prompt_length:]
-                decoded = self.tokenizer.decode(completion_ids, skip_special_tokens=True)
+                decoded = text_tokenizer.decode(completion_ids, skip_special_tokens=True)
                 scores.append(parse_verifier_score(decoded))
         return scores
 
@@ -1246,8 +1289,10 @@ class LearnedMetaVerifierScorer(LearnedVerifierScorer):
         for start in range(0, len(prompts), self.batch_size):
             batch_prompts = prompts[start : start + self.batch_size]
             configure_left_padded_generation(self.model, self.tokenizer)
-            inputs = self.tokenizer(
-                text=batch_prompts,
+            text_tokenizer = generation_text_tokenizer(self.tokenizer)
+            inputs = tokenize_generation_prompts(
+                self.tokenizer,
+                batch_prompts,
                 return_tensors="pt",
                 padding=True,
                 truncation=True,
@@ -1261,12 +1306,12 @@ class LearnedMetaVerifierScorer(LearnedVerifierScorer):
                     do_sample=False,
                     temperature=None,
                     top_p=None,
-                    eos_token_id=self.tokenizer.eos_token_id,
-                    pad_token_id=self.tokenizer.eos_token_id,
+                    eos_token_id=text_tokenizer.eos_token_id,
+                    pad_token_id=text_tokenizer.eos_token_id,
                 )
             for row_index in range(len(batch_prompts)):
                 completion_ids = output_ids[row_index, prompt_length:]
-                decoded = self.tokenizer.decode(completion_ids, skip_special_tokens=True)
+                decoded = text_tokenizer.decode(completion_ids, skip_special_tokens=True)
                 scores.append(parse_verifier_score(decoded))
         return scores
 
@@ -1718,6 +1763,7 @@ def generate_predictions(
     model.eval()
     batch_size = max(1, batch_size)
     configure_left_padded_generation(model, tokenizer)
+    text_tokenizer = generation_text_tokenizer(tokenizer)
     for start in range(0, len(rows), batch_size):
         batch_rows = rows[start : start + batch_size]
         prompts: list[str] = []
@@ -1740,7 +1786,7 @@ def generate_predictions(
                     add_generation_prompt=True,
                 )
             )
-        inputs = tokenizer(text=prompts, return_tensors="pt", padding=True).to(model.device)
+        inputs = tokenize_generation_prompts(tokenizer, prompts, return_tensors="pt", padding=True).to(model.device)
         prompt_length = inputs["input_ids"].shape[1]
         with torch.inference_mode():
             output_ids = model.generate(
@@ -1749,12 +1795,12 @@ def generate_predictions(
                 do_sample=False,
                 temperature=None,
                 top_p=None,
-                eos_token_id=tokenizer.eos_token_id,
-                pad_token_id=tokenizer.eos_token_id,
+                eos_token_id=text_tokenizer.eos_token_id,
+                pad_token_id=text_tokenizer.eos_token_id,
             )
         for output_index in range(output_ids.shape[0]):
             completion_ids = output_ids[output_index, prompt_length:]
-            raw_prediction = normalize_text(tokenizer.decode(completion_ids, skip_special_tokens=True))
+            raw_prediction = normalize_text(text_tokenizer.decode(completion_ids, skip_special_tokens=True))
             raw_predictions.append(raw_prediction)
             prediction = (
                 extract_translation_from_structured_output(raw_prediction)
@@ -1828,6 +1874,7 @@ def make_jsonl_log_callback(path: Path):
 def main() -> None:
     args = parse_args()
     validate_grpo_batching(args)
+    install_generation_padding_trace()
     global REWARD_PROFILE
     REWARD_PROFILE = args.reward_profile
 
@@ -1892,7 +1939,11 @@ def main() -> None:
         load_in_16bit=True,
         full_finetuning=False,
     )
-    patched_no_thinking_template = force_tokenizer_no_thinking_template(tokenizer)
+    text_tokenizer = generation_text_tokenizer(tokenizer)
+    patched_no_thinking_template = any(
+        force_tokenizer_no_thinking_template(candidate)
+        for candidate in (tokenizer, text_tokenizer)
+    )
     initial_trainable_parameters = trainable_parameter_count(model)
     resumed_peft_trainable_parameters = 0
     if args.attach_lora:
@@ -1970,7 +2021,7 @@ def main() -> None:
 
     trainer = GRPOTrainer(
         model=model,
-        processing_class=tokenizer,
+        processing_class=text_tokenizer,
         reward_funcs=make_reward_fn(
             args.reward_profile,
             verifier_adapter_path=args.verifier_adapter_path,

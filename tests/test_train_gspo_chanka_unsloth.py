@@ -823,6 +823,44 @@ suffix"""
         self.assertEqual(model.generation_config.eos_token_id, 7)
         self.assertEqual(model.generation_config.pad_token_id, 7)
 
+    def test_configure_generation_updates_processor_inner_tokenizer(self):
+        class GenerationConfig:
+            eos_token_id = None
+            pad_token_id = None
+
+        class Model:
+            generation_config = GenerationConfig()
+
+        class InnerTokenizer:
+            eos_token = "<eos>"
+            pad_token = None
+            eos_token_id = 9
+            padding_side = "right"
+
+            def __call__(self, **kwargs):
+                self.kwargs = kwargs
+                return "encoded"
+
+        class Processor:
+            tokenizer = InnerTokenizer()
+            eos_token = "<processor-eos>"
+            pad_token = None
+            eos_token_id = 3
+            padding_side = "right"
+
+        processor = Processor()
+        model = Model()
+
+        train_gspo.configure_left_padded_generation(model, processor)
+        encoded = train_gspo.tokenize_generation_prompts(processor, ["prompt"], padding=True)
+
+        self.assertEqual(processor.padding_side, "left")
+        self.assertEqual(processor.tokenizer.padding_side, "left")
+        self.assertEqual(processor.tokenizer.pad_token, "<eos>")
+        self.assertEqual(model.generation_config.eos_token_id, 9)
+        self.assertEqual(encoded, "encoded")
+        self.assertEqual(processor.tokenizer.kwargs["text"], ["prompt"])
+
 
 if __name__ == "__main__":
     unittest.main()
