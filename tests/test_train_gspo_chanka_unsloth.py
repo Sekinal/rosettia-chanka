@@ -768,6 +768,7 @@ suffix"""
 
         class FakeModel:
             device = "cpu"
+            generation_config = mock.Mock()
 
             def generate(self, **kwargs):
                 self.generate_kwargs = kwargs
@@ -790,11 +791,37 @@ suffix"""
         scorer.batch_size = 1
         scorer.model = FakeModel()
         scorer.tokenizer = FakeTokenizer()
+        scorer.tokenizer.padding_side = "right"
 
         self.assertEqual(scorer.score_many(["src"], ["ref"], ["hyp"]), [0.5])
         self.assertEqual(scorer.tokenizer.args, ())
         self.assertEqual(scorer.tokenizer.kwargs["text"], ["prompt"])
+        self.assertEqual(scorer.tokenizer.padding_side, "left")
         self.assertEqual(scorer.model.generate_kwargs["eos_token_id"], 0)
+
+    def test_configure_generation_uses_left_padding(self):
+        class GenerationConfig:
+            eos_token_id = None
+            pad_token_id = None
+
+        class Model:
+            generation_config = GenerationConfig()
+
+        class Tokenizer:
+            eos_token = "<eos>"
+            pad_token = None
+            eos_token_id = 7
+            padding_side = "right"
+
+        tokenizer = Tokenizer()
+        model = Model()
+
+        train_gspo.configure_left_padded_generation(model, tokenizer)
+
+        self.assertEqual(tokenizer.pad_token, "<eos>")
+        self.assertEqual(tokenizer.padding_side, "left")
+        self.assertEqual(model.generation_config.eos_token_id, 7)
+        self.assertEqual(model.generation_config.pad_token_id, 7)
 
 
 if __name__ == "__main__":

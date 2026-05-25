@@ -78,6 +78,16 @@ SPANISH_STOPWORDS = {
 }
 
 
+def configure_left_padded_generation(model: Any, tokenizer: Any) -> None:
+    """Align decoder-only batched generation with Qwen-style left padding."""
+    if getattr(tokenizer, "pad_token", None) is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    if hasattr(tokenizer, "padding_side"):
+        tokenizer.padding_side = "left"
+    model.generation_config.eos_token_id = tokenizer.eos_token_id
+    model.generation_config.pad_token_id = tokenizer.eos_token_id
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-id", default=DEFAULT_MODEL_ID)
@@ -1170,10 +1180,7 @@ class LearnedVerifierScorer:
             load_in_16bit=True,
             full_finetuning=False,
         )
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.model.generation_config.eos_token_id = self.tokenizer.eos_token_id
-        self.model.generation_config.pad_token_id = self.tokenizer.eos_token_id
+        configure_left_padded_generation(self.model, self.tokenizer)
         FastLanguageModel.for_inference(self.model)
         self.model.eval()
 
@@ -1185,6 +1192,7 @@ class LearnedVerifierScorer:
         scores: list[float] = []
         for start in range(0, len(prompts), self.batch_size):
             batch_prompts = prompts[start : start + self.batch_size]
+            configure_left_padded_generation(self.model, self.tokenizer)
             inputs = self.tokenizer(
                 text=batch_prompts,
                 return_tensors="pt",
@@ -1237,6 +1245,7 @@ class LearnedMetaVerifierScorer(LearnedVerifierScorer):
         scores: list[float] = []
         for start in range(0, len(prompts), self.batch_size):
             batch_prompts = prompts[start : start + self.batch_size]
+            configure_left_padded_generation(self.model, self.tokenizer)
             inputs = self.tokenizer(
                 text=batch_prompts,
                 return_tensors="pt",
@@ -1708,10 +1717,7 @@ def generate_predictions(
     raw_predictions: list[str] = []
     model.eval()
     batch_size = max(1, batch_size)
-    if getattr(tokenizer, "pad_token", None) is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    if hasattr(tokenizer, "padding_side"):
-        tokenizer.padding_side = "left"
+    configure_left_padded_generation(model, tokenizer)
     for start in range(0, len(rows), batch_size):
         batch_rows = rows[start : start + batch_size]
         prompts: list[str] = []
@@ -1916,10 +1922,7 @@ def main() -> None:
     final_trainable_parameters = trainable_parameter_count(model)
     if final_trainable_parameters == 0:
         raise RuntimeError("GSPO policy setup produced zero trainable parameters.")
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    model.generation_config.eos_token_id = tokenizer.eos_token_id
-    model.generation_config.pad_token_id = tokenizer.eos_token_id
+    configure_left_padded_generation(model, tokenizer)
 
     use_self_verification_prompt = args.reward_profile in SELF_VERIFIABLE_PROFILES
     use_self_verification_thinking = args.reward_profile == "self_verifiable_thinking_translation_2511"
@@ -2027,6 +2030,7 @@ def main() -> None:
             fp16=not torch.cuda.is_bf16_supported(),
         ),
     )
+    configure_left_padded_generation(model, tokenizer)
 
     trainer.train(
         resume_from_checkpoint=str(args.resume_from_checkpoint)
