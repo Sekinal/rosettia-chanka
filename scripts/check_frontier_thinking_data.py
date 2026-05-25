@@ -145,6 +145,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=0.0,
         help="Require average frontier_audit.score across audited rows. Disabled at 0.",
     )
+    parser.add_argument(
+        "--min-reference-final-match-rate",
+        type=float,
+        default=0.0,
+        help=(
+            "Require this fraction of accepted rows to have Traduccion final exactly match the reviewed "
+            "reference after whitespace normalization. Disabled at 0."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -194,6 +203,28 @@ def analysis_text(record: dict[str, Any]) -> str:
     return target
 
 
+def normalize_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def final_translation_text(record: dict[str, Any]) -> str:
+    target = str(record.get("target") or "")
+    match = re.search(
+        r"traduccion final\s*:\s*(.*?)(?:autoevaluacion\s*:|puntaje\s*:|$)",
+        target,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if not match:
+        return ""
+    return normalize_text(match.group(1))
+
+
+def final_matches_reference(record: dict[str, Any]) -> bool:
+    reference = normalize_text(str(record.get("reference") or ""))
+    final_translation = final_translation_text(record)
+    return bool(reference) and final_translation == reference
+
+
 def is_specific_analysis(record: dict[str, Any], analysis_tokens: set[str]) -> bool:
     if analysis_tokens.intersection(TRANSLATION_SPECIFIC_TERMS):
         return True
@@ -217,6 +248,7 @@ def primitive_counts(path: Path | None) -> dict[str, Any]:
             "audited_rows": 0,
             "audit_pass_rows": 0,
             "audit_scores": [],
+            "reference_final_match_rows": 0,
         }
     tag_counts: collections.Counter[str] = collections.Counter()
     missing_expected_counts: collections.Counter[str] = collections.Counter()
@@ -228,6 +260,7 @@ def primitive_counts(path: Path | None) -> dict[str, Any]:
     audited_rows = 0
     audit_pass_rows = 0
     audit_scores: list[float] = []
+    reference_final_match_rows = 0
     for record in iter_jsonl(path):
         text = analysis_text(record)
         present = [tag for tag in PRIMITIVES if tag in text]
@@ -252,6 +285,7 @@ def primitive_counts(path: Path | None) -> dict[str, Any]:
                 audit_scores.append(float(audit.get("score", 0.0)))
             except (TypeError, ValueError):
                 pass
+        reference_final_match_rows += int(final_matches_reference(record))
     return {
         "primitive_rows": len(row_tag_counts),
         "primitive_tag_total": sum(row_tag_counts),
@@ -265,6 +299,7 @@ def primitive_counts(path: Path | None) -> dict[str, Any]:
         "audited_rows": audited_rows,
         "audit_pass_rows": audit_pass_rows,
         "audit_scores": audit_scores,
+        "reference_final_match_rows": reference_final_match_rows,
     }
 
 
@@ -301,6 +336,7 @@ def gate_metrics(
     audited_rows = int(primitives.get("audited_rows", 0))
     audit_pass_rows = int(primitives.get("audit_pass_rows", 0))
     audit_scores = list(primitives.get("audit_scores", []))
+    reference_final_match_rows = int(primitives.get("reference_final_match_rows", 0))
     metrics = {
         "written_rows": float(counts["written"]),
         "failed_rows": float(counts["failed"]),
@@ -320,6 +356,8 @@ def gate_metrics(
         "audited_row_rate": audited_rows / max(1, primitive_rows),
         "audit_pass_rate": audit_pass_rows / max(1, primitive_rows),
         "avg_audit_score": sum(audit_scores) / max(1, len(audit_scores)),
+        "reference_final_match_rows": float(reference_final_match_rows),
+        "reference_final_match_rate": reference_final_match_rows / max(1, primitive_rows),
     }
     if min_tags_per_row > 0:
         rows_with_min_tags = sum(1 for count in row_tag_counts if count >= min_tags_per_row)
@@ -350,6 +388,7 @@ def check_gate(
     min_audited_row_rate: float = 0.0,
     min_audit_pass_rate: float = 0.0,
     min_avg_audit_score: float = 0.0,
+    min_reference_final_match_rate: float = 0.0,
 ) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     if metrics["written_rows"] < min_written_rows:
@@ -385,6 +424,11 @@ def check_gate(
         reasons.append(f"audit_pass_rate {metrics['audit_pass_rate']:.4f} < {min_audit_pass_rate:.4f}")
     if min_avg_audit_score > 0 and metrics["avg_audit_score"] < min_avg_audit_score:
         reasons.append(f"avg_audit_score {metrics['avg_audit_score']:.4f} < {min_avg_audit_score:.4f}")
+    if min_reference_final_match_rate > 0 and metrics["reference_final_match_rate"] < min_reference_final_match_rate:
+        reasons.append(
+            "reference_final_match_rate "
+            f"{metrics['reference_final_match_rate']:.4f} < {min_reference_final_match_rate:.4f}"
+        )
     return not reasons, reasons
 
 
@@ -410,6 +454,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.min_audited_row_rate,
         args.min_audit_pass_rate,
         args.min_avg_audit_score,
+        args.min_reference_final_match_rate,
     )
     report = {
         **metrics,
@@ -425,6 +470,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "min_audited_row_rate": args.min_audited_row_rate,
         "min_audit_pass_rate": args.min_audit_pass_rate,
         "min_avg_audit_score": args.min_avg_audit_score,
+        "min_reference_final_match_rate": args.min_reference_final_match_rate,
         "passed": passed,
         "reasons": reasons,
     }

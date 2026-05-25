@@ -293,6 +293,71 @@ class CheckFrontierThinkingDataTests(unittest.TestCase):
         self.assertIn("audit_pass_rate 0.5000 < 1.0000", reasons)
         self.assertIn("avg_audit_score 0.6000 < 0.7500", reasons)
 
+    def test_reference_final_match_gate_passes_when_final_translation_is_reference(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "out.jsonl"
+            output.write_text(
+                json.dumps(
+                    {
+                        "reference": "Kimsa qillqa kasqan.",
+                        "target": (
+                            "Analisis de traduccion: [SIGNIFICADO] conserva documentos.\n"
+                            "Traduccion final: Kimsa qillqa kasqan.\n"
+                            "Autoevaluacion: suficiente\n"
+                            "Puntaje: \\boxed{0.90}"
+                        ),
+                    }
+                )
+                + "\n"
+            )
+
+            metrics = checker.gate_metrics(
+                {"written": 1, "failed": 0, "requested": 1},
+                checker.primitive_counts(output),
+            )
+            passed, reasons = checker.check_gate(
+                metrics,
+                min_written_rows=1,
+                min_accept_rate=0.5,
+                min_reference_final_match_rate=1.0,
+            )
+
+        self.assertTrue(passed)
+        self.assertEqual(reasons, [])
+        self.assertEqual(metrics["reference_final_match_rate"], 1.0)
+
+    def test_reference_final_match_gate_fails_when_model_translation_replaces_reference(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "out.jsonl"
+            output.write_text(
+                json.dumps(
+                    {
+                        "reference": "Kimsa qillqa kasqan.",
+                        "target": (
+                            "Analisis de traduccion: [SIGNIFICADO] conserva documentos.\n"
+                            "Traduccion final: Mana chaychu.\n"
+                            "Autoevaluacion: suficiente\n"
+                            "Puntaje: \\boxed{0.90}"
+                        ),
+                    }
+                )
+                + "\n"
+            )
+
+            metrics = checker.gate_metrics(
+                {"written": 1, "failed": 0, "requested": 1},
+                checker.primitive_counts(output),
+            )
+            passed, reasons = checker.check_gate(
+                metrics,
+                min_written_rows=1,
+                min_accept_rate=0.5,
+                min_reference_final_match_rate=1.0,
+            )
+
+        self.assertFalse(passed)
+        self.assertIn("reference_final_match_rate 0.0000 < 1.0000", reasons)
+
 
 if __name__ == "__main__":
     unittest.main()

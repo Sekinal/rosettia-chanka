@@ -160,6 +160,7 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         f"- audited row rate: {metrics.get('audited_row_rate', 0.0):.4f}",
         f"- audit pass rate: {metrics.get('audit_pass_rate', 0.0):.4f}",
         f"- avg audit score: {metrics.get('avg_audit_score', 0.0):.4f}",
+        f"- reference final match rate: {metrics.get('reference_final_match_rate', 0.0):.4f}",
         "",
         "## Primitive Tags",
         "",
