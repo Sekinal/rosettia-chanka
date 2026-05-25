@@ -20,7 +20,12 @@ from typing import Any, Sequence
 ALLOWED_ACTIONS = {
     "frontier_generation": {
         "scripts": {"experiments/gspo/run_deepseek_v4_pro_paid_generation_smoke.sh"},
-        "env": {"DATA_DIR"},
+        "env": {
+            "DATA_DIR",
+            "FRONTIER_MAX_API_REQUESTS",
+            "FRONTIER_MAX_ROWS",
+            "MIN_PAID_SMOKE_ACCEPTED_ROWS",
+        },
     },
     "sft_seed": {
         "scripts": {"experiments/gspo/run_deepseek_v4_pro_sft_from_frontier_data.sh"},

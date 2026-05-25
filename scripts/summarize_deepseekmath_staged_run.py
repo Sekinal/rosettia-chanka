@@ -33,6 +33,27 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--output-md", type=Path, default=None)
     parser.add_argument("--fail-if-blocked", action="store_true")
+    parser.add_argument(
+        "--min-frontier-rows-for-serious-sft",
+        type=int,
+        default=64,
+        help=(
+            "If an SFT seed fails with fewer accepted frontier rows than this, "
+            "recommend expanding the frontier data before more policy training."
+        ),
+    )
+    parser.add_argument(
+        "--scaled-frontier-api-requests-per-row",
+        type=int,
+        default=2,
+        help="API request budget multiplier for the scaled frontier-generation recommendation.",
+    )
+    parser.add_argument(
+        "--scaled-frontier-min-accepted-rows",
+        type=int,
+        default=48,
+        help="Accepted-row data-gate floor for the scaled frontier-generation recommendation.",
+    )
     return parser.parse_args(argv)
 
 
@@ -210,7 +231,15 @@ def summarize_gspo(gspo_dir: Path | None) -> dict[str, Any]:
     return cycle_summary(gspo_dir, manifest_path)
 
 
-def next_action(frontier: dict[str, Any], sft: dict[str, Any], gspo: dict[str, Any]) -> dict[str, str]:
+def next_action(
+    frontier: dict[str, Any],
+    sft: dict[str, Any],
+    gspo: dict[str, Any],
+    *,
+    min_frontier_rows_for_serious_sft: int,
+    scaled_frontier_api_requests_per_row: int,
+    scaled_frontier_min_accepted_rows: int,
+) -> dict[str, str]:
     if not frontier.get("ready"):
         if frontier.get("preapi_ready") and frontier.get("dir"):
             frontier_dir = frontier.get("dir")
@@ -253,6 +282,30 @@ def next_action(frontier: dict[str, Any], sft: dict[str, Any], gspo: dict[str, A
         }
     if not gspo.get("exists"):
         if sft.get("promoted") is False:
+            accepted_rows = int(frontier.get("accepted_rows") or 0)
+            if frontier.get("dir") and accepted_rows < min_frontier_rows_for_serious_sft:
+                frontier_dir = frontier.get("dir")
+                target_rows = max(min_frontier_rows_for_serious_sft, accepted_rows + 1)
+                max_requests = max(
+                    target_rows * max(1, scaled_frontier_api_requests_per_row),
+                    int(frontier.get("max_api_requests") or 0),
+                )
+                min_accepted = min(target_rows, max(accepted_rows + 1, scaled_frontier_min_accepted_rows))
+                return {
+                    "stage": "frontier_generation",
+                    "command": (
+                        f"DATA_DIR={frontier_dir} "
+                        f"FRONTIER_MAX_ROWS={target_rows} "
+                        f"FRONTIER_MAX_API_REQUESTS={max_requests} "
+                        f"MIN_PAID_SMOKE_ACCEPTED_ROWS={min_accepted} "
+                        "experiments/gspo/run_deepseek_v4_pro_paid_generation_smoke.sh"
+                    ),
+                    "reason": (
+                        "SFT seed was not promoted and the accepted frontier set is too small "
+                        f"for a serious SFT attempt ({accepted_rows} < {min_frontier_rows_for_serious_sft}); "
+                        "resume paid frontier generation in the same data directory before retraining."
+                    ),
+                }
             hardcase_count = 0
             if isinstance(sft.get("output_hardcases"), dict):
                 try:
@@ -313,7 +366,14 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     frontier = summarize_frontier(frontier_dir)
     sft = summarize_sft(sft_dir)
     gspo = summarize_gspo(gspo_dir)
-    action = next_action(frontier, sft, gspo)
+    action = next_action(
+        frontier,
+        sft,
+        gspo,
+        min_frontier_rows_for_serious_sft=max(1, int(args.min_frontier_rows_for_serious_sft)),
+        scaled_frontier_api_requests_per_row=max(1, int(args.scaled_frontier_api_requests_per_row)),
+        scaled_frontier_min_accepted_rows=max(1, int(args.scaled_frontier_min_accepted_rows)),
+    )
     return {
         "discovery": {
             "enabled": bool(args.discover),

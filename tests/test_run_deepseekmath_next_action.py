@@ -26,12 +26,29 @@ class RunDeepSeekMathNextActionTests(unittest.TestCase):
             touch_script(root, script)
 
             report = runner.validate_action(
-                status("frontier_generation", f"DATA_DIR=outputs/frontier {script}"),
+                status(
+                    "frontier_generation",
+                    (
+                        "DATA_DIR=outputs/frontier "
+                        "FRONTIER_MAX_ROWS=64 "
+                        "FRONTIER_MAX_API_REQUESTS=128 "
+                        "MIN_PAID_SMOKE_ACCEPTED_ROWS=48 "
+                        f"{script}"
+                    ),
+                ),
                 root,
             )
 
         self.assertTrue(report["approved"])
-        self.assertEqual(report["env"], {"DATA_DIR": "outputs/frontier"})
+        self.assertEqual(
+            report["env"],
+            {
+                "DATA_DIR": "outputs/frontier",
+                "FRONTIER_MAX_API_REQUESTS": "128",
+                "FRONTIER_MAX_ROWS": "64",
+                "MIN_PAID_SMOKE_ACCEPTED_ROWS": "48",
+            },
+        )
         self.assertEqual(report["script"], script)
 
     def test_approves_promoted_manifest_command(self):
