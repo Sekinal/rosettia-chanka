@@ -96,6 +96,26 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         self.assertEqual(payload["model"], "deepseek-v4-flash")
         self.assertIn("pass (boolean)", payload["messages"][1]["content"])
 
+    def test_audit_prompt_rejects_vacuous_checks(self):
+        messages = builder.audit_messages(
+            "El juez Juan aprobo 3 documentos.",
+            "Juan sutiyuq juezqa kimsa qillqata chaskirqan.",
+            {
+                "analysis": "[SIGNIFICADO] correcto; [GRAMATICA] correcto.",
+                "translation": "Juan sutiyuq juezqa kimsa qillqata chaskirqan.",
+                "self_evaluation": "Riesgo bajo.",
+                "score": 0.9,
+                "expected_primitives": ["[SIGNIFICADO]", "[GRAMATICA]"],
+            },
+        )
+        content = messages[1]["content"]
+
+        self.assertIn("Reject generic analyses", content)
+        self.assertIn("at least six non-tag analysis words", content)
+        self.assertIn("Source terms to consider:", content)
+        self.assertIn("Reference terms to consider:", content)
+        self.assertIn("Juan", content)
+
     def test_parse_frontier_json_and_build_target_keeps_reference_by_default(self):
         parsed = builder.parse_frontier_json(
             json.dumps(

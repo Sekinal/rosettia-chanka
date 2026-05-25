@@ -402,6 +402,8 @@ def audit_messages(source: str, reference: str, parsed: dict[str, Any]) -> list[
     expected_line = ""
     if isinstance(expected, list) and expected:
         expected_line = f"\nRequired primitive tags: {', '.join(str(tag) for tag in expected)}\n"
+    source_terms = ", ".join(tokens_for_prompt(source)[:5]) or "none"
+    reference_terms = ", ".join(tokens_for_prompt(reference)[:5]) or "none"
     return [
         {
             "role": "system",
@@ -421,9 +423,14 @@ def audit_messages(source: str, reference: str, parsed: dict[str, Any]) -> list[
                 f"Self evaluation:\n{parsed['self_evaluation']}\n\n"
                 f"Score:\n{parsed['score']}\n\n"
                 f"{expected_line}"
+                f"Source terms to consider: {source_terms}.\n"
+                f"Reference terms to consider: {reference_terms}.\n\n"
                 "Accept only if the analysis is concise, uses the primitive tags correctly, "
                 "includes the required primitive tags when provided, does not invent unsupported grammar claims, "
-                "and the final translation is compatible with the reference.\n"
+                "and the final translation is compatible with the reference. "
+                "Reject generic analyses such as 'correcto' or 'mantiene significado' by themselves. "
+                "Each accepted tag must mention a concrete source/reference token, entity, suffix/grammar issue, "
+                "terminology choice, or Spanish-copy risk, with at least six non-tag analysis words.\n"
                 "Return a JSON object with exactly: pass (boolean), score (0.0 to 1.0), reason (short sentence)."
             ),
         },
