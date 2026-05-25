@@ -154,6 +154,27 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
         self.assertIn("MIN_FRONTIER_ROWS_FOR_SFT=64", report["next_action"]["command"])
         self.assertIn("enough accepted rows", report["next_action"]["reason"])
 
+    def test_non_tiny_frontier_without_sft_recommends_reproducible_sft_seed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            frontier = Path(tmpdir) / "frontier_thinking_data_20260525-paid-smoke-32768"
+            write_frontier(frontier, accepted_rows=61)
+
+            report = summarize.build_report(
+                summarize.parse_args(
+                    [
+                        "--frontier-dir",
+                        str(frontier),
+                        "--no-discover",
+                        "--output-json",
+                        str(Path(tmpdir) / "status.json"),
+                    ]
+                )
+            )
+
+        self.assertEqual(report["next_action"]["stage"], "sft_seed")
+        self.assertIn("STAMP=20260525-paid-smoke-32768-sft-r61", report["next_action"]["command"])
+        self.assertIn("MIN_FRONTIER_ROWS_FOR_SFT=61", report["next_action"]["command"])
+
     def test_frontier_report_without_paid_gate_does_not_unlock_sft(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -349,6 +370,31 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
         self.assertIn("FRONTIER_MAX_API_REQUESTS=128", report["next_action"]["command"])
         self.assertIn("MIN_PAID_SMOKE_ACCEPTED_ROWS=48", report["next_action"]["command"])
         self.assertIn("too small", report["next_action"]["reason"])
+
+    def test_failed_non_tiny_sft_seed_prefers_hardcases_over_topping_up_frontier(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            frontier = root / "frontier"
+            sft = root / "sft"
+            write_frontier(frontier, accepted_rows=61)
+            write_cycle(sft, "sft_seed", promoted=False, frontier_records=61)
+
+            report = summarize.build_report(
+                summarize.parse_args(
+                    [
+                        "--frontier-dir",
+                        str(frontier),
+                        "--sft-dir",
+                        str(sft),
+                        "--no-discover",
+                        "--output-json",
+                        str(root / "status.json"),
+                    ]
+                )
+            )
+
+        self.assertEqual(report["next_action"]["stage"], "hardcase_iteration")
+        self.assertIn("SFT_META_JSONL=", report["next_action"]["command"])
 
     def test_failed_sft_seed_with_stale_frontier_lineage_recommends_fresh_sft(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -38,8 +38,20 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=int,
         default=64,
         help=(
+            "Target accepted frontier rows for a serious SFT seed. If no SFT exists "
+            "and this floor is met, the recommended command includes a reproducible "
+            "row-count stamp."
+        ),
+    )
+    parser.add_argument(
+        "--min-frontier-rows-for-tiny-sft",
+        type=int,
+        default=48,
+        help=(
             "If an SFT seed fails with fewer accepted frontier rows than this, "
-            "recommend expanding the frontier data before more policy training."
+            "treat it as a data-scale failure and recommend expanding frontier data. "
+            "Above this floor, prefer hardcase iteration over asking for only a few "
+            "more paid rows."
         ),
     )
     parser.add_argument(
@@ -260,6 +272,7 @@ def next_action(
     gspo: dict[str, Any],
     *,
     min_frontier_rows_for_serious_sft: int,
+    min_frontier_rows_for_tiny_sft: int,
     scaled_frontier_api_requests_per_row: int,
     scaled_frontier_min_accepted_rows: int,
 ) -> dict[str, str]:
@@ -293,8 +306,13 @@ def next_action(
     if not sft.get("exists"):
         frontier_dir = frontier.get("dir") or "<frontier_data_dir>"
         accepted_rows = int(frontier.get("accepted_rows") or 0)
-        if frontier.get("dir") and accepted_rows >= min_frontier_rows_for_serious_sft:
+        if frontier.get("dir") and accepted_rows >= min_frontier_rows_for_tiny_sft:
             stamp = safe_stamp_from_frontier(str(frontier_dir), accepted_rows)
+            scale_note = (
+                "serious"
+                if accepted_rows >= min_frontier_rows_for_serious_sft
+                else "non-tiny"
+            )
             return {
                 "stage": "sft_seed",
                 "command": (
@@ -304,7 +322,7 @@ def next_action(
                     "experiments/gspo/run_deepseek_v4_pro_sft_from_frontier_data.sh"
                 ),
                 "reason": (
-                    "Frontier data has enough accepted rows for a serious SFT seed, "
+                    f"Frontier data has enough accepted rows for a {scale_note} SFT seed, "
                     "and no SFT seed manifest was found."
                 ),
             }
@@ -322,7 +340,7 @@ def next_action(
     if not gspo.get("exists"):
         if sft.get("promoted") is False:
             accepted_rows = int(frontier.get("accepted_rows") or 0)
-            if frontier.get("dir") and accepted_rows < min_frontier_rows_for_serious_sft:
+            if frontier.get("dir") and accepted_rows < min_frontier_rows_for_tiny_sft:
                 frontier_dir = frontier.get("dir")
                 target_rows = max(min_frontier_rows_for_serious_sft, accepted_rows + 1)
                 max_requests = max(
@@ -341,7 +359,7 @@ def next_action(
                     ),
                     "reason": (
                         "SFT seed was not promoted and the accepted frontier set is too small "
-                        f"for a serious SFT attempt ({accepted_rows} < {min_frontier_rows_for_serious_sft}); "
+                        f"for a non-tiny SFT attempt ({accepted_rows} < {min_frontier_rows_for_tiny_sft}); "
                         "resume paid frontier generation in the same data directory before retraining."
                     ),
                 }
@@ -437,6 +455,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         sft,
         gspo,
         min_frontier_rows_for_serious_sft=max(1, int(args.min_frontier_rows_for_serious_sft)),
+        min_frontier_rows_for_tiny_sft=max(1, int(args.min_frontier_rows_for_tiny_sft)),
         scaled_frontier_api_requests_per_row=max(1, int(args.scaled_frontier_api_requests_per_row)),
         scaled_frontier_min_accepted_rows=max(1, int(args.scaled_frontier_min_accepted_rows)),
     )
