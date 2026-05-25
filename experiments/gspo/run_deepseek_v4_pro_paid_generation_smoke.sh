@@ -13,6 +13,7 @@ FRONTIER_MODEL="${FRONTIER_MODEL:-deepseek-v4-pro}"
 FRONTIER_REASONING_EFFORT="${FRONTIER_REASONING_EFFORT:-max}"
 FRONTIER_API_KEY_ENV="${FRONTIER_API_KEY_ENV:-DEEPSEEK_API_KEY}"
 READ_FRONTIER_API_KEY="${READ_FRONTIER_API_KEY:-true}"
+RUN_FRONTIER_GENERATION="${RUN_FRONTIER_GENERATION:-true}"
 
 MIN_FRONTIER_ROWS_FOR_SFT="${MIN_FRONTIER_ROWS_FOR_SFT:-$FRONTIER_MAX_ROWS}"
 MIN_FRONTIER_SELECTION_ROWS="${MIN_FRONTIER_SELECTION_ROWS:-$FRONTIER_MAX_ROWS}"
@@ -35,7 +36,15 @@ FRONTIER_SUMMARY_JSON="${FRONTIER_SUMMARY_JSON:-${DATA_DIR}/deepseek_v4_pro_thin
 FRONTIER_REPORT_MD="${FRONTIER_REPORT_MD:-${DATA_DIR}/deepseek_v4_pro_thinking_report.md}"
 PAID_SMOKE_GATE_JSON="${PAID_SMOKE_GATE_JSON:-${DATA_DIR}/deepseek_v4_pro_paid_smoke_gate.json}"
 
-if [[ -z "${!FRONTIER_API_KEY_ENV:-}" ]]; then
+is_truthy() {
+  [[ "$1" == "true" || "$1" == "1" || "$1" == "yes" ]]
+}
+
+is_falsey() {
+  [[ "$1" == "false" || "$1" == "0" || "$1" == "no" ]]
+}
+
+if is_truthy "$RUN_FRONTIER_GENERATION" && [[ -z "${!FRONTIER_API_KEY_ENV:-}" ]]; then
   if [[ "$READ_FRONTIER_API_KEY" == "true" || "$READ_FRONTIER_API_KEY" == "1" || "$READ_FRONTIER_API_KEY" == "yes" ]]; then
     if [[ ! -t 0 ]]; then
       echo "${FRONTIER_API_KEY_ENV} is unset and stdin is not an interactive terminal." >&2
@@ -71,6 +80,9 @@ cd "$ROOT_DIR"
 
 echo "Starting DeepSeek V4 Pro paid generation smoke."
 echo "Rows: $FRONTIER_MAX_ROWS; max API requests: $FRONTIER_MAX_API_REQUESTS; SFT disabled."
+if is_falsey "$RUN_FRONTIER_GENERATION"; then
+  echo "Frontier generation disabled; running selection, prompt-preview, and preflight only."
+fi
 echo "Data directory: $DATA_DIR"
 
 ROOT_DIR="$ROOT_DIR" \
@@ -87,12 +99,20 @@ FRONTIER_API_KEY_ENV="$FRONTIER_API_KEY_ENV" \
 FRONTIER_MAX_ROWS="$FRONTIER_MAX_ROWS" \
 FRONTIER_MAX_API_REQUESTS="$FRONTIER_MAX_API_REQUESTS" \
 FRONTIER_AUDIT="$FRONTIER_AUDIT" \
+RUN_FRONTIER_GENERATION="$RUN_FRONTIER_GENERATION" \
+PREFLIGHT_REQUIRE_API_KEY="${PREFLIGHT_REQUIRE_API_KEY:-$RUN_FRONTIER_GENERATION}" \
 MIN_FRONTIER_ROWS_FOR_SFT="$MIN_FRONTIER_ROWS_FOR_SFT" \
 MIN_FRONTIER_SELECTION_ROWS="$MIN_FRONTIER_SELECTION_ROWS" \
 MAX_FRONTIER_SELECTION_REQUESTS="$MAX_FRONTIER_SELECTION_REQUESTS" \
 RUN_THINKING_SFT=false \
 RUN_GSPO=false \
 experiments/gspo/run_deepseek_v4_pro_thinking_sft_then_gspo.sh
+
+if is_falsey "$RUN_FRONTIER_GENERATION"; then
+  echo "Pre-API paid-smoke dry run completed without frontier generation."
+  echo "Pre-API readiness report: ${DATA_DIR}/deepseek_v4_pro_preapi_readiness.md"
+  exit 0
+fi
 
 set +e
 "$PYTHON" scripts/check_frontier_thinking_data.py \
