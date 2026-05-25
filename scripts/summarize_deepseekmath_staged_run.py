@@ -23,6 +23,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--frontier-dir", type=Path, default=None)
     parser.add_argument("--sft-dir", type=Path, default=None)
     parser.add_argument("--gspo-dir", type=Path, default=None)
+    parser.add_argument("--output-root", type=Path, default=Path("outputs"))
+    parser.add_argument(
+        "--discover",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="When stage directories are omitted, discover latest matching artifacts under --output-root.",
+    )
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--output-md", type=Path, default=None)
     parser.add_argument("--fail-if-blocked", action="store_true")
@@ -55,6 +62,49 @@ def metric(metrics: dict[str, Any] | None, key: str, default: float = 0.0) -> fl
         return float(metrics.get(key, default))
     except (TypeError, ValueError):
         return default
+
+
+def newest_dir_with_file(output_root: Path, filename: str) -> Path | None:
+    if not output_root.exists():
+        return None
+    candidates = [path.parent for path in output_root.rglob(filename) if path.is_file()]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda path: (path / filename).stat().st_mtime)
+
+
+def newest_cycle_dir(output_root: Path, stage: str) -> Path | None:
+    if not output_root.exists():
+        return None
+    candidates: list[tuple[float, Path]] = []
+    for manifest_path in output_root.rglob("cycle_manifest.json"):
+        manifest = load_json(manifest_path)
+        if isinstance(manifest, dict) and manifest.get("stage") == stage:
+            candidates.append((manifest_path.stat().st_mtime, manifest_path.parent))
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: item[0])[1]
+
+
+def discover_dirs(args: argparse.Namespace) -> tuple[Path | None, Path | None, Path | None]:
+    if not args.discover:
+        return args.frontier_dir, args.sft_dir, args.gspo_dir
+
+    frontier_dir = args.frontier_dir
+    if frontier_dir is None:
+        frontier_dir = newest_dir_with_file(args.output_root, "deepseek_v4_pro_thinking_report.json")
+    if frontier_dir is None:
+        frontier_dir = newest_dir_with_file(args.output_root, "deepseek_v4_pro_preapi_readiness.json")
+
+    sft_dir = args.sft_dir
+    if sft_dir is None:
+        sft_dir = newest_cycle_dir(args.output_root, "sft_seed")
+
+    gspo_dir = args.gspo_dir
+    if gspo_dir is None:
+        gspo_dir = newest_cycle_dir(args.output_root, "initial_gspo")
+
+    return frontier_dir, sft_dir, gspo_dir
 
 
 def frontier_paths(frontier_dir: Path | None) -> dict[str, Path | None]:
@@ -90,9 +140,11 @@ def summarize_frontier(frontier_dir: Path | None) -> dict[str, Any]:
     accepted_rows = metric(metrics, "written_rows")
     expected_coverage = metric(metrics, "expected_primitive_coverage")
     ready = bool(report) and accepted_rows > 0 and gate_passed is not False
+    preapi_ready = preapi.get("ready_for_api") if isinstance(preapi, dict) else None
     return {
         "dir": str(frontier_dir) if frontier_dir else None,
         "ready": ready,
+        "preapi_only": bool(preapi_ready) and not bool(report),
         "accepted_rows": accepted_rows,
         "failed_rows": metric(metrics, "failed_rows"),
         "accept_rate": metric(metrics, "accept_rate"),
@@ -102,7 +154,7 @@ def summarize_frontier(frontier_dir: Path | None) -> dict[str, Any]:
         "max_api_requests": summary.get("max_api_requests") if isinstance(summary, dict) else None,
         "stopped_by_api_request_budget": summary.get("stopped_by_api_request_budget") if isinstance(summary, dict) else None,
         "paid_gate_passed": gate_passed,
-        "preapi_ready": preapi.get("ready_for_api") if isinstance(preapi, dict) else None,
+        "preapi_ready": preapi_ready,
         "artifacts": {name: path_record(path) for name, path in paths.items()},
     }
 
@@ -151,6 +203,13 @@ def summarize_gspo(gspo_dir: Path | None) -> dict[str, Any]:
 
 def next_action(frontier: dict[str, Any], sft: dict[str, Any], gspo: dict[str, Any]) -> dict[str, str]:
     if not frontier.get("ready"):
+        if frontier.get("preapi_ready") and frontier.get("dir"):
+            frontier_dir = frontier.get("dir")
+            return {
+                "stage": "frontier_generation",
+                "command": f"DATA_DIR={frontier_dir} experiments/gspo/run_deepseek_v4_pro_paid_generation_smoke.sh",
+                "reason": "Pre-API readiness passed, but no accepted paid frontier report exists yet.",
+            }
         return {
             "stage": "frontier_generation",
             "command": "experiments/gspo/run_deepseek_v4_pro_paid_generation_smoke.sh",
@@ -190,16 +249,24 @@ def next_action(frontier: dict[str, Any], sft: dict[str, Any], gspo: dict[str, A
 
 
 def build_report(args: argparse.Namespace) -> dict[str, Any]:
-    frontier = summarize_frontier(args.frontier_dir)
-    sft = summarize_sft(args.sft_dir)
-    gspo = summarize_gspo(args.gspo_dir)
+    frontier_dir, sft_dir, gspo_dir = discover_dirs(args)
+    frontier = summarize_frontier(frontier_dir)
+    sft = summarize_sft(sft_dir)
+    gspo = summarize_gspo(gspo_dir)
     action = next_action(frontier, sft, gspo)
     return {
+        "discovery": {
+            "enabled": bool(args.discover),
+            "output_root": str(args.output_root),
+            "frontier_dir": str(frontier_dir) if frontier_dir else None,
+            "sft_dir": str(sft_dir) if sft_dir else None,
+            "gspo_dir": str(gspo_dir) if gspo_dir else None,
+        },
         "frontier": frontier,
         "sft_seed": sft,
         "initial_gspo": gspo,
         "next_action": action,
-        "blocked": action["stage"] == "frontier_generation",
+        "blocked": action["stage"] == "frontier_generation" and not frontier.get("preapi_ready"),
     }
 
 
@@ -226,6 +293,7 @@ def write_markdown(report: dict[str, Any], path: Path) -> None:
         "",
         f"- directory: `{frontier.get('dir')}`",
         f"- ready: {frontier.get('ready')}",
+        f"- pre-API ready: {frontier.get('preapi_ready')}",
         f"- accepted rows: {fmt(frontier.get('accepted_rows'))}",
         f"- failed rows: {fmt(frontier.get('failed_rows'))}",
         f"- accept rate: {fmt(frontier.get('accept_rate'))}",

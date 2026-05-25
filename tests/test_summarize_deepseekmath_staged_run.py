@@ -30,6 +30,17 @@ def write_frontier(root: Path, gate_passed: bool = True) -> None:
     write_json(root / "deepseek_v4_pro_paid_smoke_gate.json", {"passed": gate_passed})
 
 
+def write_preapi(root: Path) -> None:
+    write_json(
+        root / "deepseek_v4_pro_preapi_readiness.json",
+        {
+            "ready_for_api": True,
+            "prompt_preview_rows": 8,
+            "selection_report": {"selected_rows": 8},
+        },
+    )
+
+
 def write_cycle(root: Path, stage: str, promoted: bool, policy_exists: bool = True) -> None:
     adapter = root / "final_lora"
     if policy_exists:
@@ -91,6 +102,44 @@ class SummarizeDeepSeekMathStagedRunTests(unittest.TestCase):
         self.assertEqual(report["next_action"]["stage"], "sft_seed")
         self.assertIn("run_deepseek_v4_pro_sft_from_frontier_data.sh", report["next_action"]["command"])
         self.assertFalse(report["blocked"])
+
+    def test_discovers_preapi_ready_frontier_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            frontier = root / "outputs" / "frontier_thinking_data_preapi"
+            write_preapi(frontier)
+
+            report = summarize.build_report(
+                summarize.parse_args(["--output-root", str(root / "outputs"), "--output-json", str(root / "status.json")])
+            )
+
+        self.assertEqual(report["discovery"]["frontier_dir"], str(frontier))
+        self.assertTrue(report["frontier"]["preapi_ready"])
+        self.assertTrue(report["frontier"]["preapi_only"])
+        self.assertEqual(report["next_action"]["stage"], "frontier_generation")
+        self.assertIn("DATA_DIR=", report["next_action"]["command"])
+        self.assertIn("Pre-API readiness passed", report["next_action"]["reason"])
+        self.assertFalse(report["blocked"])
+
+    def test_discovers_latest_sft_and_gspo_manifests(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            output_root = root / "outputs"
+            frontier = output_root / "frontier"
+            sft = output_root / "sft"
+            gspo = output_root / "gspo"
+            write_frontier(frontier)
+            write_cycle(sft, "sft_seed", promoted=False)
+            write_cycle(gspo, "initial_gspo", promoted=False)
+
+            report = summarize.build_report(
+                summarize.parse_args(["--output-root", str(output_root), "--output-json", str(root / "status.json")])
+            )
+
+        self.assertEqual(report["discovery"]["frontier_dir"], str(frontier))
+        self.assertEqual(report["discovery"]["sft_dir"], str(sft))
+        self.assertEqual(report["discovery"]["gspo_dir"], str(gspo))
+        self.assertEqual(report["next_action"]["stage"], "hardcase_iteration")
 
     def test_recommends_gspo_after_sft_seed_exists(self):
         with tempfile.TemporaryDirectory() as tmpdir:
