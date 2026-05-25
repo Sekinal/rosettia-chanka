@@ -30,6 +30,11 @@ class BuildSelfVerifiableTranslationDataTests(unittest.TestCase):
         self.assertIn("[ANTI_COPIA]", thinking_target)
         self.assertIn("Traduccion final:", thinking_target)
         self.assertIn("Puntaje:", thinking_target)
+        compact_target = builder.compact_thinking_generator_target(rows[0]["target"])
+        self.assertIn("Analisis:", compact_target)
+        self.assertIn("Final:", compact_target)
+        self.assertIn("Puntaje:", compact_target)
+        self.assertNotIn("Autoevaluacion:", compact_target)
         self.assertEqual(len(meta_records), len(verifier_records) * 2)
         labels = [json.loads(record["label"]) for record in meta_records]
         self.assertGreater(max(label["score"] for label in labels), 0.9)

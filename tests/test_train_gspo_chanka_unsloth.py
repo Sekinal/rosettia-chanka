@@ -127,6 +127,20 @@ class TrainGspoChankaUnslothTests(unittest.TestCase):
         self.assertIn("maximo 35 palabras", messages[1]["content"])
         self.assertIn("debe ser corto", messages[1]["content"])
 
+    def test_prompt_can_request_compact_thinking_self_verification_format(self):
+        messages = train_gspo.prompt_messages(
+            "No es un buen esposo.",
+            self_verification=True,
+            self_verification_thinking=True,
+            self_verification_compact=True,
+        )
+
+        self.assertIn("exactamente 3 lineas", messages[1]["content"])
+        self.assertIn("Analisis:", messages[1]["content"])
+        self.assertIn("Final:", messages[1]["content"])
+        self.assertIn("Puntaje:", messages[1]["content"])
+        self.assertIn("No escribas Autoevaluacion", messages[1]["content"])
+
     def test_chat_template_helper_disables_thinking_when_supported(self):
         class ThinkingAwareTokenizer:
             def apply_chat_template(self, messages, enable_thinking=True, **kwargs):
@@ -333,6 +347,19 @@ suffix"""
         self.assertEqual(parsed["translation"], "Mana allin qusachu.")
         self.assertIn("conserva el significado", parsed["thinking"])
         self.assertIn("no veo errores", parsed["self_evaluation"])
+        self.assertTrue(parsed["has_thinking_format"])
+
+    def test_parse_self_verification_output_extracts_compact_thinking(self):
+        parsed = train_gspo.parse_self_verification_output(
+            "Analisis: [SIGNIFICADO] conserva negacion; [GRAMATICA] usa -chu. "
+            "Final: Mana allin qusachu. "
+            "Puntaje: \\boxed{0.84}"
+        )
+
+        self.assertEqual(parsed["translation"], "Mana allin qusachu.")
+        self.assertEqual(parsed["thinking"], "[SIGNIFICADO] conserva negacion; [GRAMATICA] usa -chu.")
+        self.assertEqual(parsed["self_score"], 0.84)
+        self.assertTrue(parsed["has_format"])
         self.assertTrue(parsed["has_thinking_format"])
 
     def test_translation_thinking_score_prefers_primitive_tags(self):
@@ -860,6 +887,31 @@ suffix"""
         self.assertEqual(model.generation_config.eos_token_id, 9)
         self.assertEqual(encoded, "encoded")
         self.assertEqual(processor.tokenizer.kwargs["text"], ["prompt"])
+
+    def test_parse_args_can_disable_truncated_completion_masking(self):
+        args = train_gspo.parse_args(["--no-mask-truncated-completions"])
+
+        self.assertFalse(args.mask_truncated_completions)
+
+    def test_score_box_stop_token_id_uses_single_closing_brace_token(self):
+        class Tokenizer:
+            def encode(self, text, add_special_tokens=False):
+                self.text = text
+                self.add_special_tokens = add_special_tokens
+                return [123]
+
+        tokenizer = Tokenizer()
+
+        self.assertEqual(train_gspo.score_box_stop_token_id(tokenizer), 123)
+        self.assertEqual(tokenizer.text, "}")
+        self.assertFalse(tokenizer.add_special_tokens)
+
+    def test_score_box_stop_token_id_rejects_multi_token_brace(self):
+        class Tokenizer:
+            def encode(self, text, add_special_tokens=False):
+                return [1, 2]
+
+        self.assertIsNone(train_gspo.score_box_stop_token_id(Tokenizer()))
 
 
 if __name__ == "__main__":

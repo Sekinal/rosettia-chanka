@@ -53,6 +53,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Use the bounded-thinking self-verification prompt for JSONL targets.",
     )
+    parser.add_argument(
+        "--prompt-self-verification-compact",
+        action="store_true",
+        help="Use the compact bounded-thinking self-verification prompt for JSONL targets.",
+    )
     parser.add_argument("--model-id", default=train_sft.DEFAULT_MODEL_ID)
     parser.add_argument(
         "--load-in-4bit",
@@ -280,13 +285,18 @@ def format_example(
     terminology_top_k: int = 0,
     prompt_self_verification: bool = False,
     prompt_self_verification_thinking: bool = False,
+    prompt_self_verification_compact: bool = False,
 ) -> dict[str, str]:
     messages = [
         *gspo.prompt_messages(
             row["source"],
             terminology_for_row(row, terminology_entries, terminology_top_k),
-            self_verification=prompt_self_verification or prompt_self_verification_thinking,
-            self_verification_thinking=prompt_self_verification_thinking,
+            self_verification=prompt_self_verification
+            or prompt_self_verification_thinking
+            or prompt_self_verification_compact,
+            self_verification_thinking=prompt_self_verification_thinking
+            or prompt_self_verification_compact,
+            self_verification_compact=prompt_self_verification_compact,
         ),
         {"role": "assistant", "content": row["target"]},
     ]
@@ -310,6 +320,7 @@ def build_dataset(
     terminology_top_k: int = 0,
     prompt_self_verification: bool = False,
     prompt_self_verification_thinking: bool = False,
+    prompt_self_verification_compact: bool = False,
 ) -> Dataset:
     return Dataset.from_list(
         [
@@ -320,6 +331,7 @@ def build_dataset(
                 terminology_top_k,
                 prompt_self_verification,
                 prompt_self_verification_thinking,
+                prompt_self_verification_compact,
             )
             for row in rows
         ]
@@ -420,6 +432,7 @@ def main() -> None:
         args.terminology_top_k,
         args.prompt_self_verification,
         args.prompt_self_verification_thinking,
+        args.prompt_self_verification_compact,
     )
     eval_dataset = build_dataset(
         tokenizer,
@@ -428,6 +441,7 @@ def main() -> None:
         args.terminology_top_k,
         args.prompt_self_verification,
         args.prompt_self_verification_thinking,
+        args.prompt_self_verification_compact,
     )
     configure_step_schedule(args, len(train_dataset))
 
@@ -484,9 +498,10 @@ def main() -> None:
     print(f"Target field: {args.target_field}")
     print(
         "Prompt self-verification: "
-        f"{args.prompt_self_verification or args.prompt_self_verification_thinking}"
+        f"{args.prompt_self_verification or args.prompt_self_verification_thinking or args.prompt_self_verification_compact}"
     )
     print(f"Prompt bounded thinking: {args.prompt_self_verification_thinking}")
+    print(f"Prompt compact thinking: {args.prompt_self_verification_compact}")
     if args.terminology_file:
         print(f"Terminology file: {args.terminology_file}")
         print(f"Terminology entries: {len(terminology_entries):,}")

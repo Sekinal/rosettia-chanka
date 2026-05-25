@@ -101,6 +101,14 @@ def thinking_generator_target(reference: str) -> str:
     )
 
 
+def compact_thinking_generator_target(reference: str) -> str:
+    return (
+        "Analisis: [SIGNIFICADO] conserva sentido; [GRAMATICA] mantiene chanka natural.\n"
+        f"Final: {gspo.normalize_text(reference)}\n"
+        "Puntaje: \\boxed{0.98}"
+    )
+
+
 def build_records(rows: Iterable[dict[str, str]], seed: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     rng = random.Random(seed)
     base_rows = list(rows)
@@ -166,12 +174,25 @@ def main() -> None:
         for record in generator_records
     ]
     write_jsonl(args.output_dir / "self_verifiable_thinking_generator_sft.jsonl", thinking_generator_records)
+    compact_thinking_generator_records = [
+        {
+            **record,
+            "target": compact_thinking_generator_target(record["reference"]),
+            "task": "self_verifiable_compact_thinking_translation_generation",
+        }
+        for record in generator_records
+    ]
+    write_jsonl(
+        args.output_dir / "self_verifiable_compact_thinking_generator_sft.jsonl",
+        compact_thinking_generator_records,
+    )
     summary = {
         "source_rows": len(rows),
         "verifier_records": len(verifier_records),
         "meta_verifier_records": len(meta_records),
         "generator_records": len(generator_records),
         "thinking_generator_records": len(thinking_generator_records),
+        "compact_thinking_generator_records": len(compact_thinking_generator_records),
     }
     (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
     print(json.dumps(summary, indent=2, sort_keys=True))

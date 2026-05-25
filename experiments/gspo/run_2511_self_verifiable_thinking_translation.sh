@@ -11,6 +11,7 @@ METRICS_JSON="${METRICS_JSON:-${OUTPUT_DIR}/chanka_gspo/final_metrics.json}"
 PREDICTIONS_JSONL="${PREDICTIONS_JSONL:-${OUTPUT_DIR}/chanka_gspo/final_predictions.jsonl}"
 TERMINOLOGY_FILE="${TERMINOLOGY_FILE:-clean_chanka/manual_quechua_chanka_glossary_simple_terms.parquet}"
 META_VERIFIER_ADAPTER="${META_VERIFIER_ADAPTER:-}"
+REWARD_PROFILE="${REWARD_PROFILE:-self_verifiable_thinking_translation_2511}"
 
 MAX_STEPS="${MAX_STEPS:-16}"
 EVAL_STEPS="${EVAL_STEPS:-8}"
@@ -41,6 +42,12 @@ SPEED_ARGS=()
 if [[ "$TRAINER_EVAL" == "false" || "$TRAINER_EVAL" == "0" || "$TRAINER_EVAL" == "no" ]]; then
   SPEED_ARGS+=(--no-trainer-eval)
 fi
+if [[ "${MASK_TRUNCATED_COMPLETIONS:-true}" == "false" || "${MASK_TRUNCATED_COMPLETIONS:-true}" == "0" || "${MASK_TRUNCATED_COMPLETIONS:-true}" == "no" ]]; then
+  SPEED_ARGS+=(--no-mask-truncated-completions)
+fi
+if [[ "${STOP_ON_SCORE_BOX:-false}" == "true" || "${STOP_ON_SCORE_BOX:-false}" == "1" || "${STOP_ON_SCORE_BOX:-false}" == "yes" ]]; then
+  SPEED_ARGS+=(--stop-on-score-box)
+fi
 if [[ -n "${FINAL_METRICS_MAX_SAMPLES:-}" ]]; then
   SPEED_ARGS+=(--final-metrics-max-samples "$FINAL_METRICS_MAX_SAMPLES")
 fi
@@ -55,7 +62,7 @@ fi
 "$PYTHON" scripts/train_gspo_chanka_unsloth.py \
   --adapter-path "$BASE_MODEL" \
   --output-dir "$OUTPUT_DIR" \
-  --reward-profile self_verifiable_thinking_translation_2511 \
+  --reward-profile "$REWARD_PROFILE" \
   "${ATTACH_ARGS[@]}" \
   --lora-r "${LORA_R:-32}" \
   --lora-alpha "${LORA_ALPHA:-64}" \

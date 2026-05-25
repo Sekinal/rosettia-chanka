@@ -47,11 +47,17 @@ REWARD_PROFILES = (
     "learned_verifier_bleu_margin_vibe_2511",
     "self_verifiable_translation_2511",
     "self_verifiable_thinking_translation_2511",
+    "self_verifiable_compact_thinking_translation_2511",
     "reference_rerank_vibe_v1",
 )
 SELF_VERIFIABLE_PROFILES = {
     "self_verifiable_translation_2511",
     "self_verifiable_thinking_translation_2511",
+    "self_verifiable_compact_thinking_translation_2511",
+}
+SELF_VERIFIABLE_THINKING_PROFILES = {
+    "self_verifiable_thinking_translation_2511",
+    "self_verifiable_compact_thinking_translation_2511",
 }
 TRANSLATION_THINKING_PRIMITIVES = {
     "SIGNIFICADO": ("significado", "fidelidad", "sentido", "omite", "agrega", "conserva"),
@@ -181,10 +187,26 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--top-p", type=float, default=0.9)
     parser.add_argument("--top-k", type=int, default=50)
     parser.add_argument("--repetition-penalty", type=float, default=1.05)
+    parser.add_argument(
+        "--stop-on-score-box",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="For structured self-verification runs, stop generation when the single-token '}' closing a boxed score is emitted.",
+    )
     parser.add_argument("--beta", type=float, default=0.0)
     parser.add_argument("--epsilon", type=float, default=0.2)
     parser.add_argument("--loss-type", choices=["dapo", "dr_grpo", "grpo", "bnpo"], default="dapo")
     parser.add_argument("--scale-rewards", choices=["group", "batch", "none"], default="group")
+    parser.add_argument(
+        "--mask-truncated-completions",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Mask overlong completions in the GRPO loss. Disable for diagnostic thinking runs "
+            "where every structured completion hits the generation cap and must still teach the "
+            "policy to become shorter."
+        ),
+    )
     parser.add_argument("--eval-steps", type=int, default=None)
     parser.add_argument("--save-steps", type=int, default=None)
     parser.add_argument("--save-total-limit", type=int, default=3)
@@ -406,6 +428,7 @@ def prompt_messages(
     few_shot_examples: Sequence[tuple[str, str]] | None = None,
     self_verification: bool = False,
     self_verification_thinking: bool = False,
+    self_verification_compact: bool = False,
 ) -> list[dict[str, str]]:
     user_content = (
         "Traduce del español al quechua chanka. Usa una traducción directa, "
@@ -436,24 +459,33 @@ def prompt_messages(
             + "\n".join(glossary_lines)
         )
     if self_verification:
-        user_content += (
-            "\n\nFormato obligatorio inspirado en verificacion formal:\n"
-            + (
-                "Analisis de traduccion: <1 a 2 chequeos muy breves; usa etiquetas como [SIGNIFICADO], [GRAMATICA], [ENTIDADES], [TERMINOLOGIA] o [ANTI_COPIA]; maximo 35 palabras>\n"
-                if self_verification_thinking
-                else ""
+        if self_verification_compact:
+            user_content += (
+                "\n\nFormato obligatorio compacto, exactamente 3 lineas y termina tras el puntaje:\n"
+                "Analisis: <maximo 18 palabras; usa 1 o 2 etiquetas [SIGNIFICADO], [GRAMATICA], [ENTIDADES], [TERMINOLOGIA] o [ANTI_COPIA] con detalles concretos>\n"
+                "Final: <solo la traduccion al quechua chanka>\n"
+                "Puntaje: \\boxed{<0.0 a 1.0>}\n"
+                "No escribas Autoevaluacion ni texto extra. El puntaje debe reflejar fidelidad, gramatica chanka, terminologia, ausencia de copia del espanol y naturalidad."
             )
-            + "Traduccion final: <solo la traduccion al quechua chanka>\n"
-            "Autoevaluacion: <menciona brevemente errores o di que no ves errores>\n"
-            "Puntaje: \\boxed{<0.0 a 1.0>}\n"
-            "El puntaje debe reflejar fidelidad, gramatica chanka, terminologia, "
-            "ausencia de copia del espanol y naturalidad. "
-            + (
-                "El analisis debe ser corto, no debe explicar paso a paso, y debe terminar antes de 'Traduccion final:'."
-                if self_verification_thinking
-                else "No escribas un proceso de razonamiento ni texto antes de 'Traduccion final:'."
+        else:
+            user_content += (
+                "\n\nFormato obligatorio inspirado en verificacion formal:\n"
+                + (
+                    "Analisis de traduccion: <1 a 2 chequeos muy breves; usa etiquetas como [SIGNIFICADO], [GRAMATICA], [ENTIDADES], [TERMINOLOGIA] o [ANTI_COPIA]; maximo 35 palabras>\n"
+                    if self_verification_thinking
+                    else ""
+                )
+                + "Traduccion final: <solo la traduccion al quechua chanka>\n"
+                "Autoevaluacion: <menciona brevemente errores o di que no ves errores>\n"
+                "Puntaje: \\boxed{<0.0 a 1.0>}\n"
+                "El puntaje debe reflejar fidelidad, gramatica chanka, terminologia, "
+                "ausencia de copia del espanol y naturalidad. "
+                + (
+                    "El analisis debe ser corto, no debe explicar paso a paso, y debe terminar antes de 'Traduccion final:'."
+                    if self_verification_thinking
+                    else "No escribas un proceso de razonamiento ni texto antes de 'Traduccion final:'."
+                )
             )
-        )
     user_content += f"\n\nEspañol: {source}"
     return [
         {"role": "system", "content": "Eres un traductor profesional español-quechua chanka."},
@@ -503,6 +535,18 @@ def force_tokenizer_no_thinking_template(tokenizer) -> bool:
     return True
 
 
+def score_box_stop_token_id(tokenizer: Any) -> int | None:
+    """Return a single-token stop id for the closing brace in ``\\boxed{...}`` scores."""
+    text_tokenizer = generation_text_tokenizer(tokenizer)
+    try:
+        token_ids = text_tokenizer.encode("}", add_special_tokens=False)
+    except TypeError:
+        token_ids = text_tokenizer.encode("}")
+    if len(token_ids) != 1:
+        return None
+    return int(token_ids[0])
+
+
 def source_contains_term(source: str, source_term: str) -> bool:
     source_norm = normalize_text(source).lower()
     term_norm = normalize_text(source_term).lower()
@@ -537,6 +581,7 @@ def build_dataset(
     terminology_top_k: int = 0,
     self_verification: bool = False,
     self_verification_thinking: bool = False,
+    self_verification_compact: bool = False,
 ) -> Dataset:
     return Dataset.from_list(
         [
@@ -548,6 +593,7 @@ def build_dataset(
                     else None,
                     self_verification=self_verification,
                     self_verification_thinking=self_verification_thinking,
+                    self_verification_compact=self_verification_compact,
                 ),
                 "target": row["target"],
                 "source": row["source"],
@@ -580,13 +626,13 @@ def completion_text(completion: object) -> str:
 def extract_translation_from_structured_output(text: str) -> str:
     normalized = normalize_text(text)
     match = re.search(
-        r"(?is)(?:traducci[oó]n\s+final|final\s+translation)\s*:\s*(.*?)(?:\s+autoevaluaci[oó]n\s*:|\s+self[- ]?evaluation\s*:|\s+puntaje\s*:|\s+score\s*:|$)",
+        r"(?is)(?:traducci[oó]n\s+final|final\s+translation|final)\s*:\s*(.*?)(?:\s+autoevaluaci[oó]n\s*:|\s+self[- ]?evaluation\s*:|\s+eval\s*:|\s+puntaje\s*:|\s+score\s*:|$)",
         normalized,
     )
     if match:
         return normalize_text(match.group(1))
     fallback = re.search(
-        r"(?is)^(.*?)(?:\s+autoevaluaci[oó]n\s*:|\s+self[- ]?evaluation\s*:|\s+puntaje\s*:|\s+score\s*:)",
+        r"(?is)^(.*?)(?:\s+autoevaluaci[oó]n\s*:|\s+self[- ]?evaluation\s*:|\s+eval\s*:|\s+puntaje\s*:|\s+score\s*:)",
         normalized,
     )
     if fallback:
@@ -598,11 +644,11 @@ def parse_self_verification_output(text: str) -> dict[str, object]:
     normalized = normalize_text(text)
     translation = extract_translation_from_structured_output(normalized)
     thinking_match = re.search(
-        r"(?is)(?:analisis\s+de\s+traducci[oó]n|an[aá]lisis\s+de\s+traducci[oó]n|translation\s+analysis)\s*:\s*(.*?)(?:\s+traducci[oó]n\s+final\s*:|\s+final\s+translation\s*:|$)",
+        r"(?is)(?:analisis\s+de\s+traducci[oó]n|an[aá]lisis\s+de\s+traducci[oó]n|translation\s+analysis|analisis|an[aá]lisis)\s*:\s*(.*?)(?:\s+traducci[oó]n\s+final\s*:|\s+final\s+translation\s*:|\s+final\s*:|$)",
         normalized,
     )
     analysis_match = re.search(
-        r"(?is)(?:autoevaluaci[oó]n|self[- ]?evaluation)\s*:\s*(.*?)(?:\s+puntaje\s*:|\s+score\s*:|$)",
+        r"(?is)(?:autoevaluaci[oó]n|self[- ]?evaluation|eval)\s*:\s*(.*?)(?:\s+puntaje\s*:|\s+score\s*:|$)",
         normalized,
     )
     score_match = re.search(r"(?is)(?:puntaje|score)\s*:\s*\\?boxed\{?\s*([01](?:\.\d+)?)\s*\}?", normalized)
@@ -612,7 +658,7 @@ def parse_self_verification_output(text: str) -> dict[str, object]:
     thinking = normalize_text(thinking_match.group(1)) if thinking_match else ""
     self_evaluation = normalize_text(analysis_match.group(1)) if analysis_match else ""
     combined_analysis = normalize_text(" ".join(part for part in (thinking, self_evaluation) if part))
-    has_format = bool(translation and analysis_match and score is not None)
+    has_format = bool(translation and (analysis_match or thinking_match) and score is not None)
     return {
         "translation": translation,
         "thinking": thinking,
@@ -620,7 +666,7 @@ def parse_self_verification_output(text: str) -> dict[str, object]:
         "analysis": combined_analysis,
         "self_score": score,
         "has_format": has_format,
-        "has_thinking_format": bool(translation and thinking_match and analysis_match and score is not None),
+        "has_thinking_format": bool(translation and thinking_match and score is not None),
     }
 
 
@@ -1753,8 +1799,10 @@ def generate_predictions(
     terminology_top_k: int = 0,
     self_verification: bool = False,
     self_verification_thinking: bool = False,
+    self_verification_compact: bool = False,
     return_raw: bool = False,
     batch_size: int = 1,
+    eos_token_id: int | list[int] | None = None,
 ) -> list[str] | tuple[list[str], list[str]]:
     import torch
 
@@ -1764,6 +1812,7 @@ def generate_predictions(
     batch_size = max(1, batch_size)
     configure_left_padded_generation(model, tokenizer)
     text_tokenizer = generation_text_tokenizer(tokenizer)
+    generation_eos_token_id = eos_token_id if eos_token_id is not None else text_tokenizer.eos_token_id
     for start in range(0, len(rows), batch_size):
         batch_rows = rows[start : start + batch_size]
         prompts: list[str] = []
@@ -1781,6 +1830,7 @@ def generate_predictions(
                         terminology,
                         self_verification=self_verification,
                         self_verification_thinking=self_verification_thinking,
+                        self_verification_compact=self_verification_compact,
                     ),
                     tokenize=False,
                     add_generation_prompt=True,
@@ -1795,7 +1845,7 @@ def generate_predictions(
                 do_sample=False,
                 temperature=None,
                 top_p=None,
-                eos_token_id=text_tokenizer.eos_token_id,
+                eos_token_id=generation_eos_token_id,
                 pad_token_id=text_tokenizer.eos_token_id,
             )
         for output_index in range(output_ids.shape[0]):
@@ -1976,13 +2026,15 @@ def main() -> None:
     configure_left_padded_generation(model, tokenizer)
 
     use_self_verification_prompt = args.reward_profile in SELF_VERIFIABLE_PROFILES
-    use_self_verification_thinking = args.reward_profile == "self_verifiable_thinking_translation_2511"
+    use_self_verification_thinking = args.reward_profile in SELF_VERIFIABLE_THINKING_PROFILES
+    use_self_verification_compact = args.reward_profile == "self_verifiable_compact_thinking_translation_2511"
     train_dataset = build_dataset(
         train_rows,
         terminology_entries,
         args.terminology_top_k,
         self_verification=use_self_verification_prompt,
         self_verification_thinking=use_self_verification_thinking,
+        self_verification_compact=use_self_verification_compact,
     )
     eval_dataset = build_dataset(
         eval_rows,
@@ -1990,6 +2042,7 @@ def main() -> None:
         args.terminology_top_k,
         self_verification=use_self_verification_prompt,
         self_verification_thinking=use_self_verification_thinking,
+        self_verification_compact=use_self_verification_compact,
     )
 
     print(f"Loaded Chanka rows: {len(rows):,}")
@@ -2015,6 +2068,15 @@ def main() -> None:
         print("Self-verification prompt: enabled")
     if patched_no_thinking_template:
         print("Tokenizer chat template: forced closed thinking block for TRL prompt rendering")
+    print(f"Mask truncated completions: {args.mask_truncated_completions}")
+    policy_eos_token_id: int | list[int] = text_tokenizer.eos_token_id
+    if args.stop_on_score_box:
+        stop_token_id = score_box_stop_token_id(text_tokenizer)
+        if stop_token_id is None:
+            print("Score-box stop token: unavailable; using tokenizer EOS")
+        else:
+            policy_eos_token_id = stop_token_id
+            print(f"Score-box stop token: enabled id={stop_token_id!r}")
     print(f"Validation: every {args.eval_steps} steps")
     print(f"Trainer eval: {args.trainer_eval}")
     print(f"Saving: every {args.save_steps} steps")
@@ -2065,13 +2127,13 @@ def main() -> None:
             top_k=args.top_k,
             repetition_penalty=args.repetition_penalty,
             generation_kwargs={
-                "eos_token_id": tokenizer.eos_token_id,
-                "pad_token_id": tokenizer.eos_token_id,
+                "eos_token_id": policy_eos_token_id,
+                "pad_token_id": text_tokenizer.eos_token_id,
             },
             loss_type=args.loss_type,
             scale_rewards=args.scale_rewards,
             importance_sampling_level="sequence",
-            mask_truncated_completions=True,
+            mask_truncated_completions=args.mask_truncated_completions,
             log_completions=args.log_completions,
             num_completions_to_print=4,
             optim="adamw_8bit",
@@ -2082,6 +2144,8 @@ def main() -> None:
         ),
     )
     configure_left_padded_generation(model, tokenizer)
+    if isinstance(policy_eos_token_id, int) and policy_eos_token_id != text_tokenizer.eos_token_id:
+        trainer.eos_token_id = policy_eos_token_id
 
     trainer.train(
         resume_from_checkpoint=str(args.resume_from_checkpoint)
@@ -2108,8 +2172,10 @@ def main() -> None:
         args.terminology_top_k,
         self_verification=use_self_verification_prompt,
         self_verification_thinking=use_self_verification_thinking,
+        self_verification_compact=use_self_verification_compact,
         return_raw=use_self_verification_prompt,
         batch_size=final_generation_batch_size,
+        eos_token_id=policy_eos_token_id,
     )
     if use_self_verification_prompt:
         predictions, raw_predictions = generated

@@ -169,6 +169,28 @@ class TrainJsonlSftUnslothTests(unittest.TestCase):
         self.assertIn("maximo 35 palabras", formatted["text"])
         self.assertIn("Allin punchaw.", formatted["text"])
 
+    def test_format_example_can_use_compact_thinking_prompt(self):
+        tokenizer = DummyTokenizer()
+        row = {
+            "source": "Buenos dias.",
+            "target": "Analisis: [SIGNIFICADO] conserva saludo.\nFinal: Allin punchaw.\nPuntaje: \\boxed{0.98}",
+            "reference": "",
+            "source_name": "self",
+            "variant": "quy/chanka_self",
+            "target_field": "target",
+        }
+
+        formatted = train_jsonl_sft.format_example(
+            tokenizer,
+            row,
+            prompt_self_verification_compact=True,
+        )
+
+        self.assertIn("exactamente 3 lineas", formatted["text"])
+        self.assertIn("Final:", formatted["text"])
+        self.assertIn("No escribas Autoevaluacion", formatted["text"])
+        self.assertIn("Allin punchaw.", formatted["text"])
+
     def test_build_dataset_can_count_terminology_matches(self):
         row = {
             "source": "La madre abandonada llego.",
