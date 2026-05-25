@@ -339,6 +339,18 @@ def expected_primitives_for_row(source: str, reference: str, max_tags: int = 3) 
     return expected[:max_tags]
 
 
+def tokens_for_prompt(text: str) -> list[str]:
+    seen: set[str] = set()
+    output: list[str] = []
+    for token in re.findall(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9]{3,}", text):
+        normalized = token.lower()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        output.append(token)
+    return output
+
+
 def prompt_messages(
     source: str,
     reference: str,
@@ -348,6 +360,8 @@ def prompt_messages(
     few_shot_block = render_few_shots(few_shots or [])
     expected = list(expected_primitives or expected_primitives_for_row(source, reference))
     expected_block = ", ".join(expected)
+    source_terms = ", ".join(tokens_for_prompt(source)[:5]) or "none"
+    reference_terms = ", ".join(tokens_for_prompt(reference)[:5]) or "none"
     return [
         {
             "role": "system",
@@ -366,6 +380,11 @@ def prompt_messages(
                 f"Reviewed Quechua Chanka reference:\n{reference}\n\n"
                 f"Required primitive tags for this row: {expected_block}.\n"
                 "The analysis must include every required primitive tag, and may add at most one extra useful tag.\n\n"
+                f"Source terms to consider: {source_terms}.\n"
+                f"Reference terms to consider: {reference_terms}.\n"
+                "Do not write generic checks like 'correcto' or 'mantiene significado' by themselves. "
+                "Each tag must mention a concrete source/reference token, entity, suffix/grammar issue, terminology choice, or Spanish-copy risk. "
+                "Use at least six non-tag words in the analysis so it can teach a real translation check.\n\n"
                 "Return a JSON object with exactly these keys:\n"
                 "- analysis: one sentence, maximum 35 words, using 2 to 4 tags from "
                 "[SIGNIFICADO], [GRAMATICA], [ENTIDADES], [TERMINOLOGIA], [ANTI_COPIA].\n"

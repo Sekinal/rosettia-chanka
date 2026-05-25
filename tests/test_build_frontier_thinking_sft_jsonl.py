@@ -37,6 +37,20 @@ class BuildFrontierThinkingSftJsonlTests(unittest.TestCase):
         self.assertIn("[GRAMATICA]", messages[1]["content"])
         self.assertIn("JSON target", messages[1]["content"])
 
+    def test_prompt_rejects_vacuous_checks_before_paid_generation(self):
+        messages = builder.prompt_messages(
+            "El juez Juan aprobo 3 documentos.",
+            "Juan sutiyuq juezqa kimsa qillqata chaskirqan.",
+        )
+        content = messages[1]["content"]
+
+        self.assertIn("Do not write generic checks", content)
+        self.assertIn("at least six non-tag words", content)
+        self.assertIn("Source terms to consider:", content)
+        self.assertIn("Reference terms to consider:", content)
+        self.assertIn("Juan", content)
+        self.assertIn("documentos", content)
+
     def test_request_payload_with_few_shots_includes_examples(self):
         args = builder.parse_args(["--output-jsonl", "out.jsonl"])
         few_shots = [
