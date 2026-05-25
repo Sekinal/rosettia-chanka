@@ -10,6 +10,7 @@ BASE_CYCLE_MANIFEST="${BASE_CYCLE_MANIFEST:-}"
 BASE_CYCLE_GATE_JSON="${BASE_CYCLE_GATE_JSON:-}"
 BASE_CYCLE_ROOT="${BASE_CYCLE_ROOT:-}"
 BASE_CYCLE_SELECTION_JSON="${BASE_CYCLE_SELECTION_JSON:-}"
+BASE_CYCLE_HARDCASE_SELECTION_JSON="${BASE_CYCLE_HARDCASE_SELECTION_JSON:-}"
 META_OUTPUT_DIR="${META_OUTPUT_DIR:-outputs/chanka_translation_meta_verifier_iter_${STAMP}}"
 FOLLOWUP_OUTPUT_DIR="${FOLLOWUP_OUTPUT_DIR:-outputs/gspo_paper_profiles/2511_self_verifiable_thinking_translation_cycle_${STAMP}}"
 BASELINE_METRICS_JSON="${BASELINE_METRICS_JSON:-}"
@@ -80,6 +81,21 @@ print(artifact.get("path") or "")
 PY
 )"
   fi
+
+  if [[ -z "$BASE_CYCLE_HARDCASE_SELECTION_JSON" ]]; then
+    BASE_CYCLE_HARDCASE_SELECTION_JSON="${FOLLOWUP_OUTPUT_DIR}/base_cycle_hardcases.json"
+  fi
+  BASE_CYCLE_HARDCASE_JSONLS="$("$PYTHON" scripts/extract_deepseekmath_manifest_hardcases.py \
+    --manifest-json "$BASE_CYCLE_MANIFEST" \
+    --output-json "$BASE_CYCLE_HARDCASE_SELECTION_JSON")"
+  if [[ -n "$BASE_CYCLE_HARDCASE_JSONLS" ]]; then
+    if [[ -n "${EXTRA_META_JSONLS:-}" ]]; then
+      EXTRA_META_JSONLS="${EXTRA_META_JSONLS}:${BASE_CYCLE_HARDCASE_JSONLS}"
+    else
+      EXTRA_META_JSONLS="$BASE_CYCLE_HARDCASE_JSONLS"
+    fi
+    export EXTRA_META_JSONLS
+  fi
 fi
 
 if [[ -z "$BASE_MODEL" ]]; then
@@ -143,6 +159,9 @@ if [[ -n "$BASE_CYCLE_MANIFEST" ]]; then
 fi
 if [[ -n "$BASE_CYCLE_SELECTION_JSON" ]]; then
   echo "Cycle base selection: $BASE_CYCLE_SELECTION_JSON"
+fi
+if [[ -n "$BASE_CYCLE_HARDCASE_SELECTION_JSON" ]]; then
+  echo "Cycle base hardcases: $BASE_CYCLE_HARDCASE_SELECTION_JSON"
 fi
 echo "Cycle follow-up output: $FOLLOWUP_OUTPUT_DIR"
 echo "Cycle manifest: $CYCLE_MANIFEST_JSON"
