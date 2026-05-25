@@ -18,11 +18,13 @@ if [[ -n "$DATA_DIR" ]]; then
   FRONTIER_SUMMARY_JSON="${FRONTIER_SUMMARY_JSON:-${DATA_DIR}/deepseek_v4_pro_thinking_sft.summary.json}"
   FRONTIER_REPORT_JSON="${FRONTIER_REPORT_JSON:-${DATA_DIR}/deepseek_v4_pro_thinking_report.json}"
   FRONTIER_REPORT_MD="${FRONTIER_REPORT_MD:-${DATA_DIR}/deepseek_v4_pro_thinking_report.md}"
+  FRONTIER_PAID_GATE_JSON="${FRONTIER_PAID_GATE_JSON:-${DATA_DIR}/deepseek_v4_pro_paid_smoke_gate.json}"
 else
   FRONTIER_FAILURES_JSONL="${FRONTIER_FAILURES_JSONL:-}"
   FRONTIER_SUMMARY_JSON="${FRONTIER_SUMMARY_JSON:-}"
   FRONTIER_REPORT_JSON="${FRONTIER_REPORT_JSON:-outputs/frontier_thinking_data_${STAMP}/deepseek_v4_pro_thinking_report.json}"
   FRONTIER_REPORT_MD="${FRONTIER_REPORT_MD:-outputs/frontier_thinking_data_${STAMP}/deepseek_v4_pro_thinking_report.md}"
+  FRONTIER_PAID_GATE_JSON="${FRONTIER_PAID_GATE_JSON:-}"
 fi
 
 THINKING_SFT_OUTPUT_DIR="${THINKING_SFT_OUTPUT_DIR:-outputs/deepseek_v4_pro_thinking_sft_${STAMP}}"
@@ -41,6 +43,7 @@ SFT_BASELINE_METRICS_JSON="${SFT_BASELINE_METRICS_JSON:-${SFT_BASELINE_EVAL_DIR}
 SFT_BASELINE_PREDICTIONS="${SFT_BASELINE_PREDICTIONS:-${SFT_BASELINE_EVAL_DIR}/predictions.jsonl}"
 STAGED_STATUS_JSON="${STAGED_STATUS_JSON:-${THINKING_SFT_OUTPUT_DIR}/deepseekmath_staged_status.json}"
 STAGED_STATUS_MD="${STAGED_STATUS_MD:-${THINKING_SFT_OUTPUT_DIR}/deepseekmath_staged_status.md}"
+PAID_FRONTIER_GATE_CHECK_JSON="${PAID_FRONTIER_GATE_CHECK_JSON:-${THINKING_SFT_OUTPUT_DIR}/paid_frontier_gate_check.json}"
 
 MIN_FRONTIER_ROWS_FOR_SFT="${MIN_FRONTIER_ROWS_FOR_SFT:-8}"
 MIN_FRONTIER_ACCEPT_RATE="${MIN_FRONTIER_ACCEPT_RATE:-0.50}"
@@ -57,6 +60,7 @@ MIN_FRONTIER_AVG_AUDIT_SCORE="${MIN_FRONTIER_AVG_AUDIT_SCORE:-0.75}"
 MIN_FRONTIER_REFERENCE_FINAL_MATCH_RATE="${MIN_FRONTIER_REFERENCE_FINAL_MATCH_RATE:-1.0}"
 
 RUN_FRONTIER_REPORT="${RUN_FRONTIER_REPORT:-true}"
+REQUIRE_PAID_FRONTIER_GATE="${REQUIRE_PAID_FRONTIER_GATE:-true}"
 RUN_SFT_TRAINING="${RUN_SFT_TRAINING:-true}"
 RUN_SFT_BASELINE_EVAL="${RUN_SFT_BASELINE_EVAL:-true}"
 RUN_SFT_PROMOTION_GATE="${RUN_SFT_PROMOTION_GATE:-true}"
@@ -105,6 +109,17 @@ if [[ "$RUN_FRONTIER_REPORT" == "true" || "$RUN_FRONTIER_REPORT" == "1" || "$RUN
     --report-json "$FRONTIER_REPORT_JSON" \
     --report-md "$FRONTIER_REPORT_MD" \
     "${REPORT_ARGS[@]}"
+fi
+
+if [[ "$REQUIRE_PAID_FRONTIER_GATE" == "true" || "$REQUIRE_PAID_FRONTIER_GATE" == "1" || "$REQUIRE_PAID_FRONTIER_GATE" == "yes" ]]; then
+  if [[ -z "$FRONTIER_PAID_GATE_JSON" ]]; then
+    echo "REQUIRE_PAID_FRONTIER_GATE=true but FRONTIER_PAID_GATE_JSON is unset. Use DATA_DIR from a paid smoke run or set REQUIRE_PAID_FRONTIER_GATE=false for explicit debugging." >&2
+    exit 2
+  fi
+  "$PYTHON" scripts/check_deepseek_frontier_paid_gate.py \
+    --paid-gate-json "$FRONTIER_PAID_GATE_JSON" \
+    --frontier-report-json "$FRONTIER_REPORT_JSON" \
+    --output-json "$PAID_FRONTIER_GATE_CHECK_JSON"
 fi
 
 GATE_ARGS=()

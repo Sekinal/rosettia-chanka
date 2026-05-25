@@ -12,6 +12,7 @@ FRONTIER_FAILURES_JSONL="${FRONTIER_FAILURES_JSONL:-${DATA_DIR}/deepseek_v4_pro_
 FRONTIER_SUMMARY_JSON="${FRONTIER_SUMMARY_JSON:-${DATA_DIR}/deepseek_v4_pro_thinking_sft.summary.json}"
 FRONTIER_REPORT_JSON="${FRONTIER_REPORT_JSON:-${DATA_DIR}/deepseek_v4_pro_thinking_report.json}"
 FRONTIER_REPORT_MD="${FRONTIER_REPORT_MD:-${DATA_DIR}/deepseek_v4_pro_thinking_report.md}"
+FRONTIER_PAID_GATE_JSON="${FRONTIER_PAID_GATE_JSON:-${DATA_DIR}/deepseek_v4_pro_paid_smoke_gate.json}"
 FRONTIER_SELECTION_REPORT_JSON="${FRONTIER_SELECTION_REPORT_JSON:-${DATA_DIR}/deepseek_v4_pro_source_selection_report.json}"
 FRONTIER_SELECTION_REPORT_MD="${FRONTIER_SELECTION_REPORT_MD:-${DATA_DIR}/deepseek_v4_pro_source_selection_report.md}"
 FRONTIER_SELECTION_JSONL="${FRONTIER_SELECTION_JSONL:-${DATA_DIR}/deepseek_v4_pro_source_selection_rows.jsonl}"
@@ -301,7 +302,8 @@ fi
   --min-audited-row-rate "$MIN_FRONTIER_AUDITED_ROW_RATE" \
   --min-audit-pass-rate "$MIN_FRONTIER_AUDIT_PASS_RATE" \
   --min-avg-audit-score "$MIN_FRONTIER_AVG_AUDIT_SCORE" \
-  --min-reference-final-match-rate "$MIN_FRONTIER_REFERENCE_FINAL_MATCH_RATE"
+  --min-reference-final-match-rate "$MIN_FRONTIER_REFERENCE_FINAL_MATCH_RATE" \
+  > "$FRONTIER_PAID_GATE_JSON"
 
 if is_truthy "$RUN_SFT_BASELINE_EVAL"; then
   if [[ ! -f "$SFT_BASELINE_METRICS_JSON" ]] || is_truthy "${SFT_BASELINE_FORCE_EVAL:-false}"; then
