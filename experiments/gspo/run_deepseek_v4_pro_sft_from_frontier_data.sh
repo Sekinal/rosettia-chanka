@@ -53,6 +53,7 @@ MIN_FRONTIER_ANALYSIS_WORD_ROW_RATE="${MIN_FRONTIER_ANALYSIS_WORD_ROW_RATE:-0.75
 MIN_FRONTIER_SPECIFIC_ANALYSIS_RATE="${MIN_FRONTIER_SPECIFIC_ANALYSIS_RATE:-0.75}"
 
 RUN_FRONTIER_REPORT="${RUN_FRONTIER_REPORT:-true}"
+RUN_SFT_TRAINING="${RUN_SFT_TRAINING:-true}"
 RUN_SFT_BASELINE_EVAL="${RUN_SFT_BASELINE_EVAL:-true}"
 RUN_SFT_PROMOTION_GATE="${RUN_SFT_PROMOTION_GATE:-true}"
 MINE_SFT_META="${MINE_SFT_META:-true}"
@@ -122,6 +123,13 @@ fi
   --min-analysis-words "$MIN_FRONTIER_ANALYSIS_WORDS" \
   --min-analysis-word-row-rate "$MIN_FRONTIER_ANALYSIS_WORD_ROW_RATE" \
   --min-specific-analysis-rate "$MIN_FRONTIER_SPECIFIC_ANALYSIS_RATE"
+
+if [[ "$RUN_SFT_TRAINING" == "false" || "$RUN_SFT_TRAINING" == "0" || "$RUN_SFT_TRAINING" == "no" ]]; then
+  echo "RUN_SFT_TRAINING=$RUN_SFT_TRAINING; stopping after frontier report and data gate."
+  echo "Frontier report: $FRONTIER_REPORT_MD"
+  echo "Staged status report: $STAGED_STATUS_MD"
+  exit 0
+fi
 
 if [[ "$RUN_SFT_BASELINE_EVAL" == "true" || "$RUN_SFT_BASELINE_EVAL" == "1" || "$RUN_SFT_BASELINE_EVAL" == "yes" ]]; then
   if [[ ! -f "$SFT_BASELINE_METRICS_JSON" || "${SFT_BASELINE_FORCE_EVAL:-false}" == "true" ]]; then
