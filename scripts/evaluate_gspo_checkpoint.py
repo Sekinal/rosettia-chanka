@@ -62,6 +62,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Prompt for step-by-step morphological reasoning in Spanish, then extract Final: line as the translation.",
     )
     parser.add_argument(
+        "--enable-thinking",
+        action="store_true",
+        help="Use Qwen3.5 native <think> blocks at inference. Increase --max-completion-length to fit reasoning.",
+    )
+    parser.add_argument(
         "--terminology-file",
         default=None,
         help="Optional dataset-repo parquet file with glossary entries for terminology-conditioned prompting.",
@@ -211,6 +216,7 @@ def generate_predictions_with_progress(
     self_verification_output: bool = False,
     self_verification_thinking_output: bool = False,
     engineered_reasoning_output: bool = False,
+    enable_thinking_inference: bool = False,
 ) -> tuple[list[dict[str, str]], list[str], list[str], list[list[tuple[str, str]]], list[list[tuple[str, str]]]]:
     import torch
 
@@ -241,9 +247,12 @@ def generate_predictions_with_progress(
             for row in batch_rows
         ]
         prompts = []
+        template_fn = (gspo.apply_chat_template_with_thinking
+                        if enable_thinking_inference
+                        else gspo.apply_chat_template_no_thinking)
         for row, terms, few_shots in zip(batch_rows, batch_terms, batch_few_shots, strict=True):
             prompts.append(
-                gspo.apply_chat_template_no_thinking(
+                template_fn(
                     tokenizer,
                     gspo.prompt_messages(
                         row["source"],
@@ -355,6 +364,7 @@ def main() -> None:
         self_verification_output,
         args.self_verification_thinking_output,
         engineered_reasoning_output=args.engineered_reasoning_output,
+        enable_thinking_inference=args.enable_thinking,
     )
     references = [row["target"] for row in generated_rows]
     sources = [row["source"] for row in generated_rows]

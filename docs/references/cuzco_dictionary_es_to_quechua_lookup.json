@@ -1,0 +1,6927 @@
+{
+  "metadata": {
+    "source": {
+      "title": "Diccionario Quechua-Español-Quechua, Qheswa-Español-Qheswa, Simi Taqe",
+      "author": "Academia Mayor de la Lengua Quechua de Cusco (AMLQ)",
+      "edition": "Segunda edición",
+      "publisher": "Gobierno Regional Cusco",
+      "year": 2005,
+      "page_count": 479,
+      "source_pdf": "/home/ieqr/Downloads/diccionario-qeswa-academia-mayor-cuzco.pdf",
+      "language_variety_of_source": "Cuzco Quechua (Qosqo qheswa, quz_Latn)"
+    },
+    "target_application": "Spanish->Chanka (Ayacucho, quy_Latn) translation grounding lookup. The Chanka parallel corpus has a judicial/administrative domain bias, so judicial terms are prioritized.",
+    "extraction": {
+      "method": "pdfplumber column-aware text extraction of pages 402-479 (Spanish->Quechua half of the dictionary); line-aware entry-head regex; manual curation by frequency / domain.",
+      "raw_entries_parsed": 5147,
+      "entries_with_quechua_translation": 4931,
+      "entries_selected": 700,
+      "selection_pipeline": [
+        "Phase 1: lemmas from a hand-curated COMMON_WORDS list (~330 entries: function words, body parts, kinship, numbers, basic verbs/adjectives, time, common nouns).",
+        "Phase 2: lemmas from a hand-curated JUDICIAL_DOMAIN_KEYWORDS list (~150 entries: judicial/administrative Spanish from the Chanka source corpus domain).",
+        "Phase 3: backfill with the shortest single-word lowercase lemmas in the parsed dictionary (which tend to be the most basic / most reused), excluding entries whose 'Quechua' equals their Spanish (loanwords or stub entries)."
+      ],
+      "alias_handling": "A few compound entries in the source (e.g. 'hijo del padre' -> Churi) were aliased to their bare lemma ('hijo'). Aliased entries are marked in their raw text."
+    },
+    "counts": {
+      "total_lemmas": 700,
+      "lemmas_flagged_cuzco_only": 150,
+      "lemmas_shared_orthography": 550
+    },
+    "caveats": [
+      "Source dictionary is Cuzco Quechua (quz_Latn). Chanka (Ayacucho, quy_Latn) shares the bulk of lexicon but is NOT identical.",
+      "Cuzco has ejective consonants (k', t', p', q', ch') and aspirates (kh, th, ph, qh, chh). Chanka does NOT distinguish these from plain stops. Where Cuzco writes 'k'aspi' Chanka writes plain 'kaspi'. The chanka_note field flags any Cuzco-only feature found and gives a naive Chanka-orthography suggestion produced by stripping the ejective apostrophe / aspirate <h>.",
+      "Vowel allophony: Cuzco often writes <e o> next to /q/ (e.g. 'qhepa', 'qosa'). Chanka typically also writes <e o> in those positions in the official Ayacucho orthography (e.g. 'qipa', 'qusa' is the academic 3-vowel form, but field varieties match Cuzco). Vowel restoration is NOT attempted; trust this lookup for CONSONANTS, double-check vowels against an Ayacucho/Chanka primary source for high-stakes use.",
+      "Cuzco 'h' (e.g. 'hatun', 'hamuy') is the same in Chanka. Cuzco 'w' is the same in Chanka.",
+      "Some Cuzco lexemes have no Chanka cognate even when orthographically clean. 'shared root' in chanka_note ONLY means there are no Cuzco-only ejectives/aspirates to strip; it does NOT certify that the word is attested in Chanka.",
+      "Trust this lookup for ROOTS / LEMMAS, NOT for inflected forms. Quechua is highly agglutinative; surface forms in the Chanka corpus will carry suffixes (-ta, -kuna, -man, -manta, -pi, -wan, -paq, -y, -ki, -n, -nchik, -niku, -nku, -chka-, -rqa-, -saq, -sun, etc.) that are not encoded here.",
+      "Some entries' qu_cuzco field may still contain a leading domain-tag fragment (e.g. 'Astron. P'unchay' or 'Anat. wiksa') because the source typography mixed those into the headword body; the actual Quechua root is the last capitalized token.",
+      "The dictionary marks regional variants with labels Pe.Aya (Ayacucho/Chanka), Pe.Anc (Ancash), Pe.Caj (Cajamarca), Pe.Jun (Junin), Pe.S.Mar (San Martin), Arg (Santiago del Estero), Bol (Bolivia), Ec (Ecuador). When present in the source, Pe.Aya IS the citation-quality Chanka form. We did NOT systematically extract Pe.Aya forms into this lookup -- they live in the raw source on the cited page. For high-stakes verification, re-read the source entry.",
+      "Page numbers refer to the PDF page INDEX (1-based) inside the source file, not the printed page number. The Spanish->Quechua half runs roughly from PDF page 402 to 479.",
+      "Some headwords in the source are gendered: 'abogado,–da' -> abogado/abogada. We strip the gender suffix and keep the masculine form as the lemma. Both genders share the same Quechua translation."
+    ],
+    "schema": {
+      "es": "Spanish lemma (headword), lowercase. May be a multi-word compound (e.g. 'hijo del padre').",
+      "qu_cuzco": "Primary Cuzco Quechua translation (first listed in source).",
+      "qu_cuzco_synonyms": "Additional Cuzco synonyms from the same entry (same gloss, alternative roots).",
+      "pos": "Part-of-speech abbreviation from source (s=sustantivo/noun, v=verb, adj=adjective, adv=adverb, pron=pronoun, prep=preposition, interj=interjection, conj=conjunction, p=participle, num=numeral, loc=locution).",
+      "gloss": "Spanish gloss; currently same as es; for richer gloss inspect the source page.",
+      "chanka_note": "Either 'shared root (no Cuzco-only ejectives/aspirates)' or 'Cuzco-only feature: <word> (<feature list>) -> Chanka likely <stripped form>'.",
+      "page": "PDF page INDEX (1-based) where the entry appears in the source PDF."
+    },
+    "orthographic_mapping_cuzco_to_chanka": {
+      "k'": "k",
+      "kh": "k",
+      "t'": "t",
+      "th": "t",
+      "p'": "p",
+      "ph": "p",
+      "q'": "q",
+      "qh": "q",
+      "ch'": "ch",
+      "chh": "ch"
+    },
+    "recommended_use": [
+      "USE this lookup to ground a Spanish word in a verified Cuzco Quechua root before letting a reasoning model speculate about morpheme shape.",
+      "USE the chanka_note to decide whether the Chanka surface form should differ orthographically from the Cuzco citation form.",
+      "DO NOT use this lookup to confirm that an inflected Chanka surface form is correct; that requires morphology rules.",
+      "DO NOT treat absence of a lemma as evidence that the word doesn't exist in Quechua -- the curation is a deliberate subset of ~700 of the dictionary's ~5400 ES->QU entries."
+    ]
+  },
+  "lemmas": [
+    {
+      "es": "abajo",
+      "qu_cuzco": "Uray",
+      "qu_cuzco_synonyms": [
+        "ura",
+        "uran",
+        "lurin"
+      ],
+      "pos": "adv",
+      "gloss": "abajo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 402
+    },
+    {
+      "es": "abandonar",
+      "qu_cuzco": "Wikch'uy",
+      "qu_cuzco_synonyms": [
+        "saqey"
+      ],
+      "pos": "v",
+      "gloss": "abandonar",
+      "chanka_note": "Cuzco-only feature: Wikch'uy (ejective ch') -> Chanka likely 'Wikchuy'",
+      "page": 402
+    },
+    {
+      "es": "abogado",
+      "qu_cuzco": "Amachaqe",
+      "qu_cuzco_synonyms": [
+        "marqa"
+      ],
+      "pos": "s",
+      "gloss": "abogado",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 403
+    },
+    {
+      "es": "abogar",
+      "qu_cuzco": "Amachay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "abogar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 403
+    },
+    {
+      "es": "abono",
+      "qu_cuzco": "Wanu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "abono",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 403
+    },
+    {
+      "es": "abra",
+      "qu_cuzco": "Willk'i",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "abra",
+      "chanka_note": "Cuzco-only feature: Willk'i (ejective k') -> Chanka likely 'Willki'",
+      "page": 403
+    },
+    {
+      "es": "abrazar",
+      "qu_cuzco": "Marq'ay",
+      "qu_cuzco_synonyms": [
+        "mak'allikuy"
+      ],
+      "pos": "v",
+      "gloss": "abrazar",
+      "chanka_note": "Cuzco-only feature: Marq'ay (ejective q') -> Chanka likely 'Marqay'; mak'allikuy (ejective k') -> Chanka likely 'makallikuy'",
+      "page": 403
+    },
+    {
+      "es": "abril",
+      "qu_cuzco": "Ayriwa",
+      "qu_cuzco_synonyms": [
+        "ayriway",
+        "wayriway killa"
+      ],
+      "pos": "s",
+      "gloss": "abril",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 403
+    },
+    {
+      "es": "abrir",
+      "qu_cuzco": "Kichay",
+      "qu_cuzco_synonyms": [
+        "kichariy"
+      ],
+      "pos": "v",
+      "gloss": "abrir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 403
+    },
+    {
+      "es": "abuela",
+      "qu_cuzco": "Hatucha",
+      "qu_cuzco_synonyms": [
+        "mamaku. Bis abuela: awkilla"
+      ],
+      "pos": "s",
+      "gloss": "abuela",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 403
+    },
+    {
+      "es": "abuelo",
+      "qu_cuzco": "Apucha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "abuelo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 403
+    },
+    {
+      "es": "acabar",
+      "qu_cuzco": "Tukuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "acabar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 403
+    },
+    {
+      "es": "acaro",
+      "qu_cuzco": "Itha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "acaro",
+      "chanka_note": "Cuzco-only feature: Itha (aspirate th) -> Chanka likely 'Ita'",
+      "page": 403
+    },
+    {
+      "es": "acaso",
+      "qu_cuzco": "Icha",
+      "qu_cuzco_synonyms": [],
+      "pos": "adv",
+      "gloss": "acaso",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 403
+    },
+    {
+      "es": "acercarse",
+      "qu_cuzco": "Achhuykuy",
+      "qu_cuzco_synonyms": [
+        "qayllakuy"
+      ],
+      "pos": "v",
+      "gloss": "acercarse",
+      "chanka_note": "Cuzco-only feature: Achhuykuy (aspirate chh) -> Chanka likely 'Achuykuy'",
+      "page": 403
+    },
+    {
+      "es": "acné",
+      "qu_cuzco": "Much'i",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "acné",
+      "chanka_note": "Cuzco-only feature: Much'i (ejective ch') -> Chanka likely 'Muchi'",
+      "page": 403
+    },
+    {
+      "es": "acompañar",
+      "qu_cuzco": "Pusay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "acompañar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 404
+    },
+    {
+      "es": "acordar",
+      "qu_cuzco": "Kamachinakuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "acordar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 404
+    },
+    {
+      "es": "acostar",
+      "qu_cuzco": "Puñuchiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "acostar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 404
+    },
+    {
+      "es": "acostarse",
+      "qu_cuzco": "Puñuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "acostarse",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 404
+    },
+    {
+      "es": "acre",
+      "qu_cuzco": "K'arku",
+      "qu_cuzco_synonyms": [
+        "qhatqe"
+      ],
+      "pos": "adj",
+      "gloss": "acre",
+      "chanka_note": "Cuzco-only feature: qhatqe (aspirate qh) -> Chanka likely 'qatqe'",
+      "page": 404
+    },
+    {
+      "es": "acusador",
+      "qu_cuzco": "Ch'ataq",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "acusador",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 404
+    },
+    {
+      "es": "acusar",
+      "qu_cuzco": "Ch'atay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "acusar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 404
+    },
+    {
+      "es": "acusete",
+      "qu_cuzco": "Ch'ata",
+      "qu_cuzco_synonyms": [
+        "ch'ataq"
+      ],
+      "pos": "adj",
+      "gloss": "acusete",
+      "chanka_note": "Cuzco-only feature: ch'ataq (ejective ch') -> Chanka likely 'chataq'",
+      "page": 404
+    },
+    {
+      "es": "además",
+      "qu_cuzco": "Hinaspa",
+      "qu_cuzco_synonyms": [
+        "chaymanta"
+      ],
+      "pos": "adv",
+      "gloss": "además",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 404
+    },
+    {
+      "es": "adentro",
+      "qu_cuzco": "Ukhu. adeudar. Econ. Manu kay",
+      "qu_cuzco_synonyms": [],
+      "pos": "adv",
+      "gloss": "adentro",
+      "chanka_note": "Cuzco-only feature: Ukhu. adeudar. Econ. Manu kay (aspirate kh) -> Chanka likely 'Uku. adeudar. Econ. Manu kay'",
+      "page": 404
+    },
+    {
+      "es": "aena",
+      "qu_cuzco": "Wayka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "aena",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 434
+    },
+    {
+      "es": "agrio",
+      "qu_cuzco": "P'osqo",
+      "qu_cuzco_synonyms": [
+        "qhatqe",
+        "haqya"
+      ],
+      "pos": "adj",
+      "gloss": "agrio",
+      "chanka_note": "Cuzco-only feature: qhatqe (aspirate qh) -> Chanka likely 'qatqe'",
+      "page": 405
+    },
+    {
+      "es": "agua",
+      "qu_cuzco": "Unu",
+      "qu_cuzco_synonyms": [
+        "yaku"
+      ],
+      "pos": "s",
+      "gloss": "agua",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 405
+    },
+    {
+      "es": "aguas",
+      "qu_cuzco": "T'iyu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "aguas",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 404
+    },
+    {
+      "es": "aguna",
+      "qu_cuzco": "Qocha",
+      "qu_cuzco_synonyms": [
+        "huch'uy qocha"
+      ],
+      "pos": "s",
+      "gloss": "aguna",
+      "chanka_note": "Cuzco-only feature: huch'uy qocha (ejective ch') -> Chanka likely 'huchuy qocha'",
+      "page": 444
+    },
+    {
+      "es": "ahijado",
+      "qu_cuzco": "Marq'asqa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "ahijado",
+      "chanka_note": "Cuzco-only feature: Marq'asqa (ejective q') -> Chanka likely 'Marqasqa'",
+      "page": 405
+    },
+    {
+      "es": "ahora",
+      "qu_cuzco": "Kunan",
+      "qu_cuzco_synonyms": [],
+      "pos": "adv",
+      "gloss": "ahora",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 405
+    },
+    {
+      "es": "ahora mismo",
+      "qu_cuzco": "Kunan pacha",
+      "qu_cuzco_synonyms": [],
+      "pos": "adv",
+      "gloss": "ahora mismo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 405
+    },
+    {
+      "es": "albo",
+      "qu_cuzco": "Yuraq",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "albo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 405
+    },
+    {
+      "es": "aldea",
+      "qu_cuzco": "Hallka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "aldea",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 405
+    },
+    {
+      "es": "alegrarse",
+      "qu_cuzco": "Kusikuy",
+      "qu_cuzco_synonyms": [
+        "chamakuy"
+      ],
+      "pos": "v",
+      "gloss": "alegrarse",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 405
+    },
+    {
+      "es": "alegría",
+      "qu_cuzco": "Kusi. q",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "alegría",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 405
+    },
+    {
+      "es": "alga",
+      "qu_cuzco": "Llulluch'a",
+      "qu_cuzco_synonyms": [
+        "qochayuyu",
+        "llach'o",
+        "laqo"
+      ],
+      "pos": "s",
+      "gloss": "alga",
+      "chanka_note": "Cuzco-only feature: Llulluch'a (ejective ch') -> Chanka likely 'Llullucha'; llach'o (ejective ch') -> Chanka likely 'llacho'",
+      "page": 406
+    },
+    {
+      "es": "alguien",
+      "qu_cuzco": "Pillapas",
+      "qu_cuzco_synonyms": [],
+      "pos": "pron",
+      "gloss": "alguien",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 406
+    },
+    {
+      "es": "algún",
+      "qu_cuzco": "Wakin",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "algún",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 406
+    },
+    {
+      "es": "alimentar",
+      "qu_cuzco": "Mikhuchiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "alimentar",
+      "chanka_note": "Cuzco-only feature: Mikhuchiy (aspirate kh) -> Chanka likely 'Mikuchiy'",
+      "page": 406
+    },
+    {
+      "es": "alma",
+      "qu_cuzco": "Nuna",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "alma",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 406
+    },
+    {
+      "es": "alpaca",
+      "qu_cuzco": "Alpaka",
+      "qu_cuzco_synonyms": [
+        "paqocha",
+        "paqo"
+      ],
+      "pos": "s",
+      "gloss": "alpaca",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 406
+    },
+    {
+      "es": "amar",
+      "qu_cuzco": "Waylluy",
+      "qu_cuzco_synonyms": [
+        "munay",
+        "munakuy luluy"
+      ],
+      "pos": "v",
+      "gloss": "amar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 406
+    },
+    {
+      "es": "amargo",
+      "qu_cuzco": "Haqya",
+      "qu_cuzco_synonyms": [
+        "k'arku",
+        "qhatqe"
+      ],
+      "pos": "adj",
+      "gloss": "amargo",
+      "chanka_note": "Cuzco-only feature: k'arku (ejective k') -> Chanka likely 'karku'; qhatqe (aspirate qh) -> Chanka likely 'qatqe'",
+      "page": 406
+    },
+    {
+      "es": "amarillo",
+      "qu_cuzco": "Q'ello. Pe.Anc qarwash",
+      "qu_cuzco_synonyms": [
+        "qallwash"
+      ],
+      "pos": "adj",
+      "gloss": "amarillo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 406
+    },
+    {
+      "es": "amarrar",
+      "qu_cuzco": "Watay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "amarrar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 406
+    },
+    {
+      "es": "amer",
+      "qu_cuzco": "Llaqway llunk'uy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "amer",
+      "chanka_note": "Cuzco-only feature: Llaqway llunk'uy (ejective k') -> Chanka likely 'Llaqway llunkuy'",
+      "page": 444
+    },
+    {
+      "es": "amor",
+      "qu_cuzco": "Munasqa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "amor",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 406
+    },
+    {
+      "es": "ampa",
+      "qu_cuzco": "Qorana",
+      "qu_cuzco_synonyms": [
+        "kuti",
+        "rawk'ana"
+      ],
+      "pos": "s",
+      "gloss": "ampa",
+      "chanka_note": "Cuzco-only feature: rawk'ana (ejective k') -> Chanka likely 'rawkana'",
+      "page": 444
+    },
+    {
+      "es": "anochecer",
+      "qu_cuzco": "Tutatay",
+      "qu_cuzco_synonyms": [
+        "ch'isinyay"
+      ],
+      "pos": "v",
+      "gloss": "anochecer",
+      "chanka_note": "Cuzco-only feature: ch'isinyay (ejective ch') -> Chanka likely 'chisinyay'",
+      "page": 407
+    },
+    {
+      "es": "anta",
+      "qu_cuzco": "Anta: Cobre",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "anta",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 407
+    },
+    {
+      "es": "antiguo",
+      "qu_cuzco": "Ñawpa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "antiguo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 407
+    },
+    {
+      "es": "anís",
+      "qu_cuzco": "Anis",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "anís",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 407
+    },
+    {
+      "es": "apoyo",
+      "qu_cuzco": "K'ira",
+      "qu_cuzco_synonyms": [
+        "tusa"
+      ],
+      "pos": "s",
+      "gloss": "apoyo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 408
+    },
+    {
+      "es": "aprender",
+      "qu_cuzco": "Yachay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "aprender",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 408
+    },
+    {
+      "es": "aquí",
+      "qu_cuzco": "Kaypi",
+      "qu_cuzco_synonyms": [],
+      "pos": "adv",
+      "gloss": "aquí",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 408
+    },
+    {
+      "es": "arado",
+      "qu_cuzco": "Taklla",
+      "qu_cuzco_synonyms": [
+        "chakitaklla"
+      ],
+      "pos": "s",
+      "gloss": "arado",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 408
+    },
+    {
+      "es": "ardid",
+      "qu_cuzco": "Qaytu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "ardid",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 408
+    },
+    {
+      "es": "arena",
+      "qu_cuzco": "Aqo",
+      "qu_cuzco_synonyms": [
+        "t'iyu: arenilla blan"
+      ],
+      "pos": "s",
+      "gloss": "arena",
+      "chanka_note": "Cuzco-only feature: t'iyu: arenilla blan (ejective t') -> Chanka likely 'tiyu: arenilla blan'",
+      "page": 408
+    },
+    {
+      "es": "arma",
+      "qu_cuzco": "Walqanqa",
+      "qu_cuzco_synonyms": [
+        "maqana"
+      ],
+      "pos": "s",
+      "gloss": "arma",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 408
+    },
+    {
+      "es": "asaltar",
+      "qu_cuzco": "Q'apujay",
+      "qu_cuzco_synonyms": [
+        "ch'aspay"
+      ],
+      "pos": "v",
+      "gloss": "asaltar",
+      "chanka_note": "Cuzco-only feature: ch'aspay (ejective ch') -> Chanka likely 'chaspay'",
+      "page": 409
+    },
+    {
+      "es": "asar",
+      "qu_cuzco": "Kankay",
+      "qu_cuzco_synonyms": [
+        "q'aspay"
+      ],
+      "pos": "v",
+      "gloss": "asar",
+      "chanka_note": "Cuzco-only feature: q'aspay (ejective q') -> Chanka likely 'qaspay'",
+      "page": 409
+    },
+    {
+      "es": "asma",
+      "qu_cuzco": "Qharqa onqoy",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "asma",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 409
+    },
+    {
+      "es": "así",
+      "qu_cuzco": "Hiña",
+      "qu_cuzco_synonyms": [
+        "hinata"
+      ],
+      "pos": "adv",
+      "gloss": "así",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 409
+    },
+    {
+      "es": "atacar",
+      "qu_cuzco": "Phawaykuy",
+      "qu_cuzco_synonyms": [
+        "qallariy. masa: waykay"
+      ],
+      "pos": "v",
+      "gloss": "atacar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 409
+    },
+    {
+      "es": "atado",
+      "qu_cuzco": "Q'epe",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "atado",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 409
+    },
+    {
+      "es": "atrás",
+      "qu_cuzco": "Qhepa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adv",
+      "gloss": "atrás",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 410
+    },
+    {
+      "es": "autoridad",
+      "qu_cuzco": "Apulli",
+      "qu_cuzco_synonyms": [
+        "qollana",
+        "kamachikuq"
+      ],
+      "pos": "s",
+      "gloss": "autoridad",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 410
+    },
+    {
+      "es": "ave",
+      "qu_cuzco": "Wallpa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "ave",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 410
+    },
+    {
+      "es": "avío",
+      "qu_cuzco": "Kharmu",
+      "qu_cuzco_synonyms": [
+        "qoqaw qoqawa"
+      ],
+      "pos": "s",
+      "gloss": "avío",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 410
+    },
+    {
+      "es": "ayer",
+      "qu_cuzco": "Qayna",
+      "qu_cuzco_synonyms": [
+        "qayna p'unchay"
+      ],
+      "pos": "adv",
+      "gloss": "ayer",
+      "chanka_note": "Cuzco-only feature: qayna p'unchay (ejective p') -> Chanka likely 'qayna punchay'",
+      "page": 410
+    },
+    {
+      "es": "ayuda",
+      "qu_cuzco": "Yanapa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "ayuda",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 410
+    },
+    {
+      "es": "ayudar",
+      "qu_cuzco": "Yanapay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "ayudar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 410
+    },
+    {
+      "es": "año",
+      "qu_cuzco": "Wata",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "año",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 407
+    },
+    {
+      "es": "baba",
+      "qu_cuzco": "Llawsa",
+      "qu_cuzco_synonyms": [
+        "llawthi"
+      ],
+      "pos": "s",
+      "gloss": "baba",
+      "chanka_note": "Cuzco-only feature: llawthi (aspirate th) -> Chanka likely 'llawti'",
+      "page": 411
+    },
+    {
+      "es": "bailar",
+      "qu_cuzco": "Tusuy",
+      "qu_cuzco_synonyms": [
+        "qhasway"
+      ],
+      "pos": "v",
+      "gloss": "bailar",
+      "chanka_note": "Cuzco-only feature: qhasway (aspirate qh) -> Chanka likely 'qasway'",
+      "page": 411
+    },
+    {
+      "es": "bajar",
+      "qu_cuzco": "Uraykuy",
+      "qu_cuzco_synonyms": [
+        "uraykamuy",
+        "urayachiy"
+      ],
+      "pos": "v",
+      "gloss": "bajar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 411
+    },
+    {
+      "es": "bajo",
+      "qu_cuzco": "Ura",
+      "qu_cuzco_synonyms": [
+        "uray"
+      ],
+      "pos": "adj",
+      "gloss": "bajo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 411
+    },
+    {
+      "es": "barba",
+      "qu_cuzco": "Sunkha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "barba",
+      "chanka_note": "Cuzco-only feature: Sunkha (aspirate kh) -> Chanka likely 'Sunka'",
+      "page": 411
+    },
+    {
+      "es": "barbilla",
+      "qu_cuzco": "K'aki",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "barbilla",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 411
+    },
+    {
+      "es": "barrer",
+      "qu_cuzco": "Pichay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "barrer",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 411
+    },
+    {
+      "es": "barro",
+      "qu_cuzco": "T'uru",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "barro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 411
+    },
+    {
+      "es": "base",
+      "qu_cuzco": "Pacha",
+      "qu_cuzco_synonyms": [
+        "siki",
+        "tiyana",
+        "teqse"
+      ],
+      "pos": "s",
+      "gloss": "base",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 411
+    },
+    {
+      "es": "batán",
+      "qu_cuzco": "Maran",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "batán",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 411
+    },
+    {
+      "es": "bazo",
+      "qu_cuzco": "ch'usaq",
+      "qu_cuzco_synonyms": [
+        "weqaw",
+        "weq'aw"
+      ],
+      "pos": "s",
+      "gloss": "bazo",
+      "chanka_note": "Cuzco-only feature: ch'usaq (ejective ch') -> Chanka likely 'chusaq'; weq'aw (ejective q') -> Chanka likely 'weqaw'",
+      "page": 411
+    },
+    {
+      "es": "bañar",
+      "qu_cuzco": "Armay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "bañar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 411
+    },
+    {
+      "es": "bebe",
+      "qu_cuzco": "Qholla wawa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "bebe",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 411
+    },
+    {
+      "es": "blanco",
+      "qu_cuzco": "Yuraq",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "blanco",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "bobo",
+      "qu_cuzco": "Upa",
+      "qu_cuzco_synonyms": [
+        "opa"
+      ],
+      "pos": "adj",
+      "gloss": "bobo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "boca",
+      "qu_cuzco": "Simi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "boca",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "bocio",
+      "qu_cuzco": "Q'oto",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "bocio",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "bofe",
+      "qu_cuzco": "Sorq'an",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "bofe",
+      "chanka_note": "Cuzco-only feature: Sorq'an (ejective q') -> Chanka likely 'Sorqan'",
+      "page": 412
+    },
+    {
+      "es": "bola",
+      "qu_cuzco": "Qhorurunpa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "bola",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "bonito",
+      "qu_cuzco": "Munaycha",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "bonito",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "borde",
+      "qu_cuzco": "Patan",
+      "qu_cuzco_synonyms": [
+        "wichi"
+      ],
+      "pos": "s",
+      "gloss": "borde",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "bosque",
+      "qu_cuzco": "Sach'a sach'a",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "bosque",
+      "chanka_note": "Cuzco-only feature: Sach'a sach'a (ejective ch') -> Chanka likely 'Sacha sacha'",
+      "page": 412
+    },
+    {
+      "es": "bosta",
+      "qu_cuzco": "Uchha",
+      "qu_cuzco_synonyms": [
+        "taqya",
+        "q'awa",
+        "murk'a"
+      ],
+      "pos": "s",
+      "gloss": "bosta",
+      "chanka_note": "Cuzco-only feature: Uchha (aspirate chh) -> Chanka likely 'Ucha'; q'awa (ejective q') -> Chanka likely 'qawa'",
+      "page": 412
+    },
+    {
+      "es": "brasa",
+      "qu_cuzco": "Sansa",
+      "qu_cuzco_synonyms": [
+        "qolli",
+        "nina sansa"
+      ],
+      "pos": "s",
+      "gloss": "brasa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "bravo",
+      "qu_cuzco": "Phiña",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "bravo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "brazo",
+      "qu_cuzco": "Mak'a",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "brazo",
+      "chanka_note": "Cuzco-only feature: Mak'a (ejective k') -> Chanka likely 'Maka'",
+      "page": 412
+    },
+    {
+      "es": "broma",
+      "qu_cuzco": "Wakta",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "broma",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "buche",
+      "qu_cuzco": "Q'oto",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "buche",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "bueno",
+      "qu_cuzco": "Allí",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "bueno",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "buho",
+      "qu_cuzco": "Tuku",
+      "qu_cuzco_synonyms": [
+        "huku"
+      ],
+      "pos": "s",
+      "gloss": "buho",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 412
+    },
+    {
+      "es": "bulto",
+      "qu_cuzco": "Q'epi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "bulto",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 413
+    },
+    {
+      "es": "burla",
+      "qu_cuzco": "Sawka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "burla",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 413
+    },
+    {
+      "es": "buscar",
+      "qu_cuzco": "Maskhay",
+      "qu_cuzco_synonyms": [
+        "t'aqwey",
+        "t'aphqey"
+      ],
+      "pos": "v",
+      "gloss": "buscar",
+      "chanka_note": "Cuzco-only feature: Maskhay (aspirate kh) -> Chanka likely 'Maskay'; t'aqwey (ejective t') -> Chanka likely 'taqwey'; t'aphqey (ejective t', aspirate ph) -> Chanka likely 'tapqey'",
+      "page": 413
+    },
+    {
+      "es": "caballo",
+      "qu_cuzco": "Uywa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "caballo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 413
+    },
+    {
+      "es": "cabello",
+      "qu_cuzco": "Chukcha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cabello",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 413
+    },
+    {
+      "es": "cabeza",
+      "qu_cuzco": "Uma",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cabeza",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 413
+    },
+    {
+      "es": "caer",
+      "qu_cuzco": "Urmay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "caer",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 414
+    },
+    {
+      "es": "callar",
+      "qu_cuzco": "Upallay",
+      "qu_cuzco_synonyms": [
+        "ch'inyay"
+      ],
+      "pos": "v",
+      "gloss": "callar",
+      "chanka_note": "Cuzco-only feature: ch'inyay (ejective ch') -> Chanka likely 'chinyay'",
+      "page": 414
+    },
+    {
+      "es": "calma",
+      "qu_cuzco": "Thak",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "calma",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 414
+    },
+    {
+      "es": "calumnia",
+      "qu_cuzco": "Luti",
+      "qu_cuzco_synonyms": [
+        "timpa",
+        "lutitunpa"
+      ],
+      "pos": "s",
+      "gloss": "calumnia",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 414
+    },
+    {
+      "es": "calumniar",
+      "qu_cuzco": "Tunpay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "calumniar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 414
+    },
+    {
+      "es": "cama",
+      "qu_cuzco": "Puñuna",
+      "qu_cuzco_synonyms": [
+        "kawito"
+      ],
+      "pos": "s",
+      "gloss": "cama",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 414
+    },
+    {
+      "es": "camino",
+      "qu_cuzco": "Ñan",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "camino",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 415
+    },
+    {
+      "es": "campo",
+      "qu_cuzco": "Panpa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "campo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 415
+    },
+    {
+      "es": "canas",
+      "qu_cuzco": "K'ana",
+      "qu_cuzco_synonyms": [
+        "incandescente",
+        "candente",
+        "encendido"
+      ],
+      "pos": "s",
+      "gloss": "canas",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 415
+    },
+    {
+      "es": "canción",
+      "qu_cuzco": "Taki",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "canción",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 415
+    },
+    {
+      "es": "canje",
+      "qu_cuzco": "Yanki",
+      "qu_cuzco_synonyms": [
+        "chhala"
+      ],
+      "pos": "s",
+      "gloss": "canje",
+      "chanka_note": "Cuzco-only feature: chhala (aspirate chh) -> Chanka likely 'chala'",
+      "page": 415
+    },
+    {
+      "es": "cantar",
+      "qu_cuzco": "Takiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "cantar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 415
+    },
+    {
+      "es": "canto",
+      "qu_cuzco": "Taki",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "canto",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 415
+    },
+    {
+      "es": "capa",
+      "qu_cuzco": "Aqsu",
+      "qu_cuzco_synonyms": [
+        "llaqolla",
+        "lliklla"
+      ],
+      "pos": "s",
+      "gloss": "capa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 415
+    },
+    {
+      "es": "cara",
+      "qu_cuzco": "Uya",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cara",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 415
+    },
+    {
+      "es": "carga",
+      "qu_cuzco": "Q'epe",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "carga",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 416
+    },
+    {
+      "es": "carne",
+      "qu_cuzco": "Aycha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "carne",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 416
+    },
+    {
+      "es": "casa",
+      "qu_cuzco": "Wasi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "casa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 416
+    },
+    {
+      "es": "casarse",
+      "qu_cuzco": "Saway",
+      "qu_cuzco_synonyms": [
+        "yauanchakuy"
+      ],
+      "pos": "v",
+      "gloss": "casarse",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 416
+    },
+    {
+      "es": "casi",
+      "qu_cuzco": "Yaqa",
+      "qu_cuzco_synonyms": [
+        "yaqalla"
+      ],
+      "pos": "adv",
+      "gloss": "casi",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 416
+    },
+    {
+      "es": "castigar",
+      "qu_cuzco": "Maqay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "castigar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 416
+    },
+    {
+      "es": "castigo",
+      "qu_cuzco": "Mirara",
+      "qu_cuzco_synonyms": [
+        "muchuchi"
+      ],
+      "pos": "s",
+      "gloss": "castigo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 416
+    },
+    {
+      "es": "causa",
+      "qu_cuzco": "Hamu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "causa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 416
+    },
+    {
+      "es": "cavar",
+      "qu_cuzco": "Toqoy",
+      "qu_cuzco_synonyms": [
+        "haphch'iy",
+        "haratay haphuq'ey"
+      ],
+      "pos": "v",
+      "gloss": "cavar",
+      "chanka_note": "Cuzco-only feature: haphch'iy (ejective ch', aspirate ph) -> Chanka likely 'hapchiy'; haratay haphuq'ey (ejective q', aspirate ph) -> Chanka likely 'haratay hapuqey'",
+      "page": 416
+    },
+    {
+      "es": "caída",
+      "qu_cuzco": "Urma",
+      "qu_cuzco_synonyms": [
+        "laq'a"
+      ],
+      "pos": "s",
+      "gloss": "caída",
+      "chanka_note": "Cuzco-only feature: laq'a (ejective q') -> Chanka likely 'laqa'",
+      "page": 414
+    },
+    {
+      "es": "caña",
+      "qu_cuzco": "Wiru",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "caña",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 415
+    },
+    {
+      "es": "censo",
+      "qu_cuzco": "Lano",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "censo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 416
+    },
+    {
+      "es": "cera",
+      "qu_cuzco": "Mapa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cera",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 417
+    },
+    {
+      "es": "cerca",
+      "qu_cuzco": "Sispa",
+      "qu_cuzco_synonyms": [
+        "sispalla",
+        "kaylla"
+      ],
+      "pos": "adv",
+      "gloss": "cerca",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 417
+    },
+    {
+      "es": "cerda",
+      "qu_cuzco": "Suphu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cerda",
+      "chanka_note": "Cuzco-only feature: Suphu (aspirate ph) -> Chanka likely 'Supu'",
+      "page": 417
+    },
+    {
+      "es": "cerdo",
+      "qu_cuzco": "Khuchi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cerdo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 417
+    },
+    {
+      "es": "cerro",
+      "qu_cuzco": "Orqo",
+      "qu_cuzco_synonyms": [
+        "orqo pat pikchu"
+      ],
+      "pos": "s",
+      "gloss": "cerro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 417
+    },
+    {
+      "es": "cesma",
+      "qu_cuzco": "Wik'u",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cesma",
+      "chanka_note": "Cuzco-only feature: Wik'u (ejective k') -> Chanka likely 'Wiku'",
+      "page": 417
+    },
+    {
+      "es": "chacra",
+      "qu_cuzco": "Chakra. Pe.Ju chakla",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "chacra",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 421
+    },
+    {
+      "es": "chancho",
+      "qu_cuzco": "Khuchi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "chancho",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 421
+    },
+    {
+      "es": "chato",
+      "qu_cuzco": "Tañu",
+      "qu_cuzco_synonyms": [
+        "t'isti",
+        "huch'uy"
+      ],
+      "pos": "adj",
+      "gloss": "chato",
+      "chanka_note": "Cuzco-only feature: t'isti (ejective t') -> Chanka likely 'tisti'; huch'uy (ejective ch') -> Chanka likely 'huchuy'",
+      "page": 422
+    },
+    {
+      "es": "chica",
+      "qu_cuzco": "Sipas",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "chica",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 422
+    },
+    {
+      "es": "chicha",
+      "qu_cuzco": "Aqha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "chicha",
+      "chanka_note": "Cuzco-only feature: Aqha (aspirate qh) -> Chanka likely 'Aqa'",
+      "page": 422
+    },
+    {
+      "es": "chico",
+      "qu_cuzco": "Wayna",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "chico",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 422
+    },
+    {
+      "es": "ciego",
+      "qu_cuzco": "Ñawsa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "ciego",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 417
+    },
+    {
+      "es": "cielo",
+      "qu_cuzco": "Hanaq pacha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cielo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 417
+    },
+    {
+      "es": "cien",
+      "qu_cuzco": "núm. Pachak",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "cien",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 417
+    },
+    {
+      "es": "ciento",
+      "qu_cuzco": "Mat. Pachak",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "ciento",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 417
+    },
+    {
+      "es": "claro",
+      "qu_cuzco": "Ch'uya",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "claro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 417
+    },
+    {
+      "es": "coca",
+      "qu_cuzco": "Kuka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "coca",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 418
+    },
+    {
+      "es": "cocinar",
+      "qu_cuzco": "Wayk'uy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "cocinar",
+      "chanka_note": "Cuzco-only feature: Wayk'uy (ejective k') -> Chanka likely 'Waykuy'",
+      "page": 418
+    },
+    {
+      "es": "codo",
+      "qu_cuzco": "Kukuchu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "codo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 418
+    },
+    {
+      "es": "cola",
+      "qu_cuzco": "Chupa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cola",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 418
+    },
+    {
+      "es": "comida",
+      "qu_cuzco": "Mikhuna",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "comida",
+      "chanka_note": "Cuzco-only feature: Mikhuna (aspirate kh) -> Chanka likely 'Mikuna'",
+      "page": 418
+    },
+    {
+      "es": "comprar",
+      "qu_cuzco": "Rantiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "comprar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 419
+    },
+    {
+      "es": "comprender",
+      "qu_cuzco": "Taripay",
+      "qu_cuzco_synonyms": [
+        "umanchay"
+      ],
+      "pos": "v",
+      "gloss": "comprender",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 419
+    },
+    {
+      "es": "condenar",
+      "qu_cuzco": "Jurisp. Hayratay",
+      "qu_cuzco_synonyms": [
+        "ñañiy"
+      ],
+      "pos": "v",
+      "gloss": "condenar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 419
+    },
+    {
+      "es": "cono",
+      "qu_cuzco": "Pikchu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cono",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 419
+    },
+    {
+      "es": "conocer",
+      "qu_cuzco": "Reqsiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "conocer",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 419
+    },
+    {
+      "es": "contar",
+      "qu_cuzco": "Yupay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "contar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 419
+    },
+    {
+      "es": "corazón",
+      "qu_cuzco": "Sonqo",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "corazón",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 420
+    },
+    {
+      "es": "coro",
+      "qu_cuzco": "Chunku",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "coro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 420
+    },
+    {
+      "es": "correr",
+      "qu_cuzco": "Phaway",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "correr",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 420
+    },
+    {
+      "es": "corte",
+      "qu_cuzco": "kuchu",
+      "qu_cuzco_synonyms": [
+        "wit'u"
+      ],
+      "pos": "s",
+      "gloss": "corte",
+      "chanka_note": "Cuzco-only feature: wit'u (ejective t') -> Chanka likely 'witu'",
+      "page": 420
+    },
+    {
+      "es": "coser",
+      "qu_cuzco": "Siray",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "coser",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 420
+    },
+    {
+      "es": "credo",
+      "qu_cuzco": "Iñi",
+      "qu_cuzco_synonyms": [
+        "iñina"
+      ],
+      "pos": "s",
+      "gloss": "credo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 420
+    },
+    {
+      "es": "creer",
+      "qu_cuzco": "Iñiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "creer",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 420
+    },
+    {
+      "es": "criminal",
+      "qu_cuzco": "Q'omalliq",
+      "qu_cuzco_synonyms": [
+        "nak'achu"
+      ],
+      "pos": "s",
+      "gloss": "criminal",
+      "chanka_note": "Cuzco-only feature: nak'achu (ejective k') -> Chanka likely 'nakachu'",
+      "page": 420
+    },
+    {
+      "es": "cría",
+      "qu_cuzco": "Uña",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cría",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 420
+    },
+    {
+      "es": "cuello",
+      "qu_cuzco": "Kunka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cuello",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 420
+    },
+    {
+      "es": "cuento",
+      "qu_cuzco": "Lit. Willakuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cuento",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 420
+    },
+    {
+      "es": "cuerpo",
+      "qu_cuzco": "Ukhu",
+      "qu_cuzco_synonyms": [
+        "uju"
+      ],
+      "pos": "s",
+      "gloss": "cuerpo",
+      "chanka_note": "Cuzco-only feature: Ukhu (aspirate kh) -> Chanka likely 'Uku'",
+      "page": 421
+    },
+    {
+      "es": "culpable",
+      "qu_cuzco": "Huchayuq",
+      "qu_cuzco_synonyms": [
+        "huchasapa"
+      ],
+      "pos": "s",
+      "gloss": "culpable",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 421
+    },
+    {
+      "es": "cultura",
+      "qu_cuzco": "Yachaytarpu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "cultura",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 421
+    },
+    {
+      "es": "cuna",
+      "qu_cuzco": "Tankana",
+      "qu_cuzco_synonyms": [
+        "k'iraw"
+      ],
+      "pos": "s",
+      "gloss": "cuna",
+      "chanka_note": "Cuzco-only feature: k'iraw (ejective k') -> Chanka likely 'kiraw'",
+      "page": 421
+    },
+    {
+      "es": "cura",
+      "qu_cuzco": "Yaya",
+      "qu_cuzco_synonyms": [
+        "tata",
+        "tayta"
+      ],
+      "pos": "s",
+      "gloss": "cura",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 421
+    },
+    {
+      "es": "curar",
+      "qu_cuzco": "Hanpiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "curar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 421
+    },
+    {
+      "es": "cuye",
+      "qu_cuzco": "Qowe. ¿cuyo",
+      "qu_cuzco_synonyms": [
+        "–ya? pron. Interrog. ¿piqpa? ¿peqpa?"
+      ],
+      "pos": "s",
+      "gloss": "cuye",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 421
+    },
+    {
+      "es": "cárcel",
+      "qu_cuzco": "Sank'ay wasi",
+      "qu_cuzco_synonyms": [
+        "ch'achay wasi",
+        "atishanka wasi"
+      ],
+      "pos": "s",
+      "gloss": "cárcel",
+      "chanka_note": "Cuzco-only feature: Sank'ay wasi (ejective k') -> Chanka likely 'Sankay wasi'; ch'achay wasi (ejective ch') -> Chanka likely 'chachay wasi'",
+      "page": 415
+    },
+    {
+      "es": "dado",
+      "qu_cuzco": "Wayru",
+      "qu_cuzco_synonyms": [
+        "chunkana"
+      ],
+      "pos": "s",
+      "gloss": "dado",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 423
+    },
+    {
+      "es": "danza",
+      "qu_cuzco": "Tusu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "danza",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 423
+    },
+    {
+      "es": "dar",
+      "qu_cuzco": "Qoy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "dar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 423
+    },
+    {
+      "es": "daño",
+      "qu_cuzco": "Chirma",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "daño",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 423
+    },
+    {
+      "es": "debajo",
+      "qu_cuzco": "Pachanpi",
+      "qu_cuzco_synonyms": [
+        "uranpi"
+      ],
+      "pos": "adv",
+      "gloss": "debajo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 423
+    },
+    {
+      "es": "deber",
+      "qu_cuzco": "Hunt'ana",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "deber",
+      "chanka_note": "Cuzco-only feature: Hunt'ana (ejective t') -> Chanka likely 'Huntana'",
+      "page": 423
+    },
+    {
+      "es": "decir",
+      "qu_cuzco": "Niy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "decir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 423
+    },
+    {
+      "es": "dedo",
+      "qu_cuzco": "Ruk'ana",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "dedo",
+      "chanka_note": "Cuzco-only feature: Ruk'ana (ejective k') -> Chanka likely 'Rukana'",
+      "page": 423
+    },
+    {
+      "es": "delegado",
+      "qu_cuzco": "Ranti",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "delegado",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 423
+    },
+    {
+      "es": "denso",
+      "qu_cuzco": "Pipu",
+      "qu_cuzco_synonyms": [
+        "thaka"
+      ],
+      "pos": "adj",
+      "gloss": "denso",
+      "chanka_note": "Cuzco-only feature: thaka (aspirate th) -> Chanka likely 'taka'",
+      "page": 423
+    },
+    {
+      "es": "denuncia",
+      "qu_cuzco": "Willakuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "denuncia",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 424
+    },
+    {
+      "es": "descansar",
+      "qu_cuzco": "Samay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "descansar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 424
+    },
+    {
+      "es": "desear",
+      "qu_cuzco": "Munay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "desear",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 424
+    },
+    {
+      "es": "despertar",
+      "qu_cuzco": "Rikch'ariy",
+      "qu_cuzco_synonyms": [
+        "rikch'arichiy"
+      ],
+      "pos": "v",
+      "gloss": "despertar",
+      "chanka_note": "Cuzco-only feature: Rikch'ariy (ejective ch') -> Chanka likely 'Rikchariy'; rikch'arichiy (ejective ch') -> Chanka likely 'rikcharichiy'",
+      "page": 425
+    },
+    {
+      "es": "detener",
+      "qu_cuzco": "Hark'ay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "detener",
+      "chanka_note": "Cuzco-only feature: Hark'ay (ejective k') -> Chanka likely 'Harkay'",
+      "page": 426
+    },
+    {
+      "es": "deuda",
+      "qu_cuzco": "Manu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "deuda",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 426
+    },
+    {
+      "es": "dicha",
+      "qu_cuzco": "Ataw",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "dicha",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 426
+    },
+    {
+      "es": "dicho",
+      "qu_cuzco": "Nisqa",
+      "qu_cuzco_synonyms": [
+        "huq nisqa"
+      ],
+      "pos": "s",
+      "gloss": "dicho",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 426
+    },
+    {
+      "es": "diente",
+      "qu_cuzco": "Kiru. Clases:",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "diente",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 426
+    },
+    {
+      "es": "difícil",
+      "qu_cuzco": "Sasa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "difícil",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 426
+    },
+    {
+      "es": "dinero",
+      "qu_cuzco": "Qolqe",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "dinero",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 427
+    },
+    {
+      "es": "dios",
+      "qu_cuzco": "Apu",
+      "qu_cuzco_synonyms": [
+        "awki",
+        "wamani",
+        "wari"
+      ],
+      "pos": "s",
+      "gloss": "dios",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 427
+    },
+    {
+      "es": "disposición",
+      "qu_cuzco": "Kamachi kamachiku",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "disposición",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 427
+    },
+    {
+      "es": "dolor",
+      "qu_cuzco": "Nanay",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "dolor",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 427
+    },
+    {
+      "es": "dormir",
+      "qu_cuzco": "Puñuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "dormir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 427
+    },
+    {
+      "es": "dos",
+      "qu_cuzco": "núm.card. Iskay",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "dos",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 427
+    },
+    {
+      "es": "duda",
+      "qu_cuzco": "Iskaya. thuki",
+      "qu_cuzco_synonyms": [
+        "tunki",
+        "a: tunkimanay"
+      ],
+      "pos": "s",
+      "gloss": "duda",
+      "chanka_note": "Cuzco-only feature: Iskaya. thuki (aspirate th) -> Chanka likely 'Iskaya. tuki'",
+      "page": 427
+    },
+    {
+      "es": "durar",
+      "qu_cuzco": "Unay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "durar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 427
+    },
+    {
+      "es": "duro",
+      "qu_cuzco": "Chuchu",
+      "qu_cuzco_synonyms": [
+        "anaq"
+      ],
+      "pos": "adj",
+      "gloss": "duro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 427
+    },
+    {
+      "es": "día",
+      "qu_cuzco": "P'unchay",
+      "qu_cuzco_synonyms": [
+        "p'uncha"
+      ],
+      "pos": "s",
+      "gloss": "día",
+      "chanka_note": "Cuzco-only feature: p'uncha (ejective p') -> Chanka likely 'puncha'",
+      "page": 426
+    },
+    {
+      "es": "echar",
+      "qu_cuzco": "Hich'ay",
+      "qu_cuzco_synonyms": [
+        "qhallay",
+        "talliy"
+      ],
+      "pos": "v",
+      "gloss": "echar",
+      "chanka_note": "Cuzco-only feature: Hich'ay (ejective ch') -> Chanka likely 'Hichay'; qhallay (aspirate qh) -> Chanka likely 'qallay'",
+      "page": 428
+    },
+    {
+      "es": "ejecutar",
+      "qu_cuzco": "Ruway",
+      "qu_cuzco_synonyms": [
+        "ruray. Arg ruway",
+        "inay"
+      ],
+      "pos": "v",
+      "gloss": "ejecutar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 428
+    },
+    {
+      "es": "empezar",
+      "qu_cuzco": "Qallariy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "empezar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 428
+    },
+    {
+      "es": "enano",
+      "qu_cuzco": "Sit'i",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "enano",
+      "chanka_note": "Cuzco-only feature: Sit'i (ejective t') -> Chanka likely 'Siti'",
+      "page": 428
+    },
+    {
+      "es": "encontrar",
+      "qu_cuzco": "Tariy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "encontrar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 429
+    },
+    {
+      "es": "enea",
+      "qu_cuzco": "Kusuru",
+      "qu_cuzco_synonyms": [
+        "mat'ara"
+      ],
+      "pos": "s",
+      "gloss": "enea",
+      "chanka_note": "Cuzco-only feature: mat'ara (ejective t') -> Chanka likely 'matara'",
+      "page": 429
+    },
+    {
+      "es": "enfermar",
+      "qu_cuzco": "Onqoy",
+      "qu_cuzco_synonyms": [
+        "onqoyay. Ca qeshyay"
+      ],
+      "pos": "v",
+      "gloss": "enfermar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 429
+    },
+    {
+      "es": "enseñar",
+      "qu_cuzco": "Yachachiy. E yachachina",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "enseñar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 430
+    },
+    {
+      "es": "enviar",
+      "qu_cuzco": "Kachay",
+      "qu_cuzco_synonyms": [
+        "apachiy"
+      ],
+      "pos": "v",
+      "gloss": "enviar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 431
+    },
+    {
+      "es": "erial",
+      "qu_cuzco": "Purun",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "erial",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 431
+    },
+    {
+      "es": "error",
+      "qu_cuzco": "Panta",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "error",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 431
+    },
+    {
+      "es": "escalera",
+      "qu_cuzco": "Wichana",
+      "qu_cuzco_synonyms": [
+        "seqana"
+      ],
+      "pos": "s",
+      "gloss": "escalera",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 431
+    },
+    {
+      "es": "escribir",
+      "qu_cuzco": "Qelqay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "escribir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 431
+    },
+    {
+      "es": "escuchar",
+      "qu_cuzco": "Uyariy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "escuchar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 431
+    },
+    {
+      "es": "espalda",
+      "qu_cuzco": "Wasa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "espalda",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 432
+    },
+    {
+      "es": "esperar",
+      "qu_cuzco": "Suyay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "esperar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 432
+    },
+    {
+      "es": "esposa",
+      "qu_cuzco": "Warmi",
+      "qu_cuzco_synonyms": [
+        "qoya"
+      ],
+      "pos": "s",
+      "gloss": "esposa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 432
+    },
+    {
+      "es": "esposo",
+      "qu_cuzco": "Qosa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "esposo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 432
+    },
+    {
+      "es": "estafar",
+      "qu_cuzco": "Ch'achuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "estafar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 432
+    },
+    {
+      "es": "estar",
+      "qu_cuzco": "Kashay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "estar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 432
+    },
+    {
+      "es": "este",
+      "qu_cuzco": "Kay",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "este",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 432
+    },
+    {
+      "es": "estrecho",
+      "qu_cuzco": "K'ikllu",
+      "qu_cuzco_synonyms": [
+        "k'iski",
+        "k'isku"
+      ],
+      "pos": "adj",
+      "gloss": "estrecho",
+      "chanka_note": "Cuzco-only feature: k'iski (ejective k') -> Chanka likely 'kiski'; k'isku (ejective k') -> Chanka likely 'kisku'",
+      "page": 432
+    },
+    {
+      "es": "estómago",
+      "qu_cuzco": "Wiksa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "estómago",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 432
+    },
+    {
+      "es": "evidencia",
+      "qu_cuzco": "sut'i",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "evidencia",
+      "chanka_note": "Cuzco-only feature: sut'i (ejective t') -> Chanka likely 'suti'",
+      "page": 433
+    },
+    {
+      "es": "exigir",
+      "qu_cuzco": "Mat'iy. mat'ipayay",
+      "qu_cuzco_synonyms": [
+        "mat'iykuy",
+        "mañapayay"
+      ],
+      "pos": "v",
+      "gloss": "exigir",
+      "chanka_note": "Cuzco-only feature: Mat'iy. mat'ipayay (ejective t') -> Chanka likely 'Matiy. matipayay'; mat'iykuy (ejective t') -> Chanka likely 'matiykuy'",
+      "page": 433
+    },
+    {
+      "es": "falo",
+      "qu_cuzco": "Ullu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "falo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 434
+    },
+    {
+      "es": "fango",
+      "qu_cuzco": "Oqho",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "fango",
+      "chanka_note": "Cuzco-only feature: Oqho (aspirate qh) -> Chanka likely 'Oqo'",
+      "page": 434
+    },
+    {
+      "es": "fardo",
+      "qu_cuzco": "T'eqe",
+      "qu_cuzco_synonyms": [
+        "ch'ipa",
+        "q'epe"
+      ],
+      "pos": "s",
+      "gloss": "fardo",
+      "chanka_note": "Cuzco-only feature: ch'ipa (ejective ch') -> Chanka likely 'chipa'; q'epe (ejective q') -> Chanka likely 'qepe'",
+      "page": 434
+    },
+    {
+      "es": "feliz",
+      "qu_cuzco": "Kusi",
+      "qu_cuzco_synonyms": [
+        "kusisqa",
+        "ataw"
+      ],
+      "pos": "adj",
+      "gloss": "feliz",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 434
+    },
+    {
+      "es": "feo",
+      "qu_cuzco": "Millay",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "feo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 434
+    },
+    {
+      "es": "feto",
+      "qu_cuzco": "Sullu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "feto",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 434
+    },
+    {
+      "es": "fila",
+      "qu_cuzco": "Qati qati",
+      "qu_cuzco_synonyms": [
+        "seq'e",
+        "sinri"
+      ],
+      "pos": "s",
+      "gloss": "fila",
+      "chanka_note": "Cuzco-only feature: seq'e (ejective q') -> Chanka likely 'seqe'",
+      "page": 434
+    },
+    {
+      "es": "filo",
+      "qu_cuzco": "Ñawch'i",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "filo",
+      "chanka_note": "Cuzco-only feature: Ñawch'i (ejective ch') -> Chanka likely 'Ñawchi'",
+      "page": 434
+    },
+    {
+      "es": "fin",
+      "qu_cuzco": "P'uchu",
+      "qu_cuzco_synonyms": [
+        "p'uchuka",
+        "tukukuy"
+      ],
+      "pos": "s",
+      "gloss": "fin",
+      "chanka_note": "Cuzco-only feature: p'uchuka (ejective p') -> Chanka likely 'puchuka'",
+      "page": 434
+    },
+    {
+      "es": "firma",
+      "qu_cuzco": "Seq'e",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "firma",
+      "chanka_note": "Cuzco-only feature: Seq'e (ejective q') -> Chanka likely 'Seqe'",
+      "page": 434
+    },
+    {
+      "es": "firmar",
+      "qu_cuzco": "Seq'ey",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "firmar",
+      "chanka_note": "Cuzco-only feature: Seq'ey (ejective q') -> Chanka likely 'Seqey'",
+      "page": 434
+    },
+    {
+      "es": "flaco",
+      "qu_cuzco": "Tullu",
+      "qu_cuzco_synonyms": [
+        "choqchi"
+      ],
+      "pos": "adj",
+      "gloss": "flaco",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 434
+    },
+    {
+      "es": "flojo",
+      "qu_cuzco": "Qella",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "flojo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 435
+    },
+    {
+      "es": "flor",
+      "qu_cuzco": "Tika",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "flor",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 435
+    },
+    {
+      "es": "fofo",
+      "qu_cuzco": "Phupa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "fofo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 435
+    },
+    {
+      "es": "frío",
+      "qu_cuzco": "Khutu",
+      "qu_cuzco_synonyms": [
+        "chiri. antón. q'oñi"
+      ],
+      "pos": "adj",
+      "gloss": "frío",
+      "chanka_note": "Cuzco-only feature: chiri. antón. q'oñi (ejective q') -> Chanka likely 'chiri. antón. qoñi'",
+      "page": 435
+    },
+    {
+      "es": "fuerza",
+      "qu_cuzco": "Kallpa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "fuerza",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 435
+    },
+    {
+      "es": "gacho",
+      "qu_cuzco": "K'umu",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "gacho",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 436
+    },
+    {
+      "es": "gago",
+      "qu_cuzco": "K'aku",
+      "qu_cuzco_synonyms": [
+        "akllu"
+      ],
+      "pos": "adj",
+      "gloss": "gago",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 436
+    },
+    {
+      "es": "gallina",
+      "qu_cuzco": "Wallpa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "gallina",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 436
+    },
+    {
+      "es": "gallo",
+      "qu_cuzco": "K'anka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "gallo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 436
+    },
+    {
+      "es": "ganar",
+      "qu_cuzco": "Atipay",
+      "qu_cuzco_synonyms": [
+        "llalliy"
+      ],
+      "pos": "v",
+      "gloss": "ganar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 436
+    },
+    {
+      "es": "garra",
+      "qu_cuzco": "Sillu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "garra",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 436
+    },
+    {
+      "es": "gente",
+      "qu_cuzco": "Runa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "gente",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 436
+    },
+    {
+      "es": "girar",
+      "qu_cuzco": "Muyuy",
+      "qu_cuzco_synonyms": [
+        "maywiy"
+      ],
+      "pos": "v",
+      "gloss": "girar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 436
+    },
+    {
+      "es": "golpe",
+      "qu_cuzco": "Taka",
+      "qu_cuzco_synonyms": [
+        "p'ana"
+      ],
+      "pos": "s",
+      "gloss": "golpe",
+      "chanka_note": "Cuzco-only feature: p'ana (ejective p') -> Chanka likely 'pana'",
+      "page": 437
+    },
+    {
+      "es": "gordo",
+      "qu_cuzco": "Wira sapa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "gordo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 437
+    },
+    {
+      "es": "gota",
+      "qu_cuzco": "Sut'u",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "gota",
+      "chanka_note": "Cuzco-only feature: Sut'u (ejective t') -> Chanka likely 'Sutu'",
+      "page": 437
+    },
+    {
+      "es": "gozo",
+      "qu_cuzco": "Kusi",
+      "qu_cuzco_synonyms": [
+        "q'ochu"
+      ],
+      "pos": "s",
+      "gloss": "gozo",
+      "chanka_note": "Cuzco-only feature: q'ochu (ejective q') -> Chanka likely 'qochu'",
+      "page": 437
+    },
+    {
+      "es": "gran",
+      "qu_cuzco": "Hatun",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "gran",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 437
+    },
+    {
+      "es": "grano",
+      "qu_cuzco": "Muru",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "grano",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 437
+    },
+    {
+      "es": "greca",
+      "qu_cuzco": "Puytu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "greca",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 437
+    },
+    {
+      "es": "grey",
+      "qu_cuzco": "Michina",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "grey",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 437
+    },
+    {
+      "es": "greña",
+      "qu_cuzco": "Tiski",
+      "qu_cuzco_synonyms": [
+        "t'anpa"
+      ],
+      "pos": "s",
+      "gloss": "greña",
+      "chanka_note": "Cuzco-only feature: t'anpa (ejective t') -> Chanka likely 'tanpa'",
+      "page": 437
+    },
+    {
+      "es": "gris",
+      "qu_cuzco": "Ch'eqche",
+      "qu_cuzco_synonyms": [
+        "ch'eqchi. muru muru"
+      ],
+      "pos": "adj",
+      "gloss": "gris",
+      "chanka_note": "Cuzco-only feature: ch'eqchi. muru muru (ejective ch') -> Chanka likely 'cheqchi. muru muru'",
+      "page": 437
+    },
+    {
+      "es": "grupo",
+      "qu_cuzco": "Qoto",
+      "qu_cuzco_synonyms": [
+        "suntur"
+      ],
+      "pos": "s",
+      "gloss": "grupo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 437
+    },
+    {
+      "es": "guano",
+      "qu_cuzco": "Wanu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "guano",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 437
+    },
+    {
+      "es": "guardar",
+      "qu_cuzco": "Waqaychay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "guardar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 437
+    },
+    {
+      "es": "guiar",
+      "qu_cuzco": "Pusay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "guiar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 437
+    },
+    {
+      "es": "guía",
+      "qu_cuzco": "Pusaq",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "guía",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 437
+    },
+    {
+      "es": "habla",
+      "qu_cuzco": "Rima",
+      "qu_cuzco_synonyms": [
+        "simi"
+      ],
+      "pos": "s",
+      "gloss": "habla",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 438
+    },
+    {
+      "es": "hablar",
+      "qu_cuzco": "Rimay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "hablar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 438
+    },
+    {
+      "es": "hacer",
+      "qu_cuzco": "Ruway",
+      "qu_cuzco_synonyms": [
+        "ruray"
+      ],
+      "pos": "v",
+      "gloss": "hacer",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 438
+    },
+    {
+      "es": "halo",
+      "qu_cuzco": "Meteor. Chinpu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "halo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 438
+    },
+    {
+      "es": "harto",
+      "qu_cuzco": "Askha",
+      "qu_cuzco_synonyms": [
+        "nanaq. An. ia ashka"
+      ],
+      "pos": "adj",
+      "gloss": "harto",
+      "chanka_note": "Cuzco-only feature: Askha (aspirate kh) -> Chanka likely 'Aska'",
+      "page": 438
+    },
+    {
+      "es": "heder",
+      "qu_cuzco": "Asnay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "heder",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 438
+    },
+    {
+      "es": "helar",
+      "qu_cuzco": "Qasay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "helar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 438
+    },
+    {
+      "es": "herir",
+      "qu_cuzco": "K'iriy",
+      "qu_cuzco_synonyms": [
+        "k'irichay"
+      ],
+      "pos": "v",
+      "gloss": "herir",
+      "chanka_note": "Cuzco-only feature: k'irichay (ejective k') -> Chanka likely 'kirichay'",
+      "page": 439
+    },
+    {
+      "es": "hermano",
+      "qu_cuzco": "Wayqe",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "hermano",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 439
+    },
+    {
+      "es": "hermoso",
+      "qu_cuzco": "Sumaq",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "hermoso",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 439
+    },
+    {
+      "es": "hiel",
+      "qu_cuzco": "Hayaqe",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "hiel",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 439
+    },
+    {
+      "es": "hielo",
+      "qu_cuzco": "Chullunku",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "hielo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 439
+    },
+    {
+      "es": "hierba",
+      "qu_cuzco": "Qora",
+      "qu_cuzco_synonyms": [
+        "q'achu"
+      ],
+      "pos": "s",
+      "gloss": "hierba",
+      "chanka_note": "Cuzco-only feature: q'achu (ejective q') -> Chanka likely 'qachu'",
+      "page": 439
+    },
+    {
+      "es": "hija",
+      "qu_cuzco": "Ususi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "hija",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 439
+    },
+    {
+      "es": "hijo",
+      "qu_cuzco": "Churi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "hijo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 439
+    },
+    {
+      "es": "hilo",
+      "qu_cuzco": "Q'aytu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "hilo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 439
+    },
+    {
+      "es": "hipo",
+      "qu_cuzco": "Hik'iy",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "hipo",
+      "chanka_note": "Cuzco-only feature: Hik'iy (ejective k') -> Chanka likely 'Hikiy'",
+      "page": 439
+    },
+    {
+      "es": "hogar",
+      "qu_cuzco": "Wasi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "hogar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 439
+    },
+    {
+      "es": "hondo",
+      "qu_cuzco": "Ukhu",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "hondo",
+      "chanka_note": "Cuzco-only feature: Ukhu (aspirate kh) -> Chanka likely 'Uku'",
+      "page": 439
+    },
+    {
+      "es": "honra",
+      "qu_cuzco": "Yupay",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "honra",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 439
+    },
+    {
+      "es": "hoy",
+      "qu_cuzco": "Kunan",
+      "qu_cuzco_synonyms": [],
+      "pos": "adv",
+      "gloss": "hoy",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 440
+    },
+    {
+      "es": "hoya",
+      "qu_cuzco": "Oqhopanpa",
+      "qu_cuzco_synonyms": [
+        "pukrupanpa"
+      ],
+      "pos": "s",
+      "gloss": "hoya",
+      "chanka_note": "Cuzco-only feature: Oqhopanpa (aspirate qh) -> Chanka likely 'Oqopanpa'",
+      "page": 440
+    },
+    {
+      "es": "hoyo",
+      "qu_cuzco": "P'ukru",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "hoyo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 440
+    },
+    {
+      "es": "hueco",
+      "qu_cuzco": "T'oqo",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "hueco",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 440
+    },
+    {
+      "es": "huerta",
+      "qu_cuzco": "Muya",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "huerta",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 440
+    },
+    {
+      "es": "hueso",
+      "qu_cuzco": "Tullu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "hueso",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 440
+    },
+    {
+      "es": "huevo",
+      "qu_cuzco": "Runtu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "huevo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 440
+    },
+    {
+      "es": "huir",
+      "qu_cuzco": "Ayqey",
+      "qu_cuzco_synonyms": [
+        "ayqekuy"
+      ],
+      "pos": "v",
+      "gloss": "huir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 440
+    },
+    {
+      "es": "humo",
+      "qu_cuzco": "Q'osñi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "humo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 440
+    },
+    {
+      "es": "hurtar",
+      "qu_cuzco": "Suway",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "hurtar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 440
+    },
+    {
+      "es": "huso",
+      "qu_cuzco": "Puska",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "huso",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 440
+    },
+    {
+      "es": "hígado",
+      "qu_cuzco": "Kukupin",
+      "qu_cuzco_synonyms": [
+        "k'ipchan"
+      ],
+      "pos": "s",
+      "gloss": "hígado",
+      "chanka_note": "Cuzco-only feature: k'ipchan (ejective k') -> Chanka likely 'kipchan'",
+      "page": 439
+    },
+    {
+      "es": "idioma",
+      "qu_cuzco": "Ling. Simi. Runa simi: idioma",
+      "qu_cuzco_synonyms": [
+        "idioma humano"
+      ],
+      "pos": "s",
+      "gloss": "idioma",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 440
+    },
+    {
+      "es": "igual",
+      "qu_cuzco": "P'aq",
+      "qu_cuzco_synonyms": [
+        "siwk"
+      ],
+      "pos": "adj",
+      "gloss": "igual",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 440
+    },
+    {
+      "es": "inka",
+      "qu_cuzco": "Inka. Monarca o",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "inka",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 441
+    },
+    {
+      "es": "isla",
+      "qu_cuzco": "wat'a",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "isla",
+      "chanka_note": "Cuzco-only feature: wat'a (ejective t') -> Chanka likely 'wata'",
+      "page": 442
+    },
+    {
+      "es": "jalar",
+      "qu_cuzco": "Chutay",
+      "qu_cuzco_synonyms": [
+        "aysay"
+      ],
+      "pos": "v",
+      "gloss": "jalar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 443
+    },
+    {
+      "es": "jeta",
+      "qu_cuzco": "Wirp'a",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "jeta",
+      "chanka_note": "Cuzco-only feature: Wirp'a (ejective p') -> Chanka likely 'Wirpa'",
+      "page": 443
+    },
+    {
+      "es": "juez",
+      "qu_cuzco": "Paqtachaq",
+      "qu_cuzco_synonyms": [
+        "taripaq",
+        "taripaku kuskachaq"
+      ],
+      "pos": "s",
+      "gloss": "juez",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 443
+    },
+    {
+      "es": "jugar",
+      "qu_cuzco": "Pukllay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "jugar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 443
+    },
+    {
+      "es": "jugo",
+      "qu_cuzco": "Hilli",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "jugo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 443
+    },
+    {
+      "es": "justicia",
+      "qu_cuzco": "Kuskachay",
+      "qu_cuzco_synonyms": [
+        "paqtachay",
+        "taripay"
+      ],
+      "pos": "s",
+      "gloss": "justicia",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 443
+    },
+    {
+      "es": "labio",
+      "qu_cuzco": "Superior: Sirphi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "labio",
+      "chanka_note": "Cuzco-only feature: Superior: Sirphi (aspirate ph) -> Chanka likely 'Superior: Sirpi'",
+      "page": 444
+    },
+    {
+      "es": "lado",
+      "qu_cuzco": "Chinru",
+      "qu_cuzco_synonyms": [
+        "kinra"
+      ],
+      "pos": "s",
+      "gloss": "lado",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 444
+    },
+    {
+      "es": "ladrón",
+      "qu_cuzco": "Suwa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "ladrón",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 444
+    },
+    {
+      "es": "lanza",
+      "qu_cuzco": "Chuki",
+      "qu_cuzco_synonyms": [
+        "chanqa chuki"
+      ],
+      "pos": "s",
+      "gloss": "lanza",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 444
+    },
+    {
+      "es": "largo",
+      "qu_cuzco": "Suni",
+      "qu_cuzco_synonyms": [
+        "suyt'u",
+        "wask'a"
+      ],
+      "pos": "adj",
+      "gloss": "largo",
+      "chanka_note": "Cuzco-only feature: suyt'u (ejective t') -> Chanka likely 'suytu'; wask'a (ejective k') -> Chanka likely 'waska'",
+      "page": 444
+    },
+    {
+      "es": "lava",
+      "qu_cuzco": "Sut'a",
+      "qu_cuzco_synonyms": [
+        "t'oqra"
+      ],
+      "pos": "s",
+      "gloss": "lava",
+      "chanka_note": "Cuzco-only feature: Sut'a (ejective t') -> Chanka likely 'Suta'; t'oqra (ejective t') -> Chanka likely 'toqra'",
+      "page": 444
+    },
+    {
+      "es": "leche",
+      "qu_cuzco": "Ñuqñu",
+      "qu_cuzco_synonyms": [
+        "wilay"
+      ],
+      "pos": "s",
+      "gloss": "leche",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 444
+    },
+    {
+      "es": "leer",
+      "qu_cuzco": "Qelqarimay",
+      "qu_cuzco_synonyms": [
+        "ñawinchay"
+      ],
+      "pos": "v",
+      "gloss": "leer",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "lejos",
+      "qu_cuzco": "Karu",
+      "qu_cuzco_synonyms": [],
+      "pos": "adv",
+      "gloss": "lejos",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "lengua",
+      "qu_cuzco": "Qallu. Ling. simi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "lengua",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "letra",
+      "qu_cuzco": "Seq'e",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "letra",
+      "chanka_note": "Cuzco-only feature: Seq'e (ejective q') -> Chanka likely 'Seqe'",
+      "page": 445
+    },
+    {
+      "es": "levantarse",
+      "qu_cuzco": "Hatariy",
+      "qu_cuzco_synonyms": [
+        "sayariy"
+      ],
+      "pos": "s",
+      "gloss": "levantarse",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "ley",
+      "qu_cuzco": "Apusuni",
+      "qu_cuzco_synonyms": [
+        "hatun kamach qelqa kamachi",
+        "apu kamachi kamachina hathun qelqa"
+      ],
+      "pos": "s",
+      "gloss": "ley",
+      "chanka_note": "Cuzco-only feature: apu kamachi kamachina hathun qelqa (aspirate th) -> Chanka likely 'apu kamachi kamachina hatun qelqa'",
+      "page": 445
+    },
+    {
+      "es": "leña",
+      "qu_cuzco": "Llant'a",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "leña",
+      "chanka_note": "Cuzco-only feature: Llant'a (ejective t') -> Chanka likely 'Llanta'",
+      "page": 445
+    },
+    {
+      "es": "libre",
+      "qu_cuzco": "Qespisqa",
+      "qu_cuzco_synonyms": [
+        "qespi",
+        "muna"
+      ],
+      "pos": "adj",
+      "gloss": "libre",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "liga",
+      "qu_cuzco": "Ch'atay",
+      "qu_cuzco_synonyms": [
+        "watay"
+      ],
+      "pos": "v",
+      "gloss": "liga",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "limpiar",
+      "qu_cuzco": "Pichay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "limpiar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "llamar",
+      "qu_cuzco": "Waqyay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "llamar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 446
+    },
+    {
+      "es": "llano",
+      "qu_cuzco": "Panpa",
+      "qu_cuzco_synonyms": [
+        "p'aq"
+      ],
+      "pos": "adj",
+      "gloss": "llano",
+      "chanka_note": "Cuzco-only feature: p'aq (ejective p') -> Chanka likely 'paq'",
+      "page": 446
+    },
+    {
+      "es": "lobo",
+      "qu_cuzco": "Asuka",
+      "qu_cuzco_synonyms": [
+        "hatunqocha puma"
+      ],
+      "pos": "s",
+      "gloss": "lobo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "loco",
+      "qu_cuzco": "Waq'a",
+      "qu_cuzco_synonyms": [
+        "waq'ayasqa",
+        "waq'alanqo"
+      ],
+      "pos": "adj",
+      "gloss": "loco",
+      "chanka_note": "Cuzco-only feature: Waq'a (ejective q') -> Chanka likely 'Waqa'; waq'ayasqa (ejective q') -> Chanka likely 'waqayasqa'; waq'alanqo (ejective q') -> Chanka likely 'waqalanqo'",
+      "page": 445
+    },
+    {
+      "es": "locro",
+      "qu_cuzco": "Roqro",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "locro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "loro",
+      "qu_cuzco": "K'alla",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "loro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "luchar",
+      "qu_cuzco": "Maqanakuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "luchar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "lucma",
+      "qu_cuzco": "Loqma",
+      "qu_cuzco_synonyms": [
+        "rukma"
+      ],
+      "pos": "s",
+      "gloss": "lucma",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "luego",
+      "qu_cuzco": "Hinaspaqa",
+      "qu_cuzco_synonyms": [
+        "chaymantaqa"
+      ],
+      "pos": "conj",
+      "gloss": "luego",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "lugar",
+      "qu_cuzco": "K'iti. luido",
+      "qu_cuzco_synonyms": [
+        "–da gastado"
+      ],
+      "pos": "s",
+      "gloss": "lugar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "luna",
+      "qu_cuzco": "Killa",
+      "qu_cuzco_synonyms": [
+        "mama killa"
+      ],
+      "pos": "s",
+      "gloss": "luna",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "lunar",
+      "qu_cuzco": "Ana",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "lunar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 445
+    },
+    {
+      "es": "luto",
+      "qu_cuzco": "Yanallikuy",
+      "qu_cuzco_synonyms": [
+        "yana p'acha"
+      ],
+      "pos": "s",
+      "gloss": "luto",
+      "chanka_note": "Cuzco-only feature: yana p'acha (ejective p') -> Chanka likely 'yana pacha'",
+      "page": 445
+    },
+    {
+      "es": "luz",
+      "qu_cuzco": "K'ancha",
+      "qu_cuzco_synonyms": [
+        "k'anchaq illa",
+        "k'anchareqilla"
+      ],
+      "pos": "s",
+      "gloss": "luz",
+      "chanka_note": "Cuzco-only feature: k'anchaq illa (ejective k') -> Chanka likely 'kanchaq illa'; k'anchareqilla (ejective k') -> Chanka likely 'kanchareqilla'",
+      "page": 445
+    },
+    {
+      "es": "línea",
+      "qu_cuzco": "Seq'e",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "línea",
+      "chanka_note": "Cuzco-only feature: Seq'e (ejective q') -> Chanka likely 'Seqe'",
+      "page": 445
+    },
+    {
+      "es": "madre",
+      "qu_cuzco": "Mama",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "madre",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 446
+    },
+    {
+      "es": "malo",
+      "qu_cuzco": "Millay",
+      "qu_cuzco_synonyms": [
+        "mana allin"
+      ],
+      "pos": "adj",
+      "gloss": "malo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 447
+    },
+    {
+      "es": "mamá",
+      "qu_cuzco": "Mama",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "mamá",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 447
+    },
+    {
+      "es": "manco",
+      "qu_cuzco": "Willu",
+      "qu_cuzco_synonyms": [
+        "ñuk'u"
+      ],
+      "pos": "adj",
+      "gloss": "manco",
+      "chanka_note": "Cuzco-only feature: ñuk'u (ejective k') -> Chanka likely 'ñuku'",
+      "page": 447
+    },
+    {
+      "es": "mano",
+      "qu_cuzco": "Maki",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "mano",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 447
+    },
+    {
+      "es": "maní",
+      "qu_cuzco": "Inchis",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "maní",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 447
+    },
+    {
+      "es": "mar",
+      "qu_cuzco": "Mamaqocha",
+      "qu_cuzco_synonyms": [
+        "hatunqocha",
+        "Maras. Geog"
+      ],
+      "pos": "s",
+      "gloss": "mar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 447
+    },
+    {
+      "es": "marca",
+      "qu_cuzco": "Tuyru",
+      "qu_cuzco_synonyms": [
+        "sanapa",
+        "unancha. V. señal"
+      ],
+      "pos": "s",
+      "gloss": "marca",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 447
+    },
+    {
+      "es": "mata",
+      "qu_cuzco": "Yura",
+      "qu_cuzco_synonyms": [
+        "roya"
+      ],
+      "pos": "s",
+      "gloss": "mata",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "matar",
+      "qu_cuzco": "Sipiy",
+      "qu_cuzco_synonyms": [
+        "wañuchiy"
+      ],
+      "pos": "v",
+      "gloss": "matar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "matrimonio",
+      "qu_cuzco": "Saway",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "matrimonio",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "mayo",
+      "qu_cuzco": "Aymuray killa aymuray",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "mayo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "mayor",
+      "qu_cuzco": "Kuraq",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "mayor",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "maíz",
+      "qu_cuzco": "Sara",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "maíz",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 447
+    },
+    {
+      "es": "mañana",
+      "qu_cuzco": "Paqarin",
+      "qu_cuzco_synonyms": [],
+      "pos": "adv",
+      "gloss": "mañana",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 447
+    },
+    {
+      "es": "mediar",
+      "qu_cuzco": "Kuskanyay",
+      "qu_cuzco_synonyms": [
+        "kuskanchay"
+      ],
+      "pos": "v",
+      "gloss": "mediar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "medir",
+      "qu_cuzco": "Tupuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "medir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "mejilla",
+      "qu_cuzco": "K'aklla",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "mejilla",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "memoria",
+      "qu_cuzco": "Yuyay",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "memoria",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "mente",
+      "qu_cuzco": "Yuyay",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "mente",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "mentir",
+      "qu_cuzco": "Llullakuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "mentir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "mentira",
+      "qu_cuzco": "Llullakuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "mentira",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "mes",
+      "qu_cuzco": "Killa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "mes",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "miedo",
+      "qu_cuzco": "Mancha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "miedo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "miel",
+      "qu_cuzco": "Apic. Lachiwa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "miel",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "mil",
+      "qu_cuzco": "núm.card. Waranqa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "mil",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "mina",
+      "qu_cuzco": "Min. Q'oya",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "mina",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "mirar",
+      "qu_cuzco": "Qhaway",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "mirar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "mismo",
+      "qu_cuzco": "Kikin",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "mismo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "mitad",
+      "qu_cuzco": "Kuskan",
+      "qu_cuzco_synonyms": [
+        "ch'eqtan"
+      ],
+      "pos": "s",
+      "gloss": "mitad",
+      "chanka_note": "Cuzco-only feature: ch'eqtan (ejective ch') -> Chanka likely 'cheqtan'",
+      "page": 449
+    },
+    {
+      "es": "moco",
+      "qu_cuzco": "Fisiol. Qhoña",
+      "qu_cuzco_synonyms": [
+        "ñuti"
+      ],
+      "pos": "s",
+      "gloss": "moco",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "mofa",
+      "qu_cuzco": "Qellma",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "mofa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "mojado",
+      "qu_cuzco": "Ch'aranchasqa",
+      "qu_cuzco_synonyms": [
+        "m"
+      ],
+      "pos": "adj",
+      "gloss": "mojado",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "moler",
+      "qu_cuzco": "Kutay",
+      "qu_cuzco_synonyms": [
+        "ñut'uy",
+        "lleqwiy"
+      ],
+      "pos": "v",
+      "gloss": "moler",
+      "chanka_note": "Cuzco-only feature: ñut'uy (ejective t') -> Chanka likely 'ñutuy'",
+      "page": 449
+    },
+    {
+      "es": "momia",
+      "qu_cuzco": "Munaw",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "momia",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "mono",
+      "qu_cuzco": "K'usillu",
+      "qu_cuzco_synonyms": [
+        "wititi",
+        "miku",
+        "chipi"
+      ],
+      "pos": "s",
+      "gloss": "mono",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "montaña",
+      "qu_cuzco": "Orqo",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "montaña",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "morir",
+      "qu_cuzco": "Wañuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "morir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "mostrar",
+      "qu_cuzco": "Rikuchiy",
+      "qu_cuzco_synonyms": [
+        "qhawachiy"
+      ],
+      "pos": "v",
+      "gloss": "mostrar",
+      "chanka_note": "Cuzco-only feature: qhawachiy (aspirate qh) -> Chanka likely 'qawachiy'",
+      "page": 449
+    },
+    {
+      "es": "mote",
+      "qu_cuzco": "Mut'i",
+      "qu_cuzco_synonyms": [
+        "mot'e"
+      ],
+      "pos": "s",
+      "gloss": "mote",
+      "chanka_note": "Cuzco-only feature: Mut'i (ejective t') -> Chanka likely 'Muti'; mot'e (ejective t') -> Chanka likely 'mote'",
+      "page": 449
+    },
+    {
+      "es": "moza",
+      "qu_cuzco": "Sipas",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "moza",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "mucho",
+      "qu_cuzco": "Askha",
+      "qu_cuzco_synonyms": [
+        "sinchi",
+        "chay"
+      ],
+      "pos": "adj",
+      "gloss": "mucho",
+      "chanka_note": "Cuzco-only feature: Askha (aspirate kh) -> Chanka likely 'Aska'",
+      "page": 449
+    },
+    {
+      "es": "mudo",
+      "qu_cuzco": "Amu",
+      "qu_cuzco_synonyms": [
+        "urpa"
+      ],
+      "pos": "adj",
+      "gloss": "mudo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "muela",
+      "qu_cuzco": "Waqoro",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "muela",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "muerte",
+      "qu_cuzco": "Wañuy p'uchukay",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "muerte",
+      "chanka_note": "Cuzco-only feature: Wañuy p'uchukay (ejective p') -> Chanka likely 'Wañuy puchukay'",
+      "page": 449
+    },
+    {
+      "es": "mujer",
+      "qu_cuzco": "Warmi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "mujer",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "mundo",
+      "qu_cuzco": "Pacha",
+      "qu_cuzco_synonyms": [
+        "kay pacha"
+      ],
+      "pos": "s",
+      "gloss": "mundo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "muro",
+      "qu_cuzco": "Perqa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "muro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "muy",
+      "qu_cuzco": "Ancha",
+      "qu_cuzco_synonyms": [
+        "manchay",
+        "nishu",
+        "sinchi"
+      ],
+      "pos": "adv",
+      "gloss": "muy",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 449
+    },
+    {
+      "es": "más",
+      "qu_cuzco": "Aswan",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "más",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 448
+    },
+    {
+      "es": "nabo",
+      "qu_cuzco": "Yuyu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nabo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 450
+    },
+    {
+      "es": "nacer",
+      "qu_cuzco": "Paqariy",
+      "qu_cuzco_synonyms": [
+        "paqarimuy"
+      ],
+      "pos": "v",
+      "gloss": "nacer",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 450
+    },
+    {
+      "es": "nada",
+      "qu_cuzco": "Ch'usaq",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nada",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 450
+    },
+    {
+      "es": "nadie",
+      "qu_cuzco": "Mana pipas",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "nadie",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 450
+    },
+    {
+      "es": "nalga",
+      "qu_cuzco": "Siki",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nalga",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 450
+    },
+    {
+      "es": "nanay",
+      "qu_cuzco": "K'uchu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nanay",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 407
+    },
+    {
+      "es": "nariz",
+      "qu_cuzco": "Senqa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nariz",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 450
+    },
+    {
+      "es": "nata",
+      "qu_cuzco": "Llukllu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nata",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 450
+    },
+    {
+      "es": "negro",
+      "qu_cuzco": "Yana",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "negro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 450
+    },
+    {
+      "es": "neto",
+      "qu_cuzco": "Hunt'asqa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "neto",
+      "chanka_note": "Cuzco-only feature: Hunt'asqa (ejective t') -> Chanka likely 'Huntasqa'",
+      "page": 450
+    },
+    {
+      "es": "nieto",
+      "qu_cuzco": "Haway",
+      "qu_cuzco_synonyms": [
+        "willka"
+      ],
+      "pos": "s",
+      "gloss": "nieto",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 450
+    },
+    {
+      "es": "nieve",
+      "qu_cuzco": "Rit'i",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nieve",
+      "chanka_note": "Cuzco-only feature: Rit'i (ejective t') -> Chanka likely 'Riti'",
+      "page": 450
+    },
+    {
+      "es": "nigua",
+      "qu_cuzco": "Piki",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nigua",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 450
+    },
+    {
+      "es": "ninguno",
+      "qu_cuzco": "Mana pipas",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "ninguno",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 450
+    },
+    {
+      "es": "noche",
+      "qu_cuzco": "Tuta",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "noche",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 450
+    },
+    {
+      "es": "nombre",
+      "qu_cuzco": "Suti",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nombre",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 451
+    },
+    {
+      "es": "nopal",
+      "qu_cuzco": "Tunas",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nopal",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 451
+    },
+    {
+      "es": "nuca",
+      "qu_cuzco": "Much'u",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nuca",
+      "chanka_note": "Cuzco-only feature: Much'u (ejective ch') -> Chanka likely 'Muchu'",
+      "page": 451
+    },
+    {
+      "es": "nudo",
+      "qu_cuzco": "Khipu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nudo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 451
+    },
+    {
+      "es": "nuera",
+      "qu_cuzco": "Qhachun",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "nuera",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 451
+    },
+    {
+      "es": "nueve",
+      "qu_cuzco": "núm. Isqon",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "nueve",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 451
+    },
+    {
+      "es": "nuevo",
+      "qu_cuzco": "Mosoq",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "nuevo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 451
+    },
+    {
+      "es": "nulo",
+      "qu_cuzco": "Yanqa",
+      "qu_cuzco_synonyms": [
+        "mana chaniyoq"
+      ],
+      "pos": "adj",
+      "gloss": "nulo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 451
+    },
+    {
+      "es": "nunca",
+      "qu_cuzco": "Mana hayk'aqpas",
+      "qu_cuzco_synonyms": [],
+      "pos": "adv",
+      "gloss": "nunca",
+      "chanka_note": "Cuzco-only feature: Mana hayk'aqpas (ejective k') -> Chanka likely 'Mana haykaqpas'",
+      "page": 451
+    },
+    {
+      "es": "número",
+      "qu_cuzco": "Yupa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "número",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 451
+    },
+    {
+      "es": "obligar",
+      "qu_cuzco": "Kamachiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "obligar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 451
+    },
+    {
+      "es": "obrar",
+      "qu_cuzco": "Ruway",
+      "qu_cuzco_synonyms": [
+        "ruray"
+      ],
+      "pos": "v",
+      "gloss": "obrar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 451
+    },
+    {
+      "es": "odio",
+      "qu_cuzco": "Cheqni",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "odio",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 452
+    },
+    {
+      "es": "ofender",
+      "qu_cuzco": "Phiñachiy",
+      "qu_cuzco_synonyms": [
+        "qesachay"
+      ],
+      "pos": "v",
+      "gloss": "ofender",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 452
+    },
+    {
+      "es": "ojo",
+      "qu_cuzco": "Ñawi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "ojo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 452
+    },
+    {
+      "es": "oler",
+      "qu_cuzco": "Muskhiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "oler",
+      "chanka_note": "Cuzco-only feature: Muskhiy (aspirate kh) -> Chanka likely 'Muskiy'",
+      "page": 452
+    },
+    {
+      "es": "olla",
+      "qu_cuzco": "Cerám. Manka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "olla",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 452
+    },
+    {
+      "es": "olmo",
+      "qu_cuzco": "Qewña",
+      "qu_cuzco_synonyms": [
+        "qewiña"
+      ],
+      "pos": "s",
+      "gloss": "olmo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 452
+    },
+    {
+      "es": "olvidar",
+      "qu_cuzco": "Qonqay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "olvidar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 452
+    },
+    {
+      "es": "ombligo",
+      "qu_cuzco": "Pupu",
+      "qu_cuzco_synonyms": [
+        "puputi"
+      ],
+      "pos": "s",
+      "gloss": "ombligo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 452
+    },
+    {
+      "es": "orden",
+      "qu_cuzco": "Kamachi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "orden",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 452
+    },
+    {
+      "es": "oreja",
+      "qu_cuzco": "rinri",
+      "qu_cuzco_synonyms": [
+        "ninri"
+      ],
+      "pos": "s",
+      "gloss": "oreja",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 452
+    },
+    {
+      "es": "oscuro",
+      "qu_cuzco": "Laqha",
+      "qu_cuzco_synonyms": [
+        "tuta"
+      ],
+      "pos": "adj",
+      "gloss": "oscuro",
+      "chanka_note": "Cuzco-only feature: Laqha (aspirate qh) -> Chanka likely 'Laqa'",
+      "page": 453
+    },
+    {
+      "es": "otro",
+      "qu_cuzco": "Hoq",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "otro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 453
+    },
+    {
+      "es": "ovar",
+      "qu_cuzco": "Runtuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "ovar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 453
+    },
+    {
+      "es": "oído",
+      "qu_cuzco": "Ninri",
+      "qu_cuzco_synonyms": [
+        "rinri. oiga! ínterj. Yaw!"
+      ],
+      "pos": "s",
+      "gloss": "oído",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 452
+    },
+    {
+      "es": "paciencia",
+      "qu_cuzco": "Muchukuq sonqo kay",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "paciencia",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 453
+    },
+    {
+      "es": "padre",
+      "qu_cuzco": "Tayta",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "padre",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 453
+    },
+    {
+      "es": "pagar",
+      "qu_cuzco": "Qopuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "pagar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 453
+    },
+    {
+      "es": "paja",
+      "qu_cuzco": "Ichhu",
+      "qu_cuzco_synonyms": [
+        "chilliwa",
+        "maq. qarwayu",
+        "iru"
+      ],
+      "pos": "s",
+      "gloss": "paja",
+      "chanka_note": "Cuzco-only feature: Ichhu (aspirate chh) -> Chanka likely 'Ichu'",
+      "page": 453
+    },
+    {
+      "es": "palabra",
+      "qu_cuzco": "Simi",
+      "qu_cuzco_synonyms": [
+        "rima"
+      ],
+      "pos": "s",
+      "gloss": "palabra",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 454
+    },
+    {
+      "es": "paloma",
+      "qu_cuzco": "Urpi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "paloma",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 454
+    },
+    {
+      "es": "pampa",
+      "qu_cuzco": "Panpa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pampa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 454
+    },
+    {
+      "es": "pan",
+      "qu_cuzco": "T'anta",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pan",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 454
+    },
+    {
+      "es": "panza",
+      "qu_cuzco": "Wiksa",
+      "qu_cuzco_synonyms": [
+        "p'usnu"
+      ],
+      "pos": "s",
+      "gloss": "panza",
+      "chanka_note": "Cuzco-only feature: p'usnu (ejective p') -> Chanka likely 'pusnu'",
+      "page": 454
+    },
+    {
+      "es": "papa",
+      "qu_cuzco": "Papa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "papa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 454
+    },
+    {
+      "es": "papá",
+      "qu_cuzco": "Tayta",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "papá",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 454
+    },
+    {
+      "es": "para",
+      "qu_cuzco": "...paq",
+      "qu_cuzco_synonyms": [],
+      "pos": "prep",
+      "gloss": "para",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 454
+    },
+    {
+      "es": "parar",
+      "qu_cuzco": "Sayay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "parar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 454
+    },
+    {
+      "es": "pared",
+      "qu_cuzco": "Perqa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pared",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 454
+    },
+    {
+      "es": "paso",
+      "qu_cuzco": "Ichi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "paso",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 455
+    },
+    {
+      "es": "pato",
+      "qu_cuzco": "Wallata",
+      "qu_cuzco_synonyms": [
+        "nuñuma",
+        "riq",
+        "qanqena"
+      ],
+      "pos": "s",
+      "gloss": "pato",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 455
+    },
+    {
+      "es": "pausa",
+      "qu_cuzco": "Sama",
+      "qu_cuzco_synonyms": [
+        "saya"
+      ],
+      "pos": "s",
+      "gloss": "pausa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 456
+    },
+    {
+      "es": "paz",
+      "qu_cuzco": "Thak kay",
+      "qu_cuzco_synonyms": [
+        "kusi qellpu kawsay"
+      ],
+      "pos": "s",
+      "gloss": "paz",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 456
+    },
+    {
+      "es": "país",
+      "qu_cuzco": "Llaqta",
+      "qu_cuzco_synonyms": [
+        "suyu"
+      ],
+      "pos": "s",
+      "gloss": "país",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 453
+    },
+    {
+      "es": "peca",
+      "qu_cuzco": "Mirka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "peca",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 456
+    },
+    {
+      "es": "pecho",
+      "qu_cuzco": "Qhasqo",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pecho",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 456
+    },
+    {
+      "es": "pedir",
+      "qu_cuzco": "Mañakuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "pedir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 456
+    },
+    {
+      "es": "pedo",
+      "qu_cuzco": "Fisiol. Supi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pedo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 456
+    },
+    {
+      "es": "pelear",
+      "qu_cuzco": "Maqanakuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "pelear",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 456
+    },
+    {
+      "es": "pelo",
+      "qu_cuzco": "Chukcha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pelo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 456
+    },
+    {
+      "es": "pene",
+      "qu_cuzco": "Ullu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pene",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 456
+    },
+    {
+      "es": "pensar",
+      "qu_cuzco": "Yuyay",
+      "qu_cuzco_synonyms": [
+        "yuyaykuy"
+      ],
+      "pos": "v",
+      "gloss": "pensar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 456
+    },
+    {
+      "es": "peor",
+      "qu_cuzco": "Aswan mana allin",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "peor",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 457
+    },
+    {
+      "es": "pepa",
+      "qu_cuzco": "Ruru",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pepa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 457
+    },
+    {
+      "es": "pequeño",
+      "qu_cuzco": "Huch'uy",
+      "qu_cuzco_synonyms": [
+        "huch'uylla"
+      ],
+      "pos": "adj",
+      "gloss": "pequeño",
+      "chanka_note": "Cuzco-only feature: Huch'uy (ejective ch') -> Chanka likely 'Huchuy'; huch'uylla (ejective ch') -> Chanka likely 'huchuylla'",
+      "page": 457
+    },
+    {
+      "es": "perder",
+      "qu_cuzco": "Chinkachiy",
+      "qu_cuzco_synonyms": [
+        "chinkachikuy"
+      ],
+      "pos": "v",
+      "gloss": "perder",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 457
+    },
+    {
+      "es": "perdonar",
+      "qu_cuzco": "Panpachay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "perdonar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 457
+    },
+    {
+      "es": "permitir",
+      "qu_cuzco": "Huñiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "permitir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 457
+    },
+    {
+      "es": "pero",
+      "qu_cuzco": "advers. Ichaqa",
+      "qu_cuzco_synonyms": [],
+      "pos": "conj",
+      "gloss": "pero",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 457
+    },
+    {
+      "es": "persona",
+      "qu_cuzco": "Runa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "persona",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 457
+    },
+    {
+      "es": "pescado",
+      "qu_cuzco": "Challwa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pescado",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 457
+    },
+    {
+      "es": "pestaña",
+      "qu_cuzco": "Qhechirpa",
+      "qu_cuzco_synonyms": [
+        "pullurki"
+      ],
+      "pos": "s",
+      "gloss": "pestaña",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "pez",
+      "qu_cuzco": "Challwa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pez",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "pezón",
+      "qu_cuzco": "Ñuñu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pezón",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "peña",
+      "qu_cuzco": "Qaqa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "peña",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 456
+    },
+    {
+      "es": "peón",
+      "qu_cuzco": "Llank'apakuq",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "peón",
+      "chanka_note": "Cuzco-only feature: Llank'apakuq (ejective k') -> Chanka likely 'Llankapakuq'",
+      "page": 457
+    },
+    {
+      "es": "piar",
+      "qu_cuzco": "chilakyay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "piar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "pichón",
+      "qu_cuzco": "Malqo",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pichón",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "pie",
+      "qu_cuzco": "Chaki",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pie",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "piedra",
+      "qu_cuzco": "Rumi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "piedra",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "piel",
+      "qu_cuzco": "Qara. piélago. Geog. Tira",
+      "qu_cuzco_synonyms": [
+        "chawpi qocha"
+      ],
+      "pos": "s",
+      "gloss": "piel",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "pierna",
+      "qu_cuzco": "Chaka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pierna",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "pilar",
+      "qu_cuzco": "Tunu",
+      "qu_cuzco_synonyms": [
+        "tuni"
+      ],
+      "pos": "s",
+      "gloss": "pilar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "piojo",
+      "qu_cuzco": "Usa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "piojo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "pisar",
+      "qu_cuzco": "Saruy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "pisar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "pista",
+      "qu_cuzco": "Yupi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pista",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "pito",
+      "qu_cuzco": "Hak'achu",
+      "qu_cuzco_synonyms": [
+        "hak'akllu"
+      ],
+      "pos": "s",
+      "gloss": "pito",
+      "chanka_note": "Cuzco-only feature: Hak'achu (ejective k') -> Chanka likely 'Hakachu'; hak'akllu (ejective k') -> Chanka likely 'hakakllu'",
+      "page": 458
+    },
+    {
+      "es": "piña",
+      "qu_cuzco": "Achupalla",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "piña",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 458
+    },
+    {
+      "es": "plato",
+      "qu_cuzco": "P'uku",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "plato",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 459
+    },
+    {
+      "es": "plazo",
+      "qu_cuzco": "Suyay",
+      "qu_cuzco_synonyms": [
+        "suyana"
+      ],
+      "pos": "s",
+      "gloss": "plazo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 459
+    },
+    {
+      "es": "pluma",
+      "qu_cuzco": "Phuru",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pluma",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 459
+    },
+    {
+      "es": "pobre",
+      "qu_cuzco": "Wakcha",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "pobre",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 459
+    },
+    {
+      "es": "poco",
+      "qu_cuzco": "Pisi",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "poco",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 459
+    },
+    {
+      "es": "poder",
+      "qu_cuzco": "Kallpa",
+      "qu_cuzco_synonyms": [
+        "atipa"
+      ],
+      "pos": "s",
+      "gloss": "poder",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 459
+    },
+    {
+      "es": "poner",
+      "qu_cuzco": "Churay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "poner",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 459
+    },
+    {
+      "es": "poseer",
+      "qu_cuzco": "Hat'alliy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "poseer",
+      "chanka_note": "Cuzco-only feature: Hat'alliy (ejective t') -> Chanka likely 'Hatalliy'",
+      "page": 460
+    },
+    {
+      "es": "poste",
+      "qu_cuzco": "Tunu",
+      "qu_cuzco_synonyms": [
+        "taima"
+      ],
+      "pos": "s",
+      "gloss": "poste",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 460
+    },
+    {
+      "es": "poyo",
+      "qu_cuzco": "Pata",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "poyo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 460
+    },
+    {
+      "es": "pozo",
+      "qu_cuzco": "P'onqo",
+      "qu_cuzco_synonyms": [
+        "p'uytu"
+      ],
+      "pos": "s",
+      "gloss": "pozo",
+      "chanka_note": "Cuzco-only feature: p'uytu (ejective p') -> Chanka likely 'puytu'",
+      "page": 460
+    },
+    {
+      "es": "preguntar",
+      "qu_cuzco": "Tapuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "preguntar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 460
+    },
+    {
+      "es": "preparar",
+      "qu_cuzco": "Kamariy",
+      "qu_cuzco_synonyms": [
+        "ruway"
+      ],
+      "pos": "v",
+      "gloss": "preparar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 460
+    },
+    {
+      "es": "presentar",
+      "qu_cuzco": "Rikuchiy",
+      "qu_cuzco_synonyms": [
+        "qayllachiy"
+      ],
+      "pos": "v",
+      "gloss": "presentar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 461
+    },
+    {
+      "es": "prestar",
+      "qu_cuzco": "Manuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "prestar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 461
+    },
+    {
+      "es": "primero",
+      "qu_cuzco": "núm.ord. Ñawpaq",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "primero",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 461
+    },
+    {
+      "es": "principio",
+      "qu_cuzco": "Qallariynin",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "principio",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 461
+    },
+    {
+      "es": "probar",
+      "qu_cuzco": "Surinchay",
+      "qu_cuzco_synonyms": [
+        "yanayku malliy"
+      ],
+      "pos": "v",
+      "gloss": "probar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 461
+    },
+    {
+      "es": "promesa",
+      "qu_cuzco": "Sullullchay",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "promesa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 462
+    },
+    {
+      "es": "propietario",
+      "qu_cuzco": "Kaqniyoq",
+      "qu_cuzco_synonyms": [
+        "kaqeyoq"
+      ],
+      "pos": "s",
+      "gloss": "propietario",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 462
+    },
+    {
+      "es": "proteger",
+      "qu_cuzco": "Amachay",
+      "qu_cuzco_synonyms": [
+        "yanapay"
+      ],
+      "pos": "v",
+      "gloss": "proteger",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 462
+    },
+    {
+      "es": "proyecto",
+      "qu_cuzco": "Musik musikusqa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "proyecto",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 462
+    },
+    {
+      "es": "pueblo",
+      "qu_cuzco": "Llaqta",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pueblo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 462
+    },
+    {
+      "es": "puerta",
+      "qu_cuzco": "Punku",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "puerta",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 462
+    },
+    {
+      "es": "pulmón",
+      "qu_cuzco": "Sorq'an",
+      "qu_cuzco_synonyms": [
+        "surq'a"
+      ],
+      "pos": "s",
+      "gloss": "pulmón",
+      "chanka_note": "Cuzco-only feature: Sorq'an (ejective q') -> Chanka likely 'Sorqan'; surq'a (ejective q') -> Chanka likely 'surqa'",
+      "page": 462
+    },
+    {
+      "es": "puma",
+      "qu_cuzco": "Puma",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "puma",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 462
+    },
+    {
+      "es": "puro",
+      "qu_cuzco": "Ch'uya",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "puro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 463
+    },
+    {
+      "es": "puño",
+      "qu_cuzco": "Saqma",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "puño",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 463
+    },
+    {
+      "es": "pájaro",
+      "qu_cuzco": "Pesqo",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "pájaro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 453
+    },
+    {
+      "es": "quizá",
+      "qu_cuzco": "Icha",
+      "qu_cuzco_synonyms": [
+        "ichas",
+        "ichapas",
+        "paqta"
+      ],
+      "pos": "adv",
+      "gloss": "quizá",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 464
+    },
+    {
+      "es": "rabo",
+      "qu_cuzco": "Chupa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "rabo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 464
+    },
+    {
+      "es": "rama",
+      "qu_cuzco": "K'allma. aka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "rama",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 464
+    },
+    {
+      "es": "rana",
+      "qu_cuzco": "K'ayra",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "rana",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 464
+    },
+    {
+      "es": "rata",
+      "qu_cuzco": "Hatun huk'ucha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "rata",
+      "chanka_note": "Cuzco-only feature: Hatun huk'ucha (ejective k') -> Chanka likely 'Hatun hukucha'",
+      "page": 465
+    },
+    {
+      "es": "ratón",
+      "qu_cuzco": "Huk'ucha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "ratón",
+      "chanka_note": "Cuzco-only feature: Huk'ucha (ejective k') -> Chanka likely 'Hukucha'",
+      "page": 465
+    },
+    {
+      "es": "rayo",
+      "qu_cuzco": "Meteor. Hillap'a",
+      "qu_cuzco_synonyms": [
+        "illapa"
+      ],
+      "pos": "s",
+      "gloss": "rayo",
+      "chanka_note": "Cuzco-only feature: Meteor. Hillap'a (ejective p') -> Chanka likely 'Meteor. Hillapa'",
+      "page": 465
+    },
+    {
+      "es": "raza",
+      "qu_cuzco": "sana",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "raza",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 465
+    },
+    {
+      "es": "recibir",
+      "qu_cuzco": "Chaskiy",
+      "qu_cuzco_synonyms": [
+        "chaskikuy"
+      ],
+      "pos": "v",
+      "gloss": "recibir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 465
+    },
+    {
+      "es": "recoger",
+      "qu_cuzco": "objetos: Hoqariy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "recoger",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 465
+    },
+    {
+      "es": "reconocer",
+      "qu_cuzco": "Reqsikuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "reconocer",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 465
+    },
+    {
+      "es": "recordar",
+      "qu_cuzco": "Yuyay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "recordar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 465
+    },
+    {
+      "es": "regalar",
+      "qu_cuzco": "Suñay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "regalar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 466
+    },
+    {
+      "es": "remo",
+      "qu_cuzco": "T'uyu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "remo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 466
+    },
+    {
+      "es": "responder",
+      "qu_cuzco": "Kutichiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "responder",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "responsabilidad",
+      "qu_cuzco": "Manu kay",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "responsabilidad",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "responsable",
+      "qu_cuzco": "Manu kaq",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "responsable",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "respuesta",
+      "qu_cuzco": "Kutichiku",
+      "qu_cuzco_synonyms": [],
+      "pos": "adv",
+      "gloss": "respuesta",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "reír",
+      "qu_cuzco": "Asiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "reír",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 466
+    },
+    {
+      "es": "risa",
+      "qu_cuzco": "Asi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "risa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "rito",
+      "qu_cuzco": "Aknana",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "rito",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "rival",
+      "qu_cuzco": "Awqa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "rival",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "riñón",
+      "qu_cuzco": "Rurun",
+      "qu_cuzco_synonyms": [
+        "wasa rurun"
+      ],
+      "pos": "s",
+      "gloss": "riñón",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "robar",
+      "qu_cuzco": "Suway",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "robar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "rodeo",
+      "qu_cuzco": "Tuma",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "rodeo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "rodilla",
+      "qu_cuzco": "Moqo",
+      "qu_cuzco_synonyms": [
+        "qonqor"
+      ],
+      "pos": "s",
+      "gloss": "rodilla",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "roer",
+      "qu_cuzco": "K'utuy",
+      "qu_cuzco_synonyms": [
+        "kutkuy",
+        "khank khaskay"
+      ],
+      "pos": "v",
+      "gloss": "roer",
+      "chanka_note": "Cuzco-only feature: khank khaskay (aspirate kh) -> Chanka likely 'kank kaskay'",
+      "page": 467
+    },
+    {
+      "es": "rojo",
+      "qu_cuzco": "Puka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "rojo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "ropa",
+      "qu_cuzco": "P'acha. rku",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "ropa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "roto",
+      "qu_cuzco": "Llik'i",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "roto",
+      "chanka_note": "Cuzco-only feature: Llik'i (ejective k') -> Chanka likely 'Lliki'",
+      "page": 467
+    },
+    {
+      "es": "roña",
+      "qu_cuzco": "Qaracha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "roña",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "rubio",
+      "qu_cuzco": "P'aqo",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "rubio",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "rueca",
+      "qu_cuzco": "Puska",
+      "qu_cuzco_synonyms": [
+        "phillillu"
+      ],
+      "pos": "s",
+      "gloss": "rueca",
+      "chanka_note": "Cuzco-only feature: phillillu (aspirate ph) -> Chanka likely 'pillillu'",
+      "page": 467
+    },
+    {
+      "es": "ruma",
+      "qu_cuzco": "Pirwa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "ruma",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "río",
+      "qu_cuzco": "Mayu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "río",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 467
+    },
+    {
+      "es": "sabiduría",
+      "qu_cuzco": "Yacha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "sabiduría",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 468
+    },
+    {
+      "es": "sacar",
+      "qu_cuzco": "Horqoy",
+      "qu_cuzco_synonyms": [
+        "horqomuy",
+        "sik'iy",
+        "wisiy",
+        "hapht'ay"
+      ],
+      "pos": "v",
+      "gloss": "sacar",
+      "chanka_note": "Cuzco-only feature: sik'iy (ejective k') -> Chanka likely 'sikiy'",
+      "page": 468
+    },
+    {
+      "es": "sal",
+      "qu_cuzco": "Kachi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "sal",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 468
+    },
+    {
+      "es": "salir",
+      "qu_cuzco": "Lloqsiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "salir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 468
+    },
+    {
+      "es": "saludar",
+      "qu_cuzco": "Napaykuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "saludar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 468
+    },
+    {
+      "es": "sangre",
+      "qu_cuzco": "Yawar",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "sangre",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 468
+    },
+    {
+      "es": "sano",
+      "qu_cuzco": "Qhali",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "sano",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 468
+    },
+    {
+      "es": "sapo",
+      "qu_cuzco": "Hanp'atu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "sapo",
+      "chanka_note": "Cuzco-only feature: Hanp'atu (ejective p') -> Chanka likely 'Hanpatu'",
+      "page": 468
+    },
+    {
+      "es": "sauce",
+      "qu_cuzco": "Wayaw",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "sauce",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "saya",
+      "qu_cuzco": "Aqsu",
+      "qu_cuzco_synonyms": [
+        "anaku"
+      ],
+      "pos": "s",
+      "gloss": "saya",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "sebo",
+      "qu_cuzco": "Wira",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "sebo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "seco",
+      "qu_cuzco": "Ch'aki",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "seco",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "sed",
+      "qu_cuzco": "ch'akiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "sed",
+      "chanka_note": "Cuzco-only feature: ch'akiy (ejective ch') -> Chanka likely 'chakiy'",
+      "page": 469
+    },
+    {
+      "es": "segundo",
+      "qu_cuzco": "núm.ord. Iskay ñeqen",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "segundo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "seis",
+      "qu_cuzco": "núm.card. Soqta",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "seis",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "selva",
+      "qu_cuzco": "Yunka",
+      "qu_cuzco_synonyms": [
+        "yunka ukhu. Neol. rupha rupha"
+      ],
+      "pos": "s",
+      "gloss": "selva",
+      "chanka_note": "Cuzco-only feature: yunka ukhu. Neol. rupha rupha (aspirate kh, aspirate ph) -> Chanka likely 'yunka uku. Neol. rupa rupa'",
+      "page": 469
+    },
+    {
+      "es": "sembrar",
+      "qu_cuzco": "Tarpuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "sembrar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "senil",
+      "qu_cuzco": "Ruk'u",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "senil",
+      "chanka_note": "Cuzco-only feature: Ruk'u (ejective k') -> Chanka likely 'Ruku'",
+      "page": 469
+    },
+    {
+      "es": "sentarse",
+      "qu_cuzco": "Tiyay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "sentarse",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "sentenciar",
+      "qu_cuzco": "Hayratay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "sentenciar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "ser",
+      "qu_cuzco": "Kay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "ser",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "señal",
+      "qu_cuzco": "Unancha",
+      "qu_cuzco_synonyms": [
+        "saywa",
+        "tuyru"
+      ],
+      "pos": "s",
+      "gloss": "señal",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "señalar",
+      "qu_cuzco": "T'uphsiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "señalar",
+      "chanka_note": "Cuzco-only feature: T'uphsiy (aspirate ph) -> Chanka likely 'T'upsiy'",
+      "page": 469
+    },
+    {
+      "es": "señor",
+      "qu_cuzco": "Wiraqocha",
+      "qu_cuzco_synonyms": [
+        "apu"
+      ],
+      "pos": "s",
+      "gloss": "señor",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "señora",
+      "qu_cuzco": "Mama",
+      "qu_cuzco_synonyms": [
+        "qoya"
+      ],
+      "pos": "s",
+      "gloss": "señora",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "señorita",
+      "qu_cuzco": "Sipas",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "señorita",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "siempre",
+      "qu_cuzco": "Wiñay",
+      "qu_cuzco_synonyms": [],
+      "pos": "adv",
+      "gloss": "siempre",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 469
+    },
+    {
+      "es": "signo",
+      "qu_cuzco": "Seq'e",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "signo",
+      "chanka_note": "Cuzco-only feature: Seq'e (ejective q') -> Chanka likely 'Seqe'",
+      "page": 470
+    },
+    {
+      "es": "siguiente",
+      "qu_cuzco": "Qatiq",
+      "qu_cuzco_synonyms": [
+        "qatiqnin",
+        "s qhepan qatiq"
+      ],
+      "pos": "adj",
+      "gloss": "siguiente",
+      "chanka_note": "Cuzco-only feature: s qhepan qatiq (aspirate qh) -> Chanka likely 's qepan qatiq'",
+      "page": 470
+    },
+    {
+      "es": "silencio",
+      "qu_cuzco": "Ch'in",
+      "qu_cuzco_synonyms": [
+        "ch'inkay"
+      ],
+      "pos": "adj",
+      "gloss": "silencio",
+      "chanka_note": "Cuzco-only feature: ch'inkay (ejective ch') -> Chanka likely 'chinkay'",
+      "page": 470
+    },
+    {
+      "es": "silla",
+      "qu_cuzco": "K'irana",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "silla",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "sismo",
+      "qu_cuzco": "Pacha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "sismo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "sitio",
+      "qu_cuzco": "K'iti",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "sitio",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "sobra",
+      "qu_cuzco": "Puchu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "sobra",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "sobrino",
+      "qu_cuzco": "Mulla",
+      "qu_cuzco_synonyms": [
+        "kucha"
+      ],
+      "pos": "s",
+      "gloss": "sobrino",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "socio",
+      "qu_cuzco": "Masi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "socio",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "soga",
+      "qu_cuzco": "Waskha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "soga",
+      "chanka_note": "Cuzco-only feature: Waskha (aspirate kh) -> Chanka likely 'Waska'",
+      "page": 470
+    },
+    {
+      "es": "sol",
+      "qu_cuzco": "Inti",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "sol",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "solaz",
+      "qu_cuzco": "Hawka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "solaz",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "solicitar",
+      "qu_cuzco": "Mañakuy",
+      "qu_cuzco_synonyms": [
+        "pituy"
+      ],
+      "pos": "v",
+      "gloss": "solicitar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "solo",
+      "qu_cuzco": "Sapan",
+      "qu_cuzco_synonyms": [
+        "mana piniyoq",
+        "sapallan"
+      ],
+      "pos": "adv",
+      "gloss": "solo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "soltar",
+      "qu_cuzco": "Kachariy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "soltar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "sonso",
+      "qu_cuzco": "Upa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "sonso",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "sopa",
+      "qu_cuzco": "Lawa",
+      "qu_cuzco_synonyms": [
+        "chupi"
+      ],
+      "pos": "s",
+      "gloss": "sopa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "soplo",
+      "qu_cuzco": "Phuku",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "soplo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "soso",
+      "qu_cuzco": "Q'ayma",
+      "qu_cuzco_synonyms": [
+        "hamya"
+      ],
+      "pos": "adj",
+      "gloss": "soso",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "sospechar",
+      "qu_cuzco": "Watupay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "sospechar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "soñar",
+      "qu_cuzco": "Mosqokuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "soñar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "suerte",
+      "qu_cuzco": "Sami",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "suerte",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 470
+    },
+    {
+      "es": "sufrir",
+      "qu_cuzco": "Muchuy",
+      "qu_cuzco_synonyms": [
+        "ñak'ariy",
+        "llakikuy"
+      ],
+      "pos": "v",
+      "gloss": "sufrir",
+      "chanka_note": "Cuzco-only feature: ñak'ariy (ejective k') -> Chanka likely 'ñakariy'",
+      "page": 471
+    },
+    {
+      "es": "suka",
+      "qu_cuzco": "Wakin",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "suka",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 459
+    },
+    {
+      "es": "surco",
+      "qu_cuzco": "Wachu",
+      "qu_cuzco_synonyms": [
+        "suka",
+        "wara"
+      ],
+      "pos": "s",
+      "gloss": "surco",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 471
+    },
+    {
+      "es": "suspender",
+      "qu_cuzco": "Warkuy",
+      "qu_cuzco_synonyms": [
+        "tatichiy"
+      ],
+      "pos": "v",
+      "gloss": "suspender",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 471
+    },
+    {
+      "es": "tacho",
+      "qu_cuzco": "Chatu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "tacho",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 471
+    },
+    {
+      "es": "tallo",
+      "qu_cuzco": "Tullu",
+      "qu_cuzco_synonyms": [
+        "chhalla",
+        "ch'allpa",
+        "toqsu"
+      ],
+      "pos": "s",
+      "gloss": "tallo",
+      "chanka_note": "Cuzco-only feature: chhalla (aspirate chh) -> Chanka likely 'challa'; ch'allpa (ejective ch') -> Chanka likely 'challpa'",
+      "page": 471
+    },
+    {
+      "es": "tanto",
+      "qu_cuzco": "Chhika",
+      "qu_cuzco_synonyms": [
+        "askha"
+      ],
+      "pos": "adv",
+      "gloss": "tanto",
+      "chanka_note": "Cuzco-only feature: askha (aspirate kh) -> Chanka likely 'aska'",
+      "page": 472
+    },
+    {
+      "es": "tapa",
+      "qu_cuzco": "Kirpa",
+      "qu_cuzco_synonyms": [
+        "kirpana"
+      ],
+      "pos": "s",
+      "gloss": "tapa",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "tarde",
+      "qu_cuzco": "Sukha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "tarde",
+      "chanka_note": "Cuzco-only feature: Sukha (aspirate kh) -> Chanka likely 'Suka'",
+      "page": 472
+    },
+    {
+      "es": "techo",
+      "qu_cuzco": "Wasi qata",
+      "qu_cuzco_synonyms": [
+        "wasi pata",
+        "wasi p'istu"
+      ],
+      "pos": "s",
+      "gloss": "techo",
+      "chanka_note": "Cuzco-only feature: wasi p'istu (ejective p') -> Chanka likely 'wasi pistu'",
+      "page": 472
+    },
+    {
+      "es": "tejer",
+      "qu_cuzco": "away",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "tejer",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "tema",
+      "qu_cuzco": "Rimana",
+      "qu_cuzco_synonyms": [
+        "yuyana"
+      ],
+      "pos": "s",
+      "gloss": "tema",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "temprano",
+      "qu_cuzco": "Tutamanta",
+      "qu_cuzco_synonyms": [
+        "tutallamanta"
+      ],
+      "pos": "adv",
+      "gloss": "temprano",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "tener",
+      "qu_cuzco": "Kay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "tener",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "tepe",
+      "qu_cuzco": "Ch'anpa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "tepe",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "tercero",
+      "qu_cuzco": "núm.ord. Kinsa ñeqen",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "tercero",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "terminar",
+      "qu_cuzco": "Tukuy",
+      "qu_cuzco_synonyms": [
+        "tukupuy",
+        "p'uchukay"
+      ],
+      "pos": "v",
+      "gloss": "terminar",
+      "chanka_note": "Cuzco-only feature: p'uchukay (ejective p') -> Chanka likely 'puchukay'",
+      "page": 472
+    },
+    {
+      "es": "tesar",
+      "qu_cuzco": "Aysay",
+      "qu_cuzco_synonyms": [
+        "chutay"
+      ],
+      "pos": "v",
+      "gloss": "tesar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "testigo",
+      "qu_cuzco": "Uyanchaq",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "testigo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "teta",
+      "qu_cuzco": "Ñuñu",
+      "qu_cuzco_synonyms": [
+        "chichi",
+        "tutu"
+      ],
+      "pos": "s",
+      "gloss": "teta",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "tibio",
+      "qu_cuzco": "clim. llaphi",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "tibio",
+      "chanka_note": "Cuzco-only feature: clim. llaphi (aspirate ph) -> Chanka likely 'clim. llapi'",
+      "page": 472
+    },
+    {
+      "es": "tiempo",
+      "qu_cuzco": "Pacha",
+      "qu_cuzco_synonyms": [
+        "kawsay pacha"
+      ],
+      "pos": "s",
+      "gloss": "tiempo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "tierra",
+      "qu_cuzco": "Allpa",
+      "qu_cuzco_synonyms": [
+        "teqsemuyu"
+      ],
+      "pos": "s",
+      "gloss": "tierra",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "tina",
+      "qu_cuzco": "Milla",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "tina",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 473
+    },
+    {
+      "es": "todo",
+      "qu_cuzco": "Llapa",
+      "qu_cuzco_synonyms": [
+        "llipi",
+        "tukuy",
+        "lliw",
+        "lluy"
+      ],
+      "pos": "adj",
+      "gloss": "todo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 473
+    },
+    {
+      "es": "toldo",
+      "qu_cuzco": "Karpa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "toldo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 473
+    },
+    {
+      "es": "tonto",
+      "qu_cuzco": "Upa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "tonto",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 473
+    },
+    {
+      "es": "toro",
+      "qu_cuzco": "Orqo waka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "toro",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 473
+    },
+    {
+      "es": "toser",
+      "qu_cuzco": "Ukhuy",
+      "qu_cuzco_synonyms": [
+        "ujuy",
+        "ch'oqhu"
+      ],
+      "pos": "v",
+      "gloss": "toser",
+      "chanka_note": "Cuzco-only feature: Ukhuy (aspirate kh) -> Chanka likely 'Ukuy'; ch'oqhu (ejective ch', aspirate qh) -> Chanka likely 'choqu'",
+      "page": 473
+    },
+    {
+      "es": "trabajar",
+      "qu_cuzco": "llank'ay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "trabajar",
+      "chanka_note": "Cuzco-only feature: llank'ay (ejective k') -> Chanka likely 'llankay'",
+      "page": 473
+    },
+    {
+      "es": "traer",
+      "qu_cuzco": "Apamuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "traer",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 473
+    },
+    {
+      "es": "trama",
+      "qu_cuzco": "Mini",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "trama",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 473
+    },
+    {
+      "es": "tres",
+      "qu_cuzco": "núm.card. Kinsa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "tres",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 473
+    },
+    {
+      "es": "triste",
+      "qu_cuzco": "Llakisqa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "triste",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 474
+    },
+    {
+      "es": "tubo",
+      "qu_cuzco": "Toqoro",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "tubo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 474
+    },
+    {
+      "es": "turno",
+      "qu_cuzco": "Mit'a",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "turno",
+      "chanka_note": "Cuzco-only feature: Mit'a (ejective t') -> Chanka likely 'Mita'",
+      "page": 474
+    },
+    {
+      "es": "tutor",
+      "qu_cuzco": "Uywaqe",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "tutor",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 474
+    },
+    {
+      "es": "tuyo",
+      "qu_cuzco": "Qanpa",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "tuyo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 474
+    },
+    {
+      "es": "tía",
+      "qu_cuzco": "ipa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "tía",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 472
+    },
+    {
+      "es": "tío",
+      "qu_cuzco": "paterno: Yaya",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "tío",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 473
+    },
+    {
+      "es": "ubre",
+      "qu_cuzco": "Ñuñu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "ubre",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 474
+    },
+    {
+      "es": "uncir",
+      "qu_cuzco": "Hawiy",
+      "qu_cuzco_synonyms": [
+        "llusiy"
+      ],
+      "pos": "v",
+      "gloss": "uncir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 474
+    },
+    {
+      "es": "ungir",
+      "qu_cuzco": "Hawiy",
+      "qu_cuzco_synonyms": [
+        "llusiy. epa"
+      ],
+      "pos": "v",
+      "gloss": "ungir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 474
+    },
+    {
+      "es": "unir",
+      "qu_cuzco": "Hukllanachiy",
+      "qu_cuzco_synonyms": [
+        "hukllachiy"
+      ],
+      "pos": "v",
+      "gloss": "unir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 475
+    },
+    {
+      "es": "uno",
+      "qu_cuzco": "núm. Huk",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "uno",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 475
+    },
+    {
+      "es": "usted",
+      "qu_cuzco": "Qan",
+      "qu_cuzco_synonyms": [],
+      "pos": "pron",
+      "gloss": "usted",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 475
+    },
+    {
+      "es": "uña",
+      "qu_cuzco": "Sillu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "uña",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 475
+    },
+    {
+      "es": "vaca",
+      "qu_cuzco": "Waka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "vaca",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 475
+    },
+    {
+      "es": "valor",
+      "qu_cuzco": "Chani",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "valor",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "vapor",
+      "qu_cuzco": "Waksi",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "vapor",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "varón",
+      "qu_cuzco": "Qhari",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "varón",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "vena",
+      "qu_cuzco": "Sirk'a",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "vena",
+      "chanka_note": "Cuzco-only feature: Sirk'a (ejective k') -> Chanka likely 'Sirka'",
+      "page": 476
+    },
+    {
+      "es": "vender",
+      "qu_cuzco": "Qhatuy",
+      "qu_cuzco_synonyms": [
+        "ranay"
+      ],
+      "pos": "s",
+      "gloss": "vender",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "venir",
+      "qu_cuzco": "Hamuy",
+      "qu_cuzco_synonyms": [
+        "qanpuy"
+      ],
+      "pos": "v",
+      "gloss": "venir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "ventana",
+      "qu_cuzco": "Qhawana",
+      "qu_cuzco_synonyms": [
+        "qhawarina"
+      ],
+      "pos": "s",
+      "gloss": "ventana",
+      "chanka_note": "Cuzco-only feature: qhawarina (aspirate qh) -> Chanka likely 'qawarina'",
+      "page": 476
+    },
+    {
+      "es": "ver",
+      "qu_cuzco": "Rikuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "ver",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "veraz",
+      "qu_cuzco": "Sut'i",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "veraz",
+      "chanka_note": "Cuzco-only feature: Sut'i (ejective t') -> Chanka likely 'Suti'",
+      "page": 476
+    },
+    {
+      "es": "verdad",
+      "qu_cuzco": "Cheqa",
+      "qu_cuzco_synonyms": [
+        "sullull"
+      ],
+      "pos": "s",
+      "gloss": "verdad",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "verde",
+      "qu_cuzco": "Q'omer",
+      "qu_cuzco_synonyms": [],
+      "pos": "adj",
+      "gloss": "verde",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "verificar",
+      "qu_cuzco": "Cheqaqchay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "verificar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "vestido",
+      "qu_cuzco": "P'acha",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "vestido",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "vestir",
+      "qu_cuzco": "P'achachiy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "vestir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "veta",
+      "qu_cuzco": "Geol. Q'eqe",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "veta",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "viajar",
+      "qu_cuzco": "Riy",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "viajar",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "vicuña",
+      "qu_cuzco": "Wik'uña",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "vicuña",
+      "chanka_note": "Cuzco-only feature: Wik'uña (ejective k') -> Chanka likely 'Wikuña'",
+      "page": 476
+    },
+    {
+      "es": "vida",
+      "qu_cuzco": "Kawsay",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "vida",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "viento",
+      "qu_cuzco": "Meteor. Wayra",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "viento",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "vientre",
+      "qu_cuzco": "Wiksa",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "vientre",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "viga",
+      "qu_cuzco": "Kurku",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "viga",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 476
+    },
+    {
+      "es": "vigilar",
+      "qu_cuzco": "Qhaway",
+      "qu_cuzco_synonyms": [
+        "qhawapayay"
+      ],
+      "pos": "v",
+      "gloss": "vigilar",
+      "chanka_note": "Cuzco-only feature: qhawapayay (aspirate qh) -> Chanka likely 'qawapayay'",
+      "page": 477
+    },
+    {
+      "es": "violencia",
+      "qu_cuzco": "Atipakuy",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "violencia",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 477
+    },
+    {
+      "es": "viuda",
+      "qu_cuzco": "Ikma",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "viuda",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 477
+    },
+    {
+      "es": "viudo",
+      "qu_cuzco": "Pasu",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "viudo",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 477
+    },
+    {
+      "es": "vivir",
+      "qu_cuzco": "Kawsay",
+      "qu_cuzco_synonyms": [],
+      "pos": "v",
+      "gloss": "vivir",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 477
+    },
+    {
+      "es": "voz",
+      "qu_cuzco": "Fisiol. Kunka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "voz",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 477
+    },
+    {
+      "es": "ya",
+      "qu_cuzco": "Ña",
+      "qu_cuzco_synonyms": [
+        "ñan"
+      ],
+      "pos": "adv",
+      "gloss": "ya",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 477
+    },
+    {
+      "es": "yema",
+      "qu_cuzco": "Runtuq q'ellun",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "yema",
+      "chanka_note": "Cuzco-only feature: Runtuq q'ellun (ejective q') -> Chanka likely 'Runtuq qellun'",
+      "page": 478
+    },
+    {
+      "es": "yerba",
+      "qu_cuzco": "Qora",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "yerba",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 478
+    },
+    {
+      "es": "yerno",
+      "qu_cuzco": "Qatay",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "yerno",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 478
+    },
+    {
+      "es": "zonzo",
+      "qu_cuzco": "Upa",
+      "qu_cuzco_synonyms": [
+        "oqa. f oqatarpu",
+        "hat'upa",
+        "hanrapa"
+      ],
+      "pos": "adj",
+      "gloss": "zonzo",
+      "chanka_note": "Cuzco-only feature: hat'upa (ejective t') -> Chanka likely 'hatupa'",
+      "page": 479
+    },
+    {
+      "es": "ácil",
+      "qu_cuzco": "Atiylla",
+      "qu_cuzco_synonyms": [
+        "atinalla"
+      ],
+      "pos": "adj",
+      "gloss": "ácil",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 434
+    },
+    {
+      "es": "ágil",
+      "qu_cuzco": "Ch'iti",
+      "qu_cuzco_synonyms": [
+        "k'uchi"
+      ],
+      "pos": "adj",
+      "gloss": "ágil",
+      "chanka_note": "Cuzco-only feature: k'uchi (ejective k') -> Chanka likely 'kuchi'",
+      "page": 405
+    },
+    {
+      "es": "águila",
+      "qu_cuzco": "Anka",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "águila",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 405
+    },
+    {
+      "es": "ángel",
+      "qu_cuzco": "Killki",
+      "qu_cuzco_synonyms": [
+        "k'illki"
+      ],
+      "pos": "s",
+      "gloss": "ángel",
+      "chanka_note": "Cuzco-only feature: k'illki (ejective k') -> Chanka likely 'killki'",
+      "page": 407
+    },
+    {
+      "es": "árbol",
+      "qu_cuzco": "Mallki",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "árbol",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 408
+    },
+    {
+      "es": "árido",
+      "qu_cuzco": "Purun",
+      "qu_cuzco_synonyms": [
+        "ch'aki"
+      ],
+      "pos": "adj",
+      "gloss": "árido",
+      "chanka_note": "Cuzco-only feature: ch'aki (ejective ch') -> Chanka likely 'chaki'",
+      "page": 408
+    },
+    {
+      "es": "época",
+      "qu_cuzco": "Mit'a",
+      "qu_cuzco_synonyms": [],
+      "pos": "s",
+      "gloss": "época",
+      "chanka_note": "Cuzco-only feature: Mit'a (ejective t') -> Chanka likely 'Mita'",
+      "page": 431
+    },
+    {
+      "es": "útil",
+      "qu_cuzco": "alli",
+      "qu_cuzco_synonyms": [
+        "allin kaq"
+      ],
+      "pos": "adj",
+      "gloss": "útil",
+      "chanka_note": "shared root (no Cuzco-only ejectives/aspirates)",
+      "page": 475
+    }
+  ]
+}

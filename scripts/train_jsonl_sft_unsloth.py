@@ -112,6 +112,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Comma-separated 0-indexed decoder layer ids to apply LoRA to. Default: all layers.",
     )
+    parser.add_argument(
+        "--enable-thinking",
+        action="store_true",
+        default=False,
+        help="Train with Qwen3.5 native <think> blocks enabled in the chat template. "
+             "Targets must already contain <think>...</think>{final} formatting.",
+    )
     parser.add_argument("--weight-decay", type=float, default=0.01)
     parser.add_argument(
         "--optim",
@@ -324,6 +331,7 @@ def format_example(
     prompt_self_verification: bool = False,
     prompt_self_verification_thinking: bool = False,
     prompt_self_verification_compact: bool = False,
+    enable_thinking: bool = False,
 ) -> dict[str, str]:
     row_self_verification, row_thinking, row_compact, row_engineered = prompt_flags_for_row(
         row,
@@ -342,8 +350,10 @@ def format_example(
         ),
         {"role": "assistant", "content": row["target"]},
     ]
+    template_fn = (gspo.apply_chat_template_with_thinking if enable_thinking
+                   else gspo.apply_chat_template_no_thinking)
     return {
-        "text": gspo.apply_chat_template_no_thinking(
+        "text": template_fn(
             tokenizer,
             messages,
             tokenize=False,
@@ -364,6 +374,7 @@ def build_dataset(
     prompt_self_verification: bool = False,
     prompt_self_verification_thinking: bool = False,
     prompt_self_verification_compact: bool = False,
+    enable_thinking: bool = False,
 ) -> Dataset:
     return Dataset.from_list(
         [
@@ -375,6 +386,7 @@ def build_dataset(
                 prompt_self_verification,
                 prompt_self_verification_thinking,
                 prompt_self_verification_compact,
+                enable_thinking,
             )
             for row in rows
         ]
@@ -481,6 +493,7 @@ def main() -> None:
         args.prompt_self_verification,
         args.prompt_self_verification_thinking,
         args.prompt_self_verification_compact,
+        enable_thinking=args.enable_thinking,
     )
     eval_dataset = build_dataset(
         tokenizer,
@@ -490,6 +503,7 @@ def main() -> None:
         args.prompt_self_verification,
         args.prompt_self_verification_thinking,
         args.prompt_self_verification_compact,
+        enable_thinking=args.enable_thinking,
     )
     configure_step_schedule(args, len(train_dataset))
 

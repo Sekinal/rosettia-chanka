@@ -523,6 +523,15 @@ def apply_chat_template_no_thinking(tokenizer, messages: list[dict[str, str]], *
         return text_tokenizer.apply_chat_template(messages, **kwargs)
 
 
+def apply_chat_template_with_thinking(tokenizer, messages: list[dict[str, str]], **kwargs):
+    """Apply chat templates with reasoning enabled (Qwen3.5 native <think> blocks)."""
+    text_tokenizer = generation_text_tokenizer(tokenizer)
+    try:
+        return text_tokenizer.apply_chat_template(messages, enable_thinking=True, **kwargs)
+    except TypeError:
+        return text_tokenizer.apply_chat_template(messages, **kwargs)
+
+
 def force_tokenizer_no_thinking_template(tokenizer) -> bool:
     """Make TRL's implicit chat-template rendering close Qwen thinking tags.
 
