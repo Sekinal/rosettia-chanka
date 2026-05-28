@@ -31,10 +31,19 @@ def make_chat_prompt(tokenizer, system: str, user: str) -> str:
         return tokenizer.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
 
 
-def extract_normalized(text: str) -> str:
-    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
-    m = re.search(r"Normalized\s*:\s*(.+?)(?:\n|$)", text, flags=re.DOTALL)
-    return m.group(1).strip().strip('"') if m else text.strip()
+def extract_normalized(text: str, fallback: str | None = None) -> str:
+    """Pull the 'Normalized: ...' line. If the model emitted only a trace
+    (no Normalized: line), fall back to the original input rather than dumping
+    raw trace text into the corpus."""
+    body = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    m = re.search(r"Normalized\s*:\s*(.+?)(?:\n|$)", body, flags=re.DOTALL)
+    if m:
+        return m.group(1).strip().strip('"')
+    # No Normalized: line. If a trace block is still present, the model never
+    # produced an answer → safest is identity (preserve input).
+    if "<think>" in text or "Tokens:" in text or fallback is not None:
+        return fallback if fallback is not None else body.strip()
+    return body.strip()
 
 
 def main():
@@ -94,7 +103,7 @@ def main():
             outs = llm.generate(prompts, sampling, lora_request=lora)
             for r, o in zip(batch, outs):
                 raw = o.outputs[0].text
-                normalized = extract_normalized(raw)
+                normalized = extract_normalized(raw, fallback=r[args.input_field])
                 rec = dict(r)
                 rec["original"] = r[args.input_field]
                 rec[args.input_field + "_normalized"] = normalized
