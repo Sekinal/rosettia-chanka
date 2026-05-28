@@ -1,0 +1,1130 @@
+{
+  "metadata": {
+    "source": "Benito Zuasnabar 2018, Diccionario Básico Quechua Chanka",
+    "variety": "Chanka (Ayacucho-Huancavelica)",
+    "n_qu_es_headwords": 3,
+    "n_es_qu_headwords": 373,
+    "n_es_lemmas_merged": 368,
+    "n_total_pairs": 382
+  },
+  "es_to_chanka": {
+    "abandonar": [
+      "saqiy"
+    ],
+    "abrir": [
+      "kichay"
+    ],
+    "abrirse": [
+      "panchi"
+    ],
+    "adentro": [
+      "uku"
+    ],
+    "adormecerse": [
+      "susunkay"
+    ],
+    "afuera": [
+      "hawa"
+    ],
+    "agua": [
+      "yaku"
+    ],
+    "ají": [
+      "uchu"
+    ],
+    "alcanzar": [
+      "chayay"
+    ],
+    "alegrar": [
+      "kusichiy"
+    ],
+    "alegrarse": [
+      "kusikuy"
+    ],
+    "algunos": [
+      "wakin"
+    ],
+    "allá": [
+      "chaypi"
+    ],
+    "alrededor": [
+      "muyu"
+    ],
+    "alumno": [
+      "yachaq"
+    ],
+    "amanecer": [
+      "paqariy"
+    ],
+    "amar": [
+      "kuyay"
+    ],
+    "amarillo": [
+      "qillu"
+    ],
+    "anciana": [
+      "paya"
+    ],
+    "anciano": [
+      "machu"
+    ],
+    "anidar": [
+      "qisachay"
+    ],
+    "anoche": [
+      "chisi"
+    ],
+    "anterior": [
+      "ñawpaq"
+    ],
+    "antes": [
+      "qayna"
+    ],
+    "aparecer": [
+      "rikuriy"
+    ],
+    "aplastar": [
+      "ñitiy"
+    ],
+    "aprender": [
+      "yachakuy"
+    ],
+    "aquí": [
+      "kay"
+    ],
+    "arar": [
+      "yapuy"
+    ],
+    "arder": [
+      "rupay"
+    ],
+    "arriba": [
+      "hanaq"
+    ],
+    "asado": [
+      "kanka"
+    ],
+    "así": [
+      "chayna",
+      "hina"
+    ],
+    "ayer": [
+      "qayna"
+    ],
+    "ayudar": [
+      "yanapay"
+    ],
+    "año": [
+      "wata"
+    ],
+    "bailar": [
+      "tusuy"
+    ],
+    "barrer": [
+      "pichay"
+    ],
+    "barriga": [
+      "wiksa"
+    ],
+    "beber": [
+      "upyay"
+    ],
+    "bello": [
+      "sumaq"
+    ],
+    "besar": [
+      "muchay"
+    ],
+    "blanco": [
+      "yuraq"
+    ],
+    "boca": [
+      "simi"
+    ],
+    "borracho": [
+      "machasqa"
+    ],
+    "bosque": [
+      "sacha"
+    ],
+    "bravo": [
+      "piña"
+    ],
+    "brazo": [
+      "marqa"
+    ],
+    "buscar": [
+      "maskay"
+    ],
+    "cabeza": [
+      "uma"
+    ],
+    "cada": [
+      "sapa"
+    ],
+    "caerse": [
+      "urmay"
+    ],
+    "calentarse": [
+      "quñiy"
+    ],
+    "caliente": [
+      "quñi"
+    ],
+    "caminar": [
+      "puriy"
+    ],
+    "candela": [
+      "nina"
+    ],
+    "cansado": [
+      "pisipasqa"
+    ],
+    "cansarse": [
+      "pisipay"
+    ],
+    "cantar": [
+      "takiy"
+    ],
+    "cara": [
+      "uya"
+    ],
+    "carne": [
+      "aycha"
+    ],
+    "casa": [
+      "wasi"
+    ],
+    "casi": [
+      "yaqa"
+    ],
+    "castigar": [
+      "panyay"
+    ],
+    "cejas": [
+      "qiñipa"
+    ],
+    "centro": [
+      "chawpi"
+    ],
+    "cerro": [
+      "urqu"
+    ],
+    "chicha": [
+      "aqa"
+    ],
+    "cinco": [
+      "pichqa"
+    ],
+    "cintura": [
+      "wiqaw"
+    ],
+    "cocinar": [
+      "yanuy"
+    ],
+    "coger": [
+      "hapiy"
+    ],
+    "cola": [
+      "chupa"
+    ],
+    "colocar": [
+      "churay"
+    ],
+    "comedor": [
+      "mikuna"
+    ],
+    "comida": [
+      "mikuna"
+    ],
+    "completar": [
+      "huntay",
+      "tukupay"
+    ],
+    "comprar": [
+      "rantiy"
+    ],
+    "conocer": [
+      "riqsiy"
+    ],
+    "conocerse": [
+      "riqsinakuy"
+    ],
+    "conocido": [
+      "riqsisqa"
+    ],
+    "contento": [
+      "kusisqa"
+    ],
+    "conversar": [
+      "rimanakuy"
+    ],
+    "corazón": [
+      "sunqu"
+    ],
+    "correr": [
+      "kallpay"
+    ],
+    "criar": [
+      "uyway"
+    ],
+    "cuatro": [
+      "tawa"
+    ],
+    "cuello": [
+      "kunka"
+    ],
+    "curarse": [
+      "hampikuy"
+    ],
+    "cuál": [
+      "mayqin"
+    ],
+    "cuándo": [
+      "haykap"
+    ],
+    "cuánto": [
+      "hayka"
+    ],
+    "cómo": [
+      "imayna"
+    ],
+    "dar": [
+      "quy"
+    ],
+    "decir": [
+      "niy"
+    ],
+    "dedos": [
+      "rukana",
+      "rukuna"
+    ],
+    "dejar": [
+      "saqiy"
+    ],
+    "demasiado": [
+      "llumpay"
+    ],
+    "derecha": [
+      "alliq"
+    ],
+    "derrumbarse": [
+      "tuniy"
+    ],
+    "descansar": [
+      "samay"
+    ],
+    "descanso": [
+      "samay"
+    ],
+    "desear": [
+      "munay"
+    ],
+    "desnudo": [
+      "qala"
+    ],
+    "después": [
+      "chaymanta",
+      "qipa"
+    ],
+    "detener": [
+      "harkay"
+    ],
+    "detrás": [
+      "qipa"
+    ],
+    "diablo": [
+      "supay"
+    ],
+    "dientes": [
+      "kiru"
+    ],
+    "diez": [
+      "chunka"
+    ],
+    "difícil": [
+      "sasa"
+    ],
+    "dinero": [
+      "qullqi"
+    ],
+    "doler": [
+      "nanay"
+    ],
+    "dormir": [
+      "puñuy"
+    ],
+    "dos": [
+      "iskay"
+    ],
+    "día": [
+      "punchaw"
+    ],
+    "dónde": [
+      "may"
+    ],
+    "ella": [
+      "pay"
+    ],
+    "ellas": [
+      "paykuna"
+    ],
+    "ellos": [
+      "paykuna"
+    ],
+    "emborracharse": [
+      "machay"
+    ],
+    "empezar": [
+      "qallariy"
+    ],
+    "empujar": [
+      "tusapay"
+    ],
+    "encontrar": [
+      "tariy"
+    ],
+    "encontrarse": [
+      "tinkuy",
+      "tupay"
+    ],
+    "enfermarse": [
+      "unqukuy"
+    ],
+    "enfermedad": [
+      "unquy"
+    ],
+    "enseñar": [
+      "yachachiy"
+    ],
+    "entonces": [
+      "chaynaqa"
+    ],
+    "entrar": [
+      "yaykuy"
+    ],
+    "entristecerse": [
+      "llakikuy"
+    ],
+    "enviar": [
+      "kachay"
+    ],
+    "equivocarse": [
+      "pantay"
+    ],
+    "escapar": [
+      "ayqiy",
+      "lluptiy"
+    ],
+    "escoger": [
+      "akllay"
+    ],
+    "escogida": [
+      "akllasqa"
+    ],
+    "esconder": [
+      "pakay"
+    ],
+    "escribir": [
+      "qillqay"
+    ],
+    "escrito": [
+      "qillqa"
+    ],
+    "escuchar": [
+      "uyariy"
+    ],
+    "ese": [
+      "chay"
+    ],
+    "eso": [
+      "chay"
+    ],
+    "espacio": [
+      "pacha"
+    ],
+    "espalda": [
+      "wasa"
+    ],
+    "esperar": [
+      "suyay"
+    ],
+    "esposa": [
+      "warmi"
+    ],
+    "esposo": [
+      "qusa"
+    ],
+    "estar": [
+      "kachkay"
+    ],
+    "este": [
+      "kay"
+    ],
+    "esto": [
+      "kay"
+    ],
+    "estrella": [
+      "quyllur"
+    ],
+    "estudiar": [
+      "yachakuy"
+    ],
+    "excremento": [
+      "aka"
+    ],
+    "faltar": [
+      "pisiy"
+    ],
+    "fermentarse": [
+      "puquy"
+    ],
+    "fila": [
+      "siqi"
+    ],
+    "fogata": [
+      "qunukuy"
+    ],
+    "frente": [
+      "urku"
+    ],
+    "frío": [
+      "chiri"
+    ],
+    "fuerte": [
+      "sinchi"
+    ],
+    "fuerza": [
+      "kallpa"
+    ],
+    "fumar": [
+      "pitay"
+    ],
+    "gallina": [
+      "wallpa"
+    ],
+    "ganar": [
+      "llalliy"
+    ],
+    "gato": [
+      "misi"
+    ],
+    "girar": [
+      "muyuy"
+    ],
+    "grasa": [
+      "wira"
+    ],
+    "grupo": [
+      "ayllu"
+    ],
+    "guardar": [
+      "churay"
+    ],
+    "hablar": [
+      "rimay"
+    ],
+    "hacer": [
+      "ruway"
+    ],
+    "hembra": [
+      "china"
+    ],
+    "hermana de mujer": [
+      "ñaña"
+    ],
+    "hermana de varón": [
+      "pani"
+    ],
+    "hermano de mujer": [
+      "turi"
+    ],
+    "hermano de varón": [
+      "wawqi"
+    ],
+    "hija de mujer": [
+      "warmi"
+    ],
+    "hija de varón": [
+      "warmi"
+    ],
+    "hijo de mujer": [
+      "qariwawa"
+    ],
+    "hijo de varón": [
+      "qarichuri"
+    ],
+    "hueco": [
+      "uchku"
+    ],
+    "hueso": [
+      "tullu"
+    ],
+    "huevo": [
+      "runtu"
+    ],
+    "huir": [
+      "lluptiy"
+    ],
+    "húmedo": [
+      "uqu"
+    ],
+    "impedir": [
+      "harkay"
+    ],
+    "ir": [
+      "riy"
+    ],
+    "izquierda": [
+      "lluqi"
+    ],
+    "joven": [
+      "musu"
+    ],
+    "jugar": [
+      "pukllay"
+    ],
+    "junto": [
+      "qaylla"
+    ],
+    "juntos": [
+      "kuska"
+    ],
+    "justo": [
+      "kamaq"
+    ],
+    "ladrón": [
+      "suwa"
+    ],
+    "lago": [
+      "qucha"
+    ],
+    "leer": [
+      "ñawinchay"
+    ],
+    "lejos": [
+      "karu"
+    ],
+    "lengua": [
+      "qallu"
+    ],
+    "levantarse": [
+      "hatariy"
+    ],
+    "liberar": [
+      "kachariy",
+      "qispichiy"
+    ],
+    "llamar": [
+      "qayay"
+    ],
+    "llenarse": [
+      "saksay"
+    ],
+    "llevar": [
+      "apay"
+    ],
+    "llorar": [
+      "waqay"
+    ],
+    "lluvia": [
+      "para"
+    ],
+    "luna": [
+      "killa"
+    ],
+    "macho": [
+      "urqu"
+    ],
+    "mamá": [
+      "mama"
+    ],
+    "mano": [
+      "maki"
+    ],
+    "masticar": [
+      "kachuy"
+    ],
+    "matar": [
+      "sipiy",
+      "wañuchiy"
+    ],
+    "maíz": [
+      "sara"
+    ],
+    "mañana": [
+      "paqarin"
+    ],
+    "medio": [
+      "chawpi"
+    ],
+    "mentón": [
+      "kakichu"
+    ],
+    "mes": [
+      "killa"
+    ],
+    "meter": [
+      "wiinay"
+    ],
+    "mil": [
+      "waranqa"
+    ],
+    "mirar": [
+      "qaway"
+    ],
+    "mojarse": [
+      "nuyuy"
+    ],
+    "moler": [
+      "kutay"
+    ],
+    "molestarse": [
+      "piñakuy"
+    ],
+    "molesto": [
+      "piña"
+    ],
+    "montar": [
+      "siqay"
+    ],
+    "morir": [
+      "wañuy"
+    ],
+    "mover": [
+      "asuy"
+    ],
+    "moverse": [
+      "kuyuy"
+    ],
+    "muchacha": [
+      "pasña"
+    ],
+    "mucho": [
+      "achka"
+    ],
+    "muchos": [
+      "achka"
+    ],
+    "mujer": [
+      "warmi"
+    ],
+    "mundo": [
+      "tiqsi"
+    ],
+    "muy": [
+      "ancha",
+      "nisyu"
+    ],
+    "más": [
+      "aswan"
+    ],
+    "nalgas": [
+      "siki"
+    ],
+    "nariz": [
+      "sinqa"
+    ],
+    "narrar": [
+      "willay"
+    ],
+    "negro": [
+      "chillu",
+      "yana"
+    ],
+    "nido": [
+      "qisa"
+    ],
+    "niño": [
+      "warma"
+    ],
+    "no": [
+      "mana"
+    ],
+    "noche": [
+      "tuta"
+    ],
+    "nombre": [
+      "suti"
+    ],
+    "nosotros": [
+      "ñuqayku"
+    ],
+    "nube": [
+      "puyu"
+    ],
+    "nueve": [
+      "isqun"
+    ],
+    "numerar": [
+      "yupay"
+    ],
+    "obedecer": [
+      "kasuy"
+    ],
+    "ocho": [
+      "pusaq"
+    ],
+    "ocioso": [
+      "qilla"
+    ],
+    "ocurrir": [
+      "imanay"
+    ],
+    "ojo": [
+      "ñawi"
+    ],
+    "oler": [
+      "muskiy"
+    ],
+    "olvidarse": [
+      "qunqay"
+    ],
+    "oreja": [
+      "rinri"
+    ],
+    "otros": [
+      "wakin"
+    ],
+    "oveja": [
+      "chita"
+    ],
+    "padre": [
+      "tayta,"
+    ],
+    "pan": [
+      "tanta"
+    ],
+    "pared": [
+      "pirqa"
+    ],
+    "parir": [
+      "wachay"
+    ],
+    "pasado": [
+      "mañana"
+    ],
+    "patear": [
+      "haytay"
+    ],
+    "pecho": [
+      "qasqu"
+    ],
+    "pedir": [
+      "mañay"
+    ],
+    "pegar": [
+      "maqay"
+    ],
+    "pelo": [
+      "chukcha"
+    ],
+    "pena": [
+      "llaki"
+    ],
+    "pensar": [
+      "yuyay"
+    ],
+    "pero": [
+      "ichaqa"
+    ],
+    "perro": [
+      "allqu"
+    ],
+    "persona": [
+      "runa"
+    ],
+    "pestañas": [
+      "qichirpa"
+    ],
+    "pez": [
+      "challwa"
+    ],
+    "peñón": [
+      "qaqa"
+    ],
+    "pie": [
+      "chaki"
+    ],
+    "piedra": [
+      "rumi"
+    ],
+    "piel": [
+      "qara"
+    ],
+    "pierna": [
+      "chaka"
+    ],
+    "plata": [
+      "qullqi"
+    ],
+    "poco": [
+      "pisi,"
+    ],
+    "poder": [
+      "atiy"
+    ],
+    "polvo": [
+      "allpa"
+    ],
+    "poner": [
+      "hinay"
+    ],
+    "por qué": [
+      "imanasqa"
+    ],
+    "preguntar": [
+      "tapuy"
+    ],
+    "primero": [
+      "qallariq"
+    ],
+    "probar": [
+      "malliy"
+    ],
+    "profesor": [
+      "yachachiq"
+    ],
+    "pueblo": [
+      "llaqta"
+    ],
+    "puerta": [
+      "punku"
+    ],
+    "puna": [
+      "sallqa"
+    ],
+    "quechua": [
+      "qichwa"
+    ],
+    "querer": [
+      "munay"
+    ],
+    "qué": [
+      "ima"
+    ],
+    "rama": [
+      "chapra"
+    ],
+    "ratón": [
+      "ukucha"
+    ],
+    "recordar": [
+      "yuyay"
+    ],
+    "regar": [
+      "parquy"
+    ],
+    "repartir": [
+      "aypuy"
+    ],
+    "responder": [
+      "kutichiy"
+    ],
+    "reunir": [
+      "huñuy"
+    ],
+    "reventar": [
+      "panchiy"
+    ],
+    "roca": [
+      "qaqa"
+    ],
+    "rodilla": [
+      "muqu"
+    ],
+    "rojo": [
+      "puka"
+    ],
+    "romper": [
+      "pakiy"
+    ],
+    "ropa": [
+      "pacha"
+    ],
+    "río": [
+      "mayu"
+    ],
+    "saber": [
+      "yachay"
+    ],
+    "sacar": [
+      "qurquy"
+    ],
+    "sal": [
+      "kachi"
+    ],
+    "salir": [
+      "lluqsiy"
+    ],
+    "secarse": [
+      "chakiy"
+    ],
+    "seis": [
+      "suqta"
+    ],
+    "sembrar": [
+      "tarpuy"
+    ],
+    "semilla": [
+      "muhu"
+    ],
+    "sentarse": [
+      "tiyay"
+    ],
+    "separar": [
+      "rakiy"
+    ],
+    "ser": [
+      "kay"
+    ],
+    "servir": [
+      "qaray"
+    ],
+    "señor": [
+      "tayta"
+    ],
+    "señora": [
+      "mama"
+    ],
+    "siete": [
+      "qanchis"
+    ],
+    "sobrino": [
+      "mulla"
+    ],
+    "sol": [
+      "inti"
+    ],
+    "soltar": [
+      "kachari"
+    ],
+    "soplar": [
+      "pukuy"
+    ],
+    "sostener": [
+      "tusapay"
+    ],
+    "soñar": [
+      "musquy"
+    ],
+    "subir": [
+      "siqay"
+    ],
+    "sucio": [
+      "qacha"
+    ],
+    "suspender": [
+      "taniy"
+    ],
+    "suspendido": [
+      "tanisqa"
+    ],
+    "tamaño": [
+      "sayay"
+    ],
+    "tendón": [
+      "anku"
+    ],
+    "terminar": [
+      "tukuy"
+    ],
+    "tiempo": [
+      "pacha",
+      "unay"
+    ],
+    "tierra": [
+      "allpa"
+    ],
+    "todo": [
+      "tukuy"
+    ],
+    "todos": [
+      "llapa",
+      "lliw"
+    ],
+    "tostar": [
+      "hamkay"
+    ],
+    "trabajador": [
+      "llamkaq"
+    ],
+    "trabajar": [
+      "llamkay"
+    ],
+    "traer": [
+      "apamuy",
+      "pusay"
+    ],
+    "tragar": [
+      "rakray"
+    ],
+    "trepar": [
+      "siqay"
+    ],
+    "tres": [
+      "kimsa"
+    ],
+    "triste": [
+      "llakisqa"
+    ],
+    "tú": [
+      "qam"
+    ],
+    "ustedes": [
+      "qamkuna"
+    ],
+    "uña": [
+      "sillu"
+    ],
+    "vacaciones": [
+      "samay"
+    ],
+    "vamos": [
+      "haku"
+    ],
+    "varón": [
+      "qari"
+    ],
+    "vencer": [
+      "atipay"
+    ],
+    "vender": [
+      "rantikuy"
+    ],
+    "venir": [
+      "hamuy"
+    ],
+    "ver": [
+      "rikuy"
+    ],
+    "viajar": [
+      "illay"
+    ],
+    "vivir": [
+      "kawsay",
+      "tiyay"
+    ],
+    "volar": [
+      "paway"
+    ],
+    "voltearse": [
+      "muyuy"
+    ],
+    "yo": [
+      "ñuqa"
+    ],
+    "zorro": [
+      "atuq"
+    ],
+    "¡oye!": [
+      "yaw"
+    ],
+    "árbol": [
+      "sacha"
+    ],
+    "él": [
+      "pay"
+    ]
+  }
+}
