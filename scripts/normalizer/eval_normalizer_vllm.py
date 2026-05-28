@@ -75,6 +75,31 @@ GOLD_PAIRS = [
     ("Cuzco llaqtam sumaq", "Qusqu llaqtam sumaq"),
     # S2 — suffix preservation
     ("mamanchix kuchkan", "mamanchik kuchkan"),
+    # §8.5 conservative fallback — religious proper nouns preserved
+    ("Jehová Diosqa rimarqan", "Jehová Diosqa rimarqan"),
+    ("Jesus hamurqan llaqtaman", "Jesus hamurqan llaqtaman"),
+    ("Dios munakuwanchik", "Dios munakuwanchik"),
+    # §8.5 — acronyms preserved
+    ("MINEDU kamachikuq", "MINEDU kamachikuq"),
+    ("UNESCO yanapan", "UNESCO yanapan"),
+    # §L0 — nisqa NOT stripped after foreign technical
+    ("Fe nisqaqa qillaymi", "Fe nisqaqa qillaymi"),
+    ("Falco sparverius nisqaqa pisqum", "Falco sparverius nisqaqa pisqum"),
+    # §8.6 — Spanish multi-word span preserved
+    ('Atuqsi nirqa "Dios mío" nispa', 'Atuqsi nirqa "Dios mío" nispa'),
+    # §L3 — Quechua surname in Spanish form preserved (the L3 carve-out we added)
+    ("Tayta Huamanmi rimarqan", "Tayta Huamanmi rimarqan"),
+    ("Quispe wawqiymi", "Quispe wawqiymi"),
+    # §6.5 — numerals unchanged
+    ("20 wawakuna hamurqaku", "20 wawakuna hamurqaku"),
+    ("iskay chunka wawakuna hamurqaku", "iskay chunka wawakuna hamurqaku"),
+    # No-change case: already MINEDU-compliant
+    ("Allillanmi taytáy", "Allillanmi taytáy"),
+    ("Ñuqa kachkani wasipi", "Ñuqa kachkani wasipi"),
+    # Multi-rule combined
+    ("Ñoqa qosqopi kachkani", "Ñuqa qusqupi kachkani"),
+    ("ñoqamanta phullu sumaqmi", "ñuqamanta pullu sumaqmi"),
+    ("Tayta Inti qhawayta munachkan", "Tayta Inti qawayta munachkan"),
 ]
 
 
