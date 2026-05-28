@@ -177,13 +177,19 @@ For each Spanish concept C:
 
 **No tie-break dilemmas.** Tables L1b, L1c, L1d below enumerate every concept we've encountered. If a new concept appears at training time, classify with the decision tree above; if uncertain, default to step 3 (Spanish surface).
 
-**`nisqa` marker policy (HARD RULE).** ALWAYS strip the calque marker `nisqa` (and orthographic variant `ñisqa`) when it immediately follows a Spanish-form loanword in narrative prose. The marker is pedagogically useful but absent from AmericasNLP 2021 test references; keeping it adds surface-form variation the model would have to learn to suppress.
+**`nisqa` marker policy (HARD RULE — refined).** ALWAYS strip the calque marker `nisqa` (and orthographic variant `ñisqa`) when it immediately follows EITHER:
 
-- `Televisor nisqatam rantirqamusqa` → `Televisortam rantirqamusqa`
-- `computadora nisqapi` → `computadorapi`
-- `Tablet nisqawan` → `Tabletwan`
+1. A category-(c) Spanish-form loanword from §L1c table (e.g., `Televisor nisqa → Televisor`, `computadora nisqa → computadora`).
+2. A category-(b) refonologized loanword from §L1b table (e.g., `iskuyla nisqa → iskuyla`).
 
-Suffixes that previously attached to `nisqa` re-attach directly to the loan stem.
+DO NOT strip `nisqa` when it follows:
+
+- Foreign technical/scientific names (chemical elements `Fe`, `K`, `H`, gas/mineral names cited in Latin/Spanish form, biological taxonomy)
+- Multi-word foreign-language inserts (`(latin simipi: Ferrum) nisqaqa` → preserve `nisqaqa`)
+- Acronyms (`UNESCO nisqaqa → UNESCO nisqaqa`)
+- Tokens that are not in any §L1b/§L1c canonical table
+
+This means `nisqa` survives ONLY when it's marking foreign-source concepts NOT yet absorbed into Quechua as loans. Suffixes that previously attached to `nisqa` re-attach directly to the loan stem when stripping applies.
 
 **Proper nouns are NEVER refonologized.** `Pedro` stays `Pedro`, never `Pidru`. `Ecuador` stays `Ecuador`, never `Ikwadur`. `Kennedy` stays `Kennedy`. This is a hard rule that overrides L1e refonologization sound maps.
 
@@ -337,7 +343,9 @@ Keep Spanish spelling unchanged, attach Quechua suffixes directly:
 
 ### L3 — Anthroponyms / toponyms of Quechua origin (HARD: per-name table)
 
-When the surrounding sentence is in Quechua, apply this fixed table:
+**Anthroponyms (surnames) carve-out.** Quechua-origin surnames written in Spanish form (`Huamán`, `Quispe`, `Mamani`) within a Quechua sentence are PRESERVED in their Spanish surface — they function legally and identity-wise as Spanish-form proper nouns. The L3 table applies ONLY when the source uses the Quechua form (`Waman` already) or when the surname appears in a toponym context (`Huancavelica`).
+
+**Toponym table (HARD: re-spell to Quechua form when in a Quechua sentence):**
 
 | Spanish surface | Canonical Quechua form |
 |---|---|

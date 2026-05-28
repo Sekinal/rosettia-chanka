@@ -1,0 +1,20 @@
+{
+  "n_total_seeds": 2070,
+  "n_labeled": 2070,
+  "n_3_way_agreement": 394,
+  "n_2_way_agreement": 684,
+  "n_single_teacher": 479,
+  "n_disagree": 513,
+  "n_with_gold_expected": 979,
+  "n_gold_match_top_vote": 975,
+  "n_gold_mismatch_top_vote": 4,
+  "by_source": {
+    "synth_v30": 879,
+    "wiki": 600,
+    "amnlp_2021": 400,
+    "runasimi_fallback": 91,
+    "v30_clean": 100
+  },
+  "n_gold_rows_written": 2058,
+  "n_disagree_rows_written": 12
+}

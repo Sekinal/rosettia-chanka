@@ -8,6 +8,7 @@ dependencies = [
     "datasets>=3.4.1,<4.4.0",
     "huggingface-hub>=0.34.0",
     "mwparserfromhell>=0.7.2",
+    "openai>=2.38.0",
     "polars>=1.40.1",
     "pyarrow>=24.0.0",
     "pymupdf>=1.27.2.3",
