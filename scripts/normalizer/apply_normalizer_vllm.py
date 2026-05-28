@@ -74,6 +74,7 @@ def main():
         max_model_len=4096,
         gpu_memory_utilization=args.gpu_mem_frac,
         trust_remote_code=True,
+        enforce_eager=True,
     )
     lora = LoRARequest("normalizer", 1, args.adapter)
     sampling = SamplingParams(temperature=0.0, max_tokens=args.max_new,
