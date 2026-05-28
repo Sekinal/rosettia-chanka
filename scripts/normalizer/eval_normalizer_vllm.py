@@ -103,6 +103,30 @@ GOLD_PAIRS = [
 ]
 
 
+def _safe_token_transform(tok: str) -> str:
+    out = tok.replace("'", "").replace("’", "")
+    for a, b in [("chh", "ch"), ("kh", "k"), ("ph", "p"), ("qh", "q"), ("th", "t")]:
+        out = out.replace(a, b)
+    out = out.replace("e", "i").replace("o", "u").replace("E", "I").replace("O", "U")
+    import re as _re
+    out = _re.sub(r"(?<!l)l(q)", r"ll\1", out)
+    return out
+
+
+def count_corruptions(original: str, proposed: str) -> int:
+    """Count tokens the model changed to something that is NOT the safe transform
+    (i.e. morphology corruption, suffix swap, hallucination, apostrophe/aspirate
+    insertion). Token-count mismatch counts as a full-sentence corruption."""
+    o, p = original.split(), proposed.split()
+    if len(o) != len(p):
+        return max(len(o), len(p))  # split/merge/hallucination
+    bad = 0
+    for ot, pt in zip(o, p):
+        if ot != pt and pt != _safe_token_transform(ot):
+            bad += 1
+    return bad
+
+
 def make_chat_prompt(tokenizer, system: str, user: str) -> str:
     msgs = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     try:
@@ -141,6 +165,9 @@ def main():
     ap.add_argument("--gpu-mem-frac", type=float, default=0.85)
     ap.add_argument("--out-json", required=True)
     ap.add_argument("--out-jsonl", default=None)
+    ap.add_argument("--clean-ref-file", default="docs/references/americasnlp_test/2021_test.quy",
+                    help="Clean MINEDU-compliant refs for the precision/corruption metric.")
+    ap.add_argument("--n-clean", type=int, default=150)
     args = ap.parse_args()
 
     from transformers import AutoTokenizer
@@ -214,6 +241,36 @@ def main():
         print(f"=== HELD-OUT GOLD: {ho_correct}/{len(rows)} = {heldout_acc*100:.1f}% ===")
         print(f"    gen time: {elapsed_heldout:.0f}s")
 
+    # ============================================================
+    # 3) PRECISION: corruption rate on clean held-out text (AmericasNLP refs).
+    #    These are MINEDU-compliant and NEVER in training, so any non-safe-
+    #    transform change is a corruption. This is the metric the §7 list missed.
+    # ============================================================
+    corruption_rate = None
+    n_corrupt_sents = None
+    if args.clean_ref_file and Path(args.clean_ref_file).exists():
+        clean = [l.strip() for l in open(args.clean_ref_file) if l.strip()][: args.n_clean]
+        prompts = [make_chat_prompt(tok, SYSTEM_PROMPT,
+                                    f"Normalize this Chanka sentence per the MINEDU 2021 spec:\n\n{s}")
+                   for s in clean]
+        outs = llm.generate(prompts, sampling, lora_request=lora)
+        total_corrupt = 0
+        n_corrupt_sents = 0
+        clean_results = []
+        for s, out in zip(clean, outs):
+            pred = extract_normalized(out.outputs[0].text)
+            c = count_corruptions(s, pred)
+            total_corrupt += c
+            if c > 0:
+                n_corrupt_sents += 1
+                clean_results.append({"input": s, "predicted": pred, "n_corrupt": c})
+        corruption_rate = n_corrupt_sents / len(clean) if clean else 0.0
+        print(f"=== PRECISION (clean {len(clean)} refs): {n_corrupt_sents} corrupted "
+              f"({corruption_rate*100:.1f}%), {total_corrupt} bad tokens ===")
+
+    # Combined score: recall (spec) minus corruption penalty. Higher = better.
+    combined = spec_acc - (corruption_rate if corruption_rate is not None else 0.0)
+
     # Save
     rec = {
         "adapter": args.adapter,
@@ -224,6 +281,9 @@ def main():
         "heldout_acc": heldout_acc,
         "heldout_correct": ho_correct if args.gold_jsonl else None,
         "heldout_total": len(rows) if args.gold_jsonl else 0,
+        "corruption_rate": corruption_rate,
+        "n_corrupt_sents": n_corrupt_sents,
+        "combined_score": combined,
         "elapsed_spec_sec": elapsed_spec,
     }
     Path(args.out_json).parent.mkdir(parents=True, exist_ok=True)

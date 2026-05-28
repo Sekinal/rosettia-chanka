@@ -31,6 +31,79 @@ def make_chat_prompt(tokenizer, system: str, user: str) -> str:
         return tokenizer.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
 
 
+def _safe_token_transform(tok: str) -> str:
+    """Apply ONLY the bulletproof, reversible character-level Chanka ops to one
+    token: strip apostrophes (R1), de-aspirate (R2), e→i / o→u (R3), l→ll before
+    q (R6). No morphology, no suffix edits, no splits. This is the ONLY edit the
+    model is permitted to trigger on a token."""
+    out = tok.replace("'", "").replace("’", "")
+    out = re.sub(r"chh", "ch", out); out = re.sub(r"kh", "k", out)
+    out = re.sub(r"ph", "p", out);  out = re.sub(r"qh", "q", out)
+    out = re.sub(r"th", "t", out)
+    out = (out.replace("e", "i").replace("o", "u")
+              .replace("E", "I").replace("O", "U"))
+    out = re.sub(r"(?<!l)l(q)", r"ll\1", out)
+    return out
+
+
+def verified_normalize(original: str, proposed: str) -> tuple[str, str | None]:
+    """Token-aligned verification. The model SELECTS which tokens to change
+    (its context judgment protects loans / proper nouns), but each accepted
+    edit must EQUAL the deterministic safe transform of that token. Any edit
+    that isn't a known-safe transform is a corruption → keep the original token.
+
+    Requires same token count (no splits/merges). If counts differ, reject the
+    whole sentence (keep original)."""
+    o_toks, p_toks = original.split(), proposed.split()
+    if len(o_toks) != len(p_toks):
+        return original, "token_count_mismatch"
+    out = []
+    vetoed = 0
+    for ot, pt in zip(o_toks, p_toks):
+        if ot == pt:
+            out.append(ot)
+            continue
+        # model wants to change this token — only allow the safe transform
+        if pt == _safe_token_transform(ot):
+            out.append(pt)
+        else:
+            out.append(ot)  # corruption (suffix swap, q/k, hallucination) → keep
+            vetoed += 1
+    result = " ".join(out)
+    return result, (f"vetoed_{vetoed}_tokens" if vetoed else None)
+
+
+def safe_accept(original: str, proposed: str) -> tuple[str, str | None]:
+    """Veto corrupting normalizations. Returns (accepted_text, reject_reason).
+
+    The model (v43b) reaches 96.9% on clean single-rule inputs but on real
+    corpus text it sometimes (a) INSERTS Cuzco apostrophes into clean Chanka,
+    (b) over-splits agglutinated words, or (c) hallucinates extra text. All
+    three are deterministically detectable; on any of them we keep the original.
+    """
+    o, p = original.strip(), proposed.strip()
+    if o == p:
+        return o, None
+    # (a) Apostrophe insertion — Chanka can only ever LOSE apostrophes.
+    n_apos_o = o.count("'") + o.count("’")
+    n_apos_p = p.count("'") + p.count("’")
+    if n_apos_p > n_apos_o:
+        return o, "apostrophe_inserted"
+    # (b) Token-count increase (over-split). Genuine compound splits are rare;
+    #     a normalizer pass that ADDS tokens is almost always wrong on Chanka
+    #     running text. Allow a decrease (nisqa-strip merges) but not increase.
+    if len(p.split()) > len(o.split()):
+        return o, "token_count_increased"
+    # (c) Hallucination / length explosion — accept only modest length deltas.
+    if len(p) > len(o) + 3:
+        return o, "length_explosion"
+    # (d) Aspirated-digraph INSERTION (model added h to make chh/kh/ph/qh/th).
+    def n_aspir(s): return len(re.findall(r"(chh|kh|ph|qh|th)", s))
+    if n_aspir(p) > n_aspir(o):
+        return o, "aspirate_inserted"
+    return p, None
+
+
 def extract_normalized(text: str, fallback: str | None = None) -> str:
     """Pull the 'Normalized: ...' line. If the model emitted only a trace
     (no Normalized: line), fall back to the original input rather than dumping
@@ -103,8 +176,11 @@ def main():
             outs = llm.generate(prompts, sampling, lora_request=lora)
             for r, o in zip(batch, outs):
                 raw = o.outputs[0].text
-                normalized = extract_normalized(raw, fallback=r[args.input_field])
+                proposed = extract_normalized(raw, fallback=r[args.input_field])
+                normalized, reject_reason = safe_accept(r[args.input_field], proposed)
                 rec = dict(r)
+                rec["safety_reject_reason"] = reject_reason
+                rec["model_proposed"] = proposed
                 rec["original"] = r[args.input_field]
                 rec[args.input_field + "_normalized"] = normalized
                 rec["normalizer_changed"] = (normalized != r[args.input_field])
