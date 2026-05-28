@@ -275,3 +275,34 @@ mangles loans). The gate is irreplaceable for *safety* — guaranteeing the mode
 never corrupts what it does touch. Neither alone is minimal-error; together they
 are. This hybrid (LLM-proposes / deterministic-verifies) is the methodological
 takeaway.
+
+---
+
+## 10. Production run — normalizing the v34 MT training corpus
+
+With the gated normalizer validated, we apply it to the **actual data that will
+train the v34 translator**, to unify orthography across sources (the mixed-
+orthography problem that sank MT v31/v32).
+
+**Corpus.** AmericasNLP 2021 Spanish–Quechua train split: 125 008 aligned
+(quy, es) pairs. Leakage-checked at download: **0** overlap with the 1003-line
+AmericasNLP 2021 test set. The Spanish side is left untouched; only the Chanka
+(`quy`) side is normalized.
+
+**Pipeline.**
+1. vLLM serves `unsloth/Qwen3.5-4B` + LoRA `v45a/checkpoint-1263`
+   (`enforce_eager`, `max_lora_rank=512`).
+2. Each quy sentence → model proposes normalization (with trace) →
+   `verified_normalize` gate accepts only deterministic-safe edits.
+3. Output re-aligned with the untouched Spanish side → v34 parallel corpus.
+
+**Safety inheritance.** Because every emitted line passes the verified gate, the
+0 %-corruption guarantee measured on the held-out probe carries over to the full
+125 k corpus: the normalizer can only apply spec-safe edits or leave a line
+unchanged — it cannot inject morphology errors into the training data. This is
+the property that makes it safe to normalize at scale without human review of
+every line.
+
+**Output:** `data/amnlp_train_quy_normalized.jsonl` (per-line: original quy,
+gated-normalized quy, Spanish, change flag) → folded into the v34 training set
+alongside the (already-clean) v30 corpus.
