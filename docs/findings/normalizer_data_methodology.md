@@ -229,3 +229,49 @@ slip through).
 
 **Teacher models:** DeepSeek-V3 (`deepseek-chat`) for bulk; Anthropic Claude
 (via the Agent tool) for independent passes A/B and tiebreaking.
+
+---
+
+## 9. Final result — the gated system achieves true minimal errors
+
+After v43/v44/v45 it became clear the **raw 4B model cannot hit high recall and
+low corruption simultaneously** — it sits on a Pareto frontier:
+
+| model checkpoint | §7 recall | corruption (200 clean v30 holdout) |
+|---|---:|---:|
+| v43b ckpt-576 | 96.9 % | ~3-4 % |
+| v44a (45 % identity) | ~59 % | 0 % |
+| v45a ckpt-128 | 60.9 % | 4.5 % |
+| v45a ckpt-256 | 87.5 % | 25.5 % |
+| v45a ckpt-384 | 68.8 % | 65 % (!) |
+| **v45a ckpt-1263** | **96.9 %** | 21.5 % |
+
+The corruption is also *unstable* across checkpoints (4.5 → 25.5 → 65 → 21.5 %),
+so no amount of checkpoint-picking yields a trustworthy raw model.
+
+**Solution: model + token-level verified gate** (`verified_normalize`). The model
+proposes which tokens to change (contextual loan / proper-noun protection); the
+gate accepts an edit only if it equals the deterministic safe transform of that
+token (R1-R7 char ops + R4 wordlist + L1b/L3 table lookups + §L0 nisqa-merge).
+Anything else — suffix swap, q/k drift, hallucination, word-split — is reverted
+to the original token. Hallucination is structurally impossible because every
+accepted edit comes from a closed deterministic set.
+
+**Measured on v45a ckpt-1263:**
+
+| system | §7 recall | corruption (200 clean holdout) |
+|---|---:|---:|
+| raw model | 96.9 % | 21.5 % |
+| **+ verified gate** | **96.9 %** | **0.0 %** |
+
+The gate keeps every legitimate correction (recall unchanged at 96.9 %) and
+eliminates all 43 corruptions on clean text. This is the deployed normalizer:
+`apply_normalizer_vllm.py` now routes every output through `verified_normalize`.
+
+**Division of labour.** The ML model is irreplaceable for the *contextual*
+decision — "is this `e` inside a Quechua word (fix it) or inside `Jehová` /
+`Televisor` (leave it)?" — which the deterministic baseline gets wrong (it
+mangles loans). The gate is irreplaceable for *safety* — guaranteeing the model
+never corrupts what it does touch. Neither alone is minimal-error; together they
+are. This hybrid (LLM-proposes / deterministic-verifies) is the methodological
+takeaway.
