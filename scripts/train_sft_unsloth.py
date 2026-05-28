@@ -81,6 +81,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--validation-fraction", type=float, default=None)
     parser.add_argument("--max-train-samples", type=int, default=None)
     parser.add_argument("--max-eval-samples", type=int, default=None)
+    parser.add_argument("--resume-from-checkpoint", type=str, default=None,
+                        help="Path to a checkpoint directory to resume from (loads optimizer state).")
+    parser.add_argument("--chanka-file", type=str, default=None,
+                        help="Override CHANKA_FILE (path within --dataset-repo). Use to swap in the v30 expanded corpus.")
+    parser.add_argument("--gradient-checkpointing", type=str, default="unsloth",
+                        choices=["unsloth", "true", "false"],
+                        help="LoRA gradient checkpointing mode. 'false' uses ~30%% more VRAM but trains ~30%% faster.")
     parser.add_argument("--num-train-epochs", type=float, default=None)
     parser.add_argument("--max-steps", type=int, default=-1)
     parser.add_argument("--learning-rate", type=float, default=None)
@@ -223,7 +230,10 @@ def rows_from_frame(frame: pl.DataFrame, stage: str, source_name: str) -> list[d
 
 
 def load_rows(args: argparse.Namespace) -> list[dict[str, str]]:
-    filenames = BROAD_FILES if args.stage == "broad" else [CHANKA_FILE]
+    if args.stage == "broad":
+        filenames = BROAD_FILES
+    else:
+        filenames = [args.chanka_file] if args.chanka_file else [CHANKA_FILE]
     rows: list[dict[str, str]] = []
     for filename in filenames:
         path = download_parquet(args.dataset_repo, filename)
@@ -557,7 +567,11 @@ def main() -> None:
             "lora_alpha": args.lora_alpha,
             "lora_dropout": args.lora_dropout,
             "bias": "none",
-            "use_gradient_checkpointing": "unsloth",
+            "use_gradient_checkpointing": (
+                False if args.gradient_checkpointing == "false"
+                else True if args.gradient_checkpointing == "true"
+                else "unsloth"
+            ),
             "random_state": args.seed,
             "max_seq_length": args.max_seq_length,
             **adapter_flags(args.adapter_method),
@@ -640,7 +654,7 @@ def main() -> None:
     print(f"Save only model: {args.save_only_model}")
     print(f"Optimizer: {args.optim}")
 
-    trainer.train()
+    trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
     metrics = trainer.evaluate()
     print(metrics)
 
