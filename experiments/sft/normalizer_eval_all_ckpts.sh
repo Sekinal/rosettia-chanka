@@ -29,7 +29,7 @@ for CKPT in $TRAIN_DIR/checkpoint-*; do
     --base unsloth/Qwen3.5-4B \
     --adapter $CKPT \
     --gold-jsonl $HELDOUT --n-heldout 100 \
-    --lora-rank 128 --gpu-mem-frac 0.85 \
+    --lora-rank 512 --gpu-mem-frac 0.85 \
     --out-json $OUT \
     --out-jsonl $EVAL_DIR/ckpt_${N}.preds.jsonl \
     > outputs/logs/eval_$(basename $TRAIN_DIR)_ckpt${N}.log 2>&1
