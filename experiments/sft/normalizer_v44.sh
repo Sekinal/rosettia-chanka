@@ -45,7 +45,7 @@ for IDX in 0 1 2; do
     .venv/bin/python scripts/normalizer/eval_normalizer_vllm.py \
       --base unsloth/Qwen3.5-4B --adapter $CKPT \
       --gold-jsonl $HELDOUT --n-heldout 100 \
-      --clean-ref-file docs/references/americasnlp_test/2021_test.quy --n-clean 150 \
+      --clean-ref-file data/normalizer_precision_holdout.txt --n-clean 200 \
       --lora-rank 512 --gpu-mem-frac 0.85 \
       --out-json $OUT --out-jsonl $EVAL_DIR/ckpt_${N}.preds.jsonl \
       > outputs/logs/eval_${TAG}_ckpt${N}.log 2>&1
