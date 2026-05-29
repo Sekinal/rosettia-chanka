@@ -158,7 +158,8 @@ def extract_normalized(text: str, fallback: str | None = None) -> str:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", required=True)
-    ap.add_argument("--adapter", required=True)
+    ap.add_argument("--adapter", default="none", help="LoRA adapter dir, or 'none' for a merged base model.")
+    ap.add_argument("--compile", action="store_true", help="Enable torch.compile (faster; default eager).")
     ap.add_argument("--input-jsonl", required=True)
     ap.add_argument("--input-field", default="chanka", help="Field name in input JSONL")
     ap.add_argument("--out-jsonl", required=True)
@@ -184,17 +185,18 @@ def main():
     from vllm import LLM, SamplingParams
     from vllm.lora.request import LoRARequest
 
+    use_lora = args.adapter and args.adapter.lower() != "none"
     llm = LLM(
         model=args.base,
-        enable_lora=True,
-        max_lora_rank=args.lora_rank,
+        enable_lora=use_lora,
+        max_lora_rank=args.lora_rank if use_lora else None,
         dtype="bfloat16",
         max_model_len=4096,
         gpu_memory_utilization=args.gpu_mem_frac,
         trust_remote_code=True,
-        enforce_eager=True,
+        enforce_eager=not args.compile,   # compile=faster (merged model only)
     )
-    lora = LoRARequest("normalizer", 1, args.adapter)
+    lora = LoRARequest("normalizer", 1, args.adapter) if use_lora else None
     sampling = SamplingParams(temperature=0.0, max_tokens=args.max_new,
                               stop=["<|im_end|>", "<|endoftext|>"])
 
