@@ -306,3 +306,27 @@ every line.
 **Output:** `data/amnlp_train_quy_normalized.jsonl` (per-line: original quy,
 gated-normalized quy, Spanish, change flag) → folded into the v34 training set
 alongside the (already-clean) v30 corpus.
+
+---
+
+## 11. v34 corpus QC pass (post-normalization)
+
+After normalization + preprocessing, a deeper multi-category QC of the 109,543-pair
+corpus removed **987 (0.90%)** genuine-junk rows → `v34_training_corpus_clean3.jsonl`
+(108,556):
+
+| filter | dropped | nature |
+|---|---:|---|
+| citation-fragment / no-alpha quy | 390 | misaligned (quy = bare verse number) |
+| char-ratio outliers (passed token-ratio τ but extreme char ratio) | 313 | misalignments |
+| near-identical copy-through (sim ≥ 0.92) | 228 | untranslated refs / titles / copyright |
+| scripture-citation-only quy vs real es | 56 | es text → lone quy citation |
+
+**Deliberately NOT dropped (false-positive-heavy):**
+- **numeric_mismatch (6.75%)** — sampling showed these are mostly *legitimate*
+  translations differing only in verse-number phrasing; bulk-dropping would repeat
+  the v31 over-filtering regression.
+- **ALL-CAPS headers (0.84%)** — correctly translated section titles, valid parallel text.
+
+Lesson reaffirmed: aggressive heuristic filtering destroys good low-resource data.
+High-precision, manually-verified filters only.
